@@ -14,6 +14,13 @@ def completed_minute_bars(
     latest_ts: float,
     bar_seconds: float = 60.0,
 ) -> list[MarketBar]:
+    """Build completed sampled minute bars for the current session.
+
+    Volume/turnover are interval deltas only when the previous completed
+    minute is contiguous in the same session, so the previous bar's last
+    cumulative snapshot is a reliable baseline. The first observed bar and
+    any bar after a gap return ``None`` for those fields.
+    """
     if not snapshots or bar_seconds <= 0:
         return []
     forming_start = math.floor(latest_ts / bar_seconds) * bar_seconds
@@ -27,19 +34,16 @@ def completed_minute_bars(
         buckets.setdefault(start, []).append(snapshot)
 
     bars: list[MarketBar] = []
-    last_volume = 0.0
+    prev_end: float | None = None
+    last_volume: float | None = None
     last_turnover: float | None = None
     for start in sorted(buckets):
         group = sorted(buckets[start], key=lambda item: item.market_timestamp)
         last = group[-1]
         prices = [item.price for item in group]
-        bar_volume = max(0.0, last.volume - last_volume)
-        last_volume = last.volume
-        bar_turnover = None
-        if last.turnover is not None:
-            prev_turnover = last_turnover or 0.0
-            bar_turnover = max(0.0, last.turnover - prev_turnover)
-            last_turnover = last.turnover
+        contiguous = prev_end is not None and start == prev_end
+        volume = _interval_delta(last.volume, last_volume, contiguous)
+        turnover = _interval_delta(last.turnover, last_turnover, contiguous)
         bars.append(
             MarketBar(
                 symbol=last.symbol,
@@ -49,8 +53,21 @@ def completed_minute_bars(
                 high=max(prices),
                 low=min(prices),
                 close=prices[-1],
-                volume=bar_volume,
-                turnover=bar_turnover,
+                volume=volume,
+                turnover=turnover,
             )
         )
+        last_volume = last.volume
+        last_turnover = last.turnover
+        prev_end = start + bar_seconds
     return bars
+
+
+def _interval_delta(
+    current: float | None,
+    previous: float | None,
+    contiguous: bool,
+) -> float | None:
+    if not contiguous or current is None or previous is None:
+        return None
+    return max(0.0, current - previous)

@@ -47,6 +47,8 @@ def normalize_snapshot(raw: Mapping[str, Any], clock: Clock) -> MarketSnapshot:
     turnover = None
     if "turnover" in raw and raw["turnover"] is not None:
         turnover = _require_finite_number(raw["turnover"], "turnover")
+        if turnover < 0:
+            raise SnapshotValidationError("invalid turnover")
 
     return MarketSnapshot(
         symbol=symbol,

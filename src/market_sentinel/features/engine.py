@@ -24,6 +24,7 @@ class FeatureEngine:
         if latest is None:
             return None
         high_ref, low_ref = _session_refs(buffer, latest)
+        # Day range uses provider session extremes, not sampled bar OHLC.
         high_now = (
             session_extreme_high(latest)
             if high_ref is None

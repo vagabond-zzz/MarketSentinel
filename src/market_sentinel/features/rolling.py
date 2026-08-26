@@ -34,7 +34,7 @@ def price_change(
     anchor = resolve_anchor(buffer, latest, window_s, policy.max_anchor_lag_s)
     if anchor is None or anchor.price == 0:
         return None
-    return (latest.price - anchor.price) / anchor.price
+    return (latest.price - anchor.price) / anchor.price  # decimal fraction; 0.006 = 0.6%
 
 
 def volume_delta(

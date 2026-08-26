@@ -14,6 +14,24 @@ class FeaturePolicy:
 
 @dataclass(frozen=True)
 class MarketBar:
+    """Sampled / observed 1-minute OHLC from polled snapshots.
+
+    Adaptive polling (1s / 3s / 10s) means this bar is the aggregation of
+    snapshots the process actually saw. It is **not** guaranteed to equal an
+    exchange-published 1-minute K-line.
+
+    ``volume`` / ``turnover`` are interval increments derived from session
+    cumulative snapshot fields. They are ``None`` unless a reliable same-session
+    previous-minute cumulative anchor exists. A missing baseline (mid-session
+    start) or an unattributable gap must not be filled with the cumulative
+    value or a guessed interval.
+
+    Intraday breakout rules must use provider session extremes
+    (``max(price, snapshot.high)`` / ``min(price, snapshot.low)``) against
+    previous ``session_high_ref`` / ``session_low_ref``, not this sampled
+    bar high / low.
+    """
+
     symbol: str
     start_timestamp: float
     end_timestamp: float
@@ -21,12 +39,29 @@ class MarketBar:
     high: float
     low: float
     close: float
-    volume: float
+    volume: float | None
     turnover: float | None
 
 
 @dataclass(frozen=True)
 class MarketFeatures:
+    """Per-symbol feature snapshot at one market timestamp.
+
+    ``change_*`` values are **decimal fractions**, not percent points:
+
+    - ``0.006`` = 0.6%
+    - ``0.01``  = 1%
+    - ``0.035`` = 3.5%
+
+    Event-rule thresholds must use the same unit (``0.006``, never ``0.6``
+    to mean 0.6%).
+
+    ``session_high_ref`` / ``session_low_ref`` are previous same-session
+    provider extremes. Breakout detection compares those refs with the
+    current provider-observed session extreme, not sampled ``MarketBar``
+    high / low.
+    """
+
     symbol: str
     market_timestamp: float
     received_timestamp: float

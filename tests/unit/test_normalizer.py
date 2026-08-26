@@ -57,6 +57,20 @@ def test_normalize_snapshot_rejects_non_positive_price() -> None:
         normalize_snapshot(_raw(price=0), FakeClock())
 
 
+def test_normalize_snapshot_rejects_negative_or_non_finite_turnover() -> None:
+    with pytest.raises(SnapshotValidationError, match="turnover"):
+        normalize_snapshot(_raw(turnover=-1), FakeClock())
+    with pytest.raises(SnapshotValidationError, match="turnover"):
+        normalize_snapshot(_raw(turnover=float("nan")), FakeClock())
+    with pytest.raises(SnapshotValidationError, match="turnover"):
+        normalize_snapshot(_raw(turnover=float("inf")), FakeClock())
+
+
+def test_normalize_snapshot_accepts_zero_turnover() -> None:
+    snapshot = normalize_snapshot(_raw(turnover=0), FakeClock())
+    assert snapshot.turnover == 0.0
+
+
 def test_normalize_many_drops_invalid_rows() -> None:
     clock = FakeClock(wall=1_700_000_100.0)
     snapshots = normalize_many(
