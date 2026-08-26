@@ -78,13 +78,19 @@ volume + breakout + rapid move → 4
 
 ## 5. Dedupe
 
-建议：
+当前冻结实现：
 
 ```text
-dedupeKey = symbol + eventType + direction + timeBucket
+key = symbol + event type + direction
 ```
 
-目标：同一市场行为尽量只产生一个 Event。
+- TTL 使用真实 `market_timestamp` elapsed time
+- TTL 内同/低 severity suppress
+- TTL 内更高 severity upgrade
+- `elapsed == TTL` 允许新 Event
+- out-of-order Event 不允许 rewind state
+
+目标：同一市场行为尽量只产生一个 Event。key 不含 Unix time bucket。
 
 ## 6. Cluster
 
@@ -98,16 +104,19 @@ day_high_breakout
 
 可聚合成一个“量价突破”类 Signal，但不表达买卖建议。
 
+`90s` 是 look-back window：只把窗口内连续的 Event 合成同一 episode。不是等待 90s 再提醒。
+
 ## 7. Cooldown
 
-```ts
-interface CooldownPolicy {
-  eventType: string;
-  cooldownMs: number;
-}
+当前冻结实现：
+
+```text
+identity = Signal episode id
 ```
 
-不同 Event 使用不同 cooldown；更高 severity 可以覆盖旧事件。
+- same episode 同级 suppress
+- higher priority escalation 可突破
+- new episode 获得独立首次 alert eligibility
 
 ## 8. Signal Composer
 
@@ -186,9 +195,9 @@ average signal latency
 - [x] Token = 0；
 - [x] CLI 展示完整 Feature → Event → Signal。
 
-## 14. Implementation status (v0.2 RC)
+## 14. Implementation status (v0.2.0)
 
-M9 completes the v0.2 Release Candidate on `feat/v0.2-event-engine`. This does not start v0.3.
+v0.2.0 Market Event Engine is complete on `feat/v0.2-event-engine`. This does not start v0.3.
 
 | Milestone | Status |
 |---|---|
@@ -204,4 +213,4 @@ M9 completes the v0.2 Release Candidate on `feat/v0.2-event-engine`. This does n
 | M8 CLI v2 diagnostics | done |
 | M9 Replay / E2E / perf / coverage gate / docs | done |
 
-Not in v0.2: Cursor Host, TypeScript, live HTTP provider, `notified_timestamp`, LLM / News / MCP, merge to main, `v0.2.0` tag.
+Not in v0.2: Cursor Host, TypeScript, live HTTP provider, `notified_timestamp`, LLM / News / MCP.

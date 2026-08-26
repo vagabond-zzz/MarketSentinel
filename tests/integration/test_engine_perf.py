@@ -55,7 +55,7 @@ def _write_replay(path: Path, *, snapshots: int = 120) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-async def test_ten_symbol_engine_replay_stays_under_two_seconds(tmp_path: Path) -> None:
+async def test_ten_symbol_engine_replay_stays_within_regression_budget(tmp_path: Path) -> None:
     fixture = tmp_path / "ten_symbol_120.jsonl"
     _write_replay(fixture)
     clock = FakeClock(wall=OPEN, monotonic=0.0)

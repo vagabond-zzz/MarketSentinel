@@ -2,7 +2,7 @@
 
 Low-latency market monitoring core for developer hosts (Cursor, DeepSeek Harness, ZCode).
 
-Current stage: **v0.2 Event Engine** (Release Candidate). High-frequency market updates never call an LLM (`Token = 0`). There is no Cursor Host, no live HTTP provider, and no `v0.2.0` tag yet.
+Current version: **v0.2.0 — Market Event Engine**. High-frequency market updates never call an LLM (`Token = 0`). There is no Cursor Host, no live HTTP provider, no `notified_timestamp`, and no LLM / News / MCP.
 
 ## Positioning
 

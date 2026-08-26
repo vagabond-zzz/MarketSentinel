@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.2.0 — 2026-08-26
+
+Market Event Engine: deterministic Features, six Event Rules, Dedupe / Cluster / episode-aware Cooldown, Signal lifecycle, COLD/WARM/HOT Runtime integration, CLI diagnostics, Replay E2E, and coverage/performance gates.
+
+- Feature Engine: 1m/5m/15m change, volume ratio, EMA5/20, RSI14, VWAP, session high/low
+- Six Event Rules: `rapid_move`, `volume_spike`, `price_volume_expansion`, `day_high_breakout`, `day_low_breakdown`, `vwap_cross`
+- Dedupe / Cluster / episode-aware Cooldown (identity = Signal episode id)
+- Signal lifecycle (90s look-back episode, reversal isolation, `active_signals` from live composer state)
+- COLD/WARM/HOT Runtime integration (`WarmingPolicy` + `EngineTickResult`)
+- CLI diagnostics (`ACTIVE SIGNALS` / `EVENTS THIS TICK` / `ALERTS THIS TICK`, `run --once`, `run --verbose`)
+- Replay E2E scenarios (normal, WARM precursor, rapid move, volume spike, price+volume+breakout, episode, reversal, persistence, alert edge)
+- Coverage gate (`fail_under = 85`) and 10-symbol engine regression budget
+
+Still out of scope: Cursor Host, live HTTP provider, `notified_timestamp`, LLM / News / MCP, auto-trading.
+
 ## M6.1 — Signal Lifecycle & Pipeline Semantics
 
 Hardening of Signal episode identity, pipeline batching, cooldown vs. Core state, and directional clustering. Event Rule thresholds, Feature Engine, Scheduler, and `MarketEngine` are unchanged. No M7 Runtime Integration.

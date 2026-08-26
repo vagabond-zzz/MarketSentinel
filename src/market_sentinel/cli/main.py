@@ -93,9 +93,7 @@ def _handle_watchlist(watchlist: Watchlist, args: argparse.Namespace) -> int:
 
 async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
     if args.provider == "http":
-        print(
-            "HttpQuoteProvider is not required for v0.1 Core; use fake or replay.", file=sys.stderr
-        )
+        print("HttpQuoteProvider is not implemented; use fake or replay.", file=sys.stderr)
         return 2
     clock = SystemClock()
     provider: FakeProvider | ReplayProvider

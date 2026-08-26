@@ -64,6 +64,13 @@ def test_run_once_prints_state_events_and_alerts(tmp_path: Path, capsys) -> None
     assert "\x1b[" not in out
 
 
+def test_http_provider_is_not_implemented(tmp_path: Path, capsys) -> None:
+    path = tmp_path / "watchlist.json"
+    assert main(["--watchlist", str(path), "--provider", "http", "run", "--once"]) == 2
+    err = capsys.readouterr().err
+    assert "HttpQuoteProvider is not implemented; use fake or replay." in err
+
+
 def test_run_once_verbose_includes_scheduler_transition(tmp_path: Path, capsys) -> None:
     path = tmp_path / "watchlist.json"
     assert main(["--watchlist", str(path), "watchlist", "add", "00700.HK"]) == 0
