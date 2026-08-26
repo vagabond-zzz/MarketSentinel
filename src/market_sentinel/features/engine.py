@@ -73,6 +73,8 @@ class FeatureEngine:
             rsi14=rsi_wilder(closes, period=14),
             session_high_ref=high_ref,
             session_low_ref=low_ref,
+            session_high_obs=session_extreme_high(latest),
+            session_low_obs=session_extreme_low(latest),
         )
 
 

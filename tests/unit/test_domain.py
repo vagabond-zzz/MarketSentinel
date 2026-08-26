@@ -1,4 +1,11 @@
-from market_sentinel.domain.enums import FeedStatus, SchedulerLevel
+from market_sentinel.domain.enums import (
+    EventDirection,
+    EventType,
+    FeedStatus,
+    GeneratedBy,
+    SchedulerLevel,
+    SignalPriority,
+)
 from market_sentinel.domain.models import MarketSnapshot, MarketState, WatchItem
 
 
@@ -13,6 +20,20 @@ def test_feed_status_members() -> None:
         "STALE",
         "DISCONNECTED",
     }
+
+
+def test_event_signal_enum_members() -> None:
+    assert {item.value for item in EventType} == {
+        "rapid_move",
+        "volume_spike",
+        "price_volume_expansion",
+        "day_high_breakout",
+        "day_low_breakdown",
+        "vwap_cross",
+    }
+    assert {item.value for item in EventDirection} == {"up", "down", "none"}
+    assert {item.value for item in SignalPriority} == {"info", "notice", "important", "critical"}
+    assert GeneratedBy.RULE.value == "rule"
 
 
 def test_market_snapshot_stores_wall_timestamps() -> None:

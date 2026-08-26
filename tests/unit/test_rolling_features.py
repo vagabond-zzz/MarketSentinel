@@ -136,4 +136,6 @@ def test_session_high_ref_is_previous_extreme_not_current() -> None:
     assert features is not None
     assert features.session_high_ref == 101.0
     assert features.session_low_ref == 99.0
+    assert features.session_high_obs == 103.0
+    assert features.session_low_obs == 100.0
     assert features.day_range_position == (103.0 - 99.0) / (103.0 - 99.0)

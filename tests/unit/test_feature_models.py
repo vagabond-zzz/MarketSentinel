@@ -117,6 +117,8 @@ def test_feature_models_exist_with_optional_metrics() -> None:
         rsi14=None,
         session_high_ref=None,
         session_low_ref=None,
+        session_high_obs=100.0,
+        session_low_obs=100.0,
     )
     assert features.change_1m is None
     documented = MarketFeatures(
@@ -139,6 +141,8 @@ def test_feature_models_exist_with_optional_metrics() -> None:
         rsi14=None,
         session_high_ref=None,
         session_low_ref=None,
+        session_high_obs=100.0,
+        session_low_obs=100.0,
     )
     assert documented.change_1m == 0.006  # 0.6%, not 0.6 percent-points
     assert documented.change_5m == 0.01

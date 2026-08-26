@@ -57,9 +57,10 @@ class MarketFeatures:
     to mean 0.6%).
 
     ``session_high_ref`` / ``session_low_ref`` are previous same-session
-    provider extremes. Breakout detection compares those refs with the
-    current provider-observed session extreme, not sampled ``MarketBar``
-    high / low.
+    provider extremes. Breakout detection compares those refs with
+    ``session_high_obs`` / ``session_low_obs`` (current
+    ``max(price, snapshot.high)`` / ``min(price, snapshot.low)``), not
+    sampled ``MarketBar`` high / low.
     """
 
     symbol: str
@@ -81,3 +82,5 @@ class MarketFeatures:
     rsi14: float | None
     session_high_ref: float | None
     session_low_ref: float | None
+    session_high_obs: float
+    session_low_obs: float
