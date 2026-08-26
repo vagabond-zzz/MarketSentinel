@@ -14,6 +14,7 @@ class FakeProvider:
         self._quotes: dict[str, dict[str, Any]] = {}
         self._failed: set[str] = set()
         self._timeout = False
+        self.last_requested: list[str] = []
 
     def set_quote(self, symbol: str, **fields: Any) -> None:
         quote = _default_quote(symbol, self._clock.wall_time())
@@ -28,6 +29,7 @@ class FakeProvider:
         self._timeout = timeout
 
     async def fetch_quotes(self, symbols: list[str]) -> list[MarketSnapshot]:
+        self.last_requested = list(symbols)
         if self._timeout:
             raise TimeoutError("provider timeout")
 

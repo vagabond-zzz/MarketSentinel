@@ -56,6 +56,20 @@ class AdaptiveScheduler:
     def mark_fetched(self, symbol: str) -> None:
         self._last_fetch_mono[symbol] = self._clock.monotonic_time()
 
+    def next_wait_s(self, symbols: list[str]) -> float:
+        if not symbols:
+            return 1.0
+        now = self._clock.monotonic_time()
+        remaining: list[float] = []
+        for symbol in symbols:
+            last_fetch = self._last_fetch_mono.get(symbol)
+            interval = self._interval(self.get_level(symbol))
+            if last_fetch is None:
+                remaining.append(0.0)
+                continue
+            remaining.append(max(0.0, interval - (now - last_fetch)))
+        return min(remaining)
+
     def _interval(self, level: SchedulerLevel) -> float:
         if level is SchedulerLevel.HOT:
             return self._policy.hot_interval_s

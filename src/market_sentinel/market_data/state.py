@@ -23,3 +23,27 @@ class MarketStateStore:
         )
         self._states[snapshot.symbol] = state
         return state
+
+    def apply_runtime(
+        self,
+        symbol: str,
+        *,
+        level: SchedulerLevel,
+        feed_status: FeedStatus,
+        feed_latency: float | None,
+        last_update_age: float | None,
+    ) -> MarketState:
+        current = self._states.get(symbol)
+        state = MarketState(
+            symbol=symbol,
+            latest=current.latest if current is not None else None,
+            level=level,
+            feed_status=feed_status,
+            feed_latency=feed_latency,
+            last_update_age=last_update_age,
+        )
+        self._states[symbol] = state
+        return state
+
+    def snapshot_for(self, symbols: list[str]) -> list[MarketState]:
+        return [self._states[symbol] for symbol in symbols if symbol in self._states]
