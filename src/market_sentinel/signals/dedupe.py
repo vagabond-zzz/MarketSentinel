@@ -29,6 +29,8 @@ class EventDeduper:
             self._store(event)
             return event
         elapsed = event.market_timestamp - previous.market_timestamp
+        if elapsed < 0:
+            return None
         if elapsed < previous.ttl_s:
             if event.severity > previous.severity:
                 self._store(event)

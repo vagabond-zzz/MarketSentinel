@@ -3,7 +3,7 @@ from __future__ import annotations
 from market_sentinel.clock import Clock
 from market_sentinel.domain.events import MarketEvent
 from market_sentinel.domain.features import MarketFeatures
-from market_sentinel.domain.signals import Signal, SignalTrace
+from market_sentinel.domain.signals import SignalPipelineResult
 from market_sentinel.events.detector import EventDetector
 from market_sentinel.signals.composer import SignalComposer
 from market_sentinel.signals.cooldown import CooldownGate
@@ -11,7 +11,7 @@ from market_sentinel.signals.dedupe import EventDeduper
 
 
 class SignalPipeline:
-    """Feature pair → rules → dedupe → immediate cluster/compose → cooldown.
+    """Feature pair → detect all → dedupe all → compose episodes → cooldown once.
 
     Not wired into MarketEngine (M7).
     """
@@ -27,24 +27,38 @@ class SignalPipeline:
     ) -> None:
         self._detector = detector or EventDetector(clock)
         self._deduper = deduper or EventDeduper()
-        self._composer = composer or SignalComposer(clock)
+        self.composer = composer or SignalComposer(clock)
         self._cooldown = cooldown or CooldownGate(clock)
 
     def process(
         self,
         previous: MarketFeatures | None,
         current: MarketFeatures,
-    ) -> tuple[list[MarketEvent], Signal | None, SignalTrace | None]:
+    ) -> SignalPipelineResult:
         accepted: list[MarketEvent] = []
-        emitted: Signal | None = None
-        emitted_trace: SignalTrace | None = None
         for event in self._detector.evaluate(previous, current):
             kept = self._deduper.accept(event)
-            if kept is None:
-                continue
-            accepted.append(kept)
-            signal, trace = self._composer.consume(kept, current)
-            if self._cooldown.allow(signal.symbol, signal.family, signal.priority):
-                emitted = signal
-                emitted_trace = trace
-        return accepted, emitted, emitted_trace
+            if kept is not None:
+                accepted.append(kept)
+        accepted_events = tuple(accepted)
+        if not accepted_events:
+            return SignalPipelineResult(
+                accepted_events=(),
+                signal_updates=(),
+                traces=(),
+                alert_candidates=(),
+            )
+        self.composer.consume_batch(accepted_events, current)
+        signal_updates = self.composer.active_signals(current.symbol)
+        traces = tuple(self.composer.trace_for(item.id) for item in signal_updates)
+        alert_candidates = tuple(
+            signal
+            for signal in signal_updates
+            if self._cooldown.allow(signal.symbol, signal.family, signal.priority)
+        )
+        return SignalPipelineResult(
+            accepted_events=accepted_events,
+            signal_updates=signal_updates,
+            traces=traces,
+            alert_candidates=alert_candidates,
+        )

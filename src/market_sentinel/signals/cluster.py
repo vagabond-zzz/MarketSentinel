@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from market_sentinel.domain.enums import EventType
+from market_sentinel.domain.enums import EventDirection, EventType
 from market_sentinel.domain.events import MarketEvent
 
 CLUSTER_LOOKBACK_S = 90.0
@@ -40,8 +40,50 @@ def cluster_members(event: MarketEvent, recent: Sequence[MarketEvent]) -> list[M
         members = [item for item in recent if item.type is EventType.VWAP_CROSS]
     else:
         members = [item for item in recent if item.type in _TAPE_TYPES]
-    members.sort(key=lambda item: (item.market_timestamp, item.id))
-    return members
+    return _compatible_members(event, members)
+
+
+def _compatible_members(event: MarketEvent, members: Sequence[MarketEvent]) -> list[MarketEvent]:
+    if event.direction is EventDirection.NONE:
+        selected = list(members)
+    else:
+        selected = [
+            item for item in members if item.direction in {event.direction, EventDirection.NONE}
+        ]
+    selected.sort(key=lambda item: (item.market_timestamp, item.id))
+    return selected
+
+
+def partition_lineage_episodes(
+    recent: Sequence[MarketEvent],
+) -> list[tuple[EventDirection, list[MarketEvent]]]:
+    """Split one lineage's look-back events into directional episodes.
+
+    NONE (e.g. volume_spike) may join UP or DOWN. UP and DOWN never share an episode.
+    """
+    ups = [item for item in recent if item.direction is EventDirection.UP]
+    downs = [item for item in recent if item.direction is EventDirection.DOWN]
+    nones = [item for item in recent if item.direction is EventDirection.NONE]
+    episodes: list[tuple[EventDirection, list[MarketEvent]]] = []
+    if ups:
+        episodes.append(
+            (
+                EventDirection.UP,
+                sorted(nones + ups, key=lambda item: (item.market_timestamp, item.id)),
+            )
+        )
+    if downs:
+        episodes.append(
+            (
+                EventDirection.DOWN,
+                sorted(nones + downs, key=lambda item: (item.market_timestamp, item.id)),
+            )
+        )
+    if nones and not ups and not downs:
+        episodes.append(
+            (EventDirection.NONE, sorted(nones, key=lambda item: (item.market_timestamp, item.id)))
+        )
+    return episodes
 
 
 def classify_family(events: Sequence[MarketEvent]) -> str:

@@ -54,3 +54,15 @@ def test_dedupe_is_independent_per_symbol_type_and_direction() -> None:
     assert deduper.accept(b) is b
     assert deduper.accept(down) is down
     assert deduper.accept(volume) is volume
+
+
+def test_dedupe_out_of_order_timestamp_does_not_rewind_state() -> None:
+    deduper = EventDeduper()
+    first = make_event(severity=2, market_timestamp=100.0, ttl_s=60.0)
+    assert deduper.accept(first) is first
+    earlier_higher = make_event(severity=5, market_timestamp=90.0, ttl_s=60.0)
+    assert deduper.accept(earlier_higher) is None
+    still_inside = make_event(severity=2, market_timestamp=150.0, ttl_s=60.0)
+    assert deduper.accept(still_inside) is None
+    expired = make_event(severity=2, market_timestamp=160.0, ttl_s=60.0)
+    assert deduper.accept(expired) is expired
