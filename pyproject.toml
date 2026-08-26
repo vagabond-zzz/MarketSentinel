@@ -30,6 +30,9 @@ packages = ["src/market_sentinel"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: end-to-end core tests that must stay offline by default",
+]
 
 [tool.ruff]
 target-version = "py312"
