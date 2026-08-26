@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from market_sentinel.domain.features import FeaturePolicy, MarketFeatures
+from market_sentinel.features.bars import completed_minute_bars
+from market_sentinel.features.indicators import ema, rsi_wilder, session_vwap
 from market_sentinel.features.rolling import price_change, volume_delta, volume_ratio
 from market_sentinel.market_data.ring_buffer import RingBuffer
 from market_sentinel.market_data.session import (
@@ -38,6 +40,18 @@ class FeatureEngine:
         day_change = None
         if latest.prev_close != 0:
             day_change = (latest.price - latest.prev_close) / latest.prev_close
+        session_snaps = [
+            snapshot
+            for snapshot in buffer.since(0.0)
+            if is_same_session(snapshot.market_timestamp, latest.market_timestamp)
+        ]
+        bars = completed_minute_bars(
+            session_snaps,
+            latest_ts=latest.market_timestamp,
+            bar_seconds=self._policy.bar_seconds,
+        )
+        closes = [bar.close for bar in bars]
+        vwap, above_vwap = session_vwap(latest)
         return MarketFeatures(
             symbol=latest.symbol,
             market_timestamp=latest.market_timestamp,
@@ -51,11 +65,11 @@ class FeatureEngine:
             volume_5m=volume_delta(buffer, latest, 300.0, self._policy),
             volume_ratio_1m=volume_ratio(buffer, latest, 60.0, self._policy),
             volume_ratio_5m=volume_ratio(buffer, latest, 300.0, self._policy),
-            vwap=None,
-            above_vwap=None,
-            ema5=None,
-            ema20=None,
-            rsi14=None,
+            vwap=vwap,
+            above_vwap=above_vwap,
+            ema5=ema(closes, period=5),
+            ema20=ema(closes, period=20),
+            rsi14=rsi_wilder(closes, period=14),
             session_high_ref=high_ref,
             session_low_ref=low_ref,
         )
