@@ -2,7 +2,7 @@
 
 Low-latency market monitoring core for developer hosts (Cursor, DeepSeek Harness, ZCode).
 
-Current stage: **v0.1 Core Foundation**. High-frequency market updates never call an LLM (`Token = 0`).
+Current stage: **v0.1 Core Foundation** (implemented). High-frequency market updates never call an LLM (`Token = 0`).
 
 ## Requirements
 
@@ -26,8 +26,29 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
-## v0.1 scope
+Default pytest is offline. Do not depend on live market HTTP.
 
-Python Core only: Market Provider, Snapshot normalize, Ring Buffer, Market State, Adaptive Scheduler, Feed Health, CLI diagnostics.
+## CLI
 
-Not in v0.1: Feature / Event / Signal engines, Cursor UI, DSH / ZCode adapters, HTTP API, database, LLM.
+```bash
+uv run market-sentinel --watchlist data/watchlist.json watchlist add 00700.HK
+uv run market-sentinel --watchlist data/watchlist.json watchlist list
+uv run market-sentinel --watchlist data/watchlist.json run --once
+```
+
+`--provider` defaults to `fake`. `replay` reads a JSONL fixture. `http` is not part of the offline v0.1 Core path.
+
+## v0.1 status
+
+Done:
+
+- Dual clock (`wall_time` + `monotonic_time`)
+- MarketProvider + FakeProvider + ReplayProvider
+- Snapshot normalize
+- Ring buffer and market state
+- Watchlist (max 10, JSON)
+- COLD/WARM/HOT scheduler (any transition; upgrade fast, downgrade cautious)
+- Feed health with consecutive-failure disconnect
+- `MarketEngine.tick()` and diagnostics CLI
+
+Not in v0.1: Feature / Event / Signal engines, Cursor UI, DSH / ZCode adapters, live HttpQuoteProvider as a Core gate, HTTP API, database, LLM.
