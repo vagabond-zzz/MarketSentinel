@@ -7,6 +7,14 @@ from market_sentinel.domain.enums import FeedStatus, SchedulerLevel
 
 @dataclass(frozen=True)
 class MarketSnapshot:
+    """Normalized quote.
+
+    ``volume`` is session-cumulative share/lot count from session open through
+    ``market_timestamp``. ``turnover``, when present, is session-cumulative
+    notional in the same session. Feature code must not treat these as
+    per-sample interval values.
+    """
+
     symbol: str
     price: float
     open: float

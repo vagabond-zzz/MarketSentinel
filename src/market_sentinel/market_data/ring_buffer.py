@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right
 from collections.abc import Sequence
 
 from market_sentinel.domain.models import MarketSnapshot
@@ -41,6 +41,15 @@ class RingBuffer:
 
     def since(self, timestamp: float) -> Sequence[MarketSnapshot]:
         return tuple(item for item in self._items if item.market_timestamp >= timestamp)
+
+    def at_or_before(self, timestamp: float) -> MarketSnapshot | None:
+        if not self._items:
+            return None
+        timestamps = [item.market_timestamp for item in self._items]
+        index = bisect_right(timestamps, timestamp) - 1
+        if index < 0:
+            return None
+        return self._items[index]
 
     def _evict(self) -> None:
         newest = self._items[-1].market_timestamp

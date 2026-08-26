@@ -19,6 +19,12 @@ class SymbolBuffers:
             return None
         return buffer.latest()
 
+    def at_or_before(self, symbol: str, timestamp: float) -> MarketSnapshot | None:
+        buffer = self._buffers.get(symbol)
+        if buffer is None:
+            return None
+        return buffer.at_or_before(timestamp)
+
     def window(self, symbol: str, duration_s: float):
         return self._buffer_for(symbol).window(duration_s)
 
