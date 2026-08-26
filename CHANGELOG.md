@@ -133,3 +133,23 @@ An active episode remaining in `MarketState.active_signals` is not re-printed as
 
 - `run --once` still ticks, prints, and exits.
 - `run --verbose` adds `Scheduler: COLD -> HOT`, timestamps, and ids.
+
+## M9 — v0.2 Release Candidate
+
+Replay fixtures, end-to-end scenarios, a loose performance check, coverage gate, and documentation wrap-up. Feature math, the six Event thresholds, Dedupe, Cluster, Cooldown, Signal episodes, and Scheduler dwell are unchanged. No v0.3, Cursor, merge to main, or `v0.2.0` tag.
+
+### Replay
+
+Deterministic JSONL under `tests/fixtures/` (`normal_market`, `pre_signal_warm`, `rapid_move`, `volume_spike`, `price_breakout`, `price_volume_breakout`, `episode_lifecycle`, `reversal`, `tape_then_vwap`). Scenarios run `ReplayProvider → MarketEngine.tick() → Feature → Event → Signal → Scheduler → MarketState`.
+
+### Runtime isolation
+
+If a due symbol gets no fresh snapshot this tick (timeout, missing quote), the engine does not re-run Feature/Event/Signal on stale buffer data. Last safe `features` / `active_signals` stay; tick output has empty events and alerts.
+
+### Performance
+
+10 symbols × 120 snapshots through the full engine tick path must finish in under 8s (observed ~0.95s uninstrumented, ~3.4s under coverage). Feature-only 10×120 remains under 1s.
+
+### Coverage
+
+`[tool.coverage.report] fail_under = 85` is enabled for `uv run pytest --cov=market_sentinel`.

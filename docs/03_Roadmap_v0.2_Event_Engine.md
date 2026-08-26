@@ -175,13 +175,33 @@ average signal latency
 
 ## 13. 验收
 
-- [ ] Feature Engine 单测；
-- [ ] 至少 5 条 Event Rule；
-- [ ] severity 可解释；
-- [ ] dedupe；
-- [ ] cluster；
-- [ ] cooldown；
-- [ ] Signal；
-- [ ] Scheduler 可被 Event 驱动；
-- [ ] Token = 0；
-- [ ] CLI 展示完整 Feature → Event → Signal。
+- [x] Feature Engine 单测；
+- [x] 至少 5 条 Event Rule；
+- [x] severity 可解释；
+- [x] dedupe；
+- [x] cluster；
+- [x] cooldown；
+- [x] Signal；
+- [x] Scheduler 可被 Event 驱动；
+- [x] Token = 0；
+- [x] CLI 展示完整 Feature → Event → Signal。
+
+## 14. Implementation status (v0.2 RC)
+
+M9 completes the v0.2 Release Candidate on `feat/v0.2-event-engine`. This does not start v0.3.
+
+| Milestone | Status |
+|---|---|
+| M1 Domain / provider contract (v0.1 carry-forward) | done |
+| M2 Runtime tick / scheduler / feed health (v0.1) | done |
+| M3 Feature Engine | done |
+| M4 Event rules (six) | done |
+| M5 Dedupe + cooldown | done |
+| M6 Cluster + Signal composer | done |
+| M6.1 Signal lifecycle | done |
+| M6.2 Episode-aware cooldown / NONE attribution | done |
+| M7 Runtime Integration | done |
+| M8 CLI v2 diagnostics | done |
+| M9 Replay / E2E / perf / coverage gate / docs | done |
+
+Not in v0.2: Cursor Host, TypeScript, live HTTP provider, `notified_timestamp`, LLM / News / MCP, merge to main, `v0.2.0` tag.
