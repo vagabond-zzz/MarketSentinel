@@ -56,34 +56,72 @@ def _compatible_members(event: MarketEvent, members: Sequence[MarketEvent]) -> l
 
 def partition_lineage_episodes(
     recent: Sequence[MarketEvent],
+    *,
+    none_target: EventDirection,
 ) -> list[tuple[EventDirection, list[MarketEvent]]]:
     """Split one lineage's look-back events into directional episodes.
 
-    NONE (e.g. volume_spike) may join UP or DOWN. UP and DOWN never share an episode.
+    NONE events are assigned to exactly one episode, given by ``none_target``.
     """
     ups = [item for item in recent if item.direction is EventDirection.UP]
     downs = [item for item in recent if item.direction is EventDirection.DOWN]
     nones = [item for item in recent if item.direction is EventDirection.NONE]
+    none_up = nones if none_target is EventDirection.UP else []
+    none_down = nones if none_target is EventDirection.DOWN else []
+    none_alone = nones if none_target is EventDirection.NONE else []
     episodes: list[tuple[EventDirection, list[MarketEvent]]] = []
-    if ups:
+    if ups or none_up:
         episodes.append(
             (
                 EventDirection.UP,
-                sorted(nones + ups, key=lambda item: (item.market_timestamp, item.id)),
+                sorted(none_up + ups, key=lambda item: (item.market_timestamp, item.id)),
             )
         )
-    if downs:
+    if downs or none_down:
         episodes.append(
             (
                 EventDirection.DOWN,
-                sorted(nones + downs, key=lambda item: (item.market_timestamp, item.id)),
+                sorted(none_down + downs, key=lambda item: (item.market_timestamp, item.id)),
             )
         )
-    if nones and not ups and not downs:
+    if none_alone:
         episodes.append(
-            (EventDirection.NONE, sorted(nones, key=lambda item: (item.market_timestamp, item.id)))
+            (
+                EventDirection.NONE,
+                sorted(none_alone, key=lambda item: (item.market_timestamp, item.id)),
+            )
         )
     return episodes
+
+
+def resolve_none_target(
+    batch: Sequence[MarketEvent],
+    recent: Sequence[MarketEvent],
+    live_directions: frozenset[EventDirection],
+) -> EventDirection:
+    """Deterministic home for NONE events in this batch. Never duplicates them."""
+    batch_dirs = {
+        item.direction
+        for item in batch
+        if item.direction in {EventDirection.UP, EventDirection.DOWN}
+    }
+    if batch_dirs == {EventDirection.UP}:
+        return EventDirection.UP
+    if batch_dirs == {EventDirection.DOWN}:
+        return EventDirection.DOWN
+    if len(batch_dirs) > 1:
+        return EventDirection.NONE
+    lookback_dirs = {
+        item.direction
+        for item in recent
+        if item.direction in {EventDirection.UP, EventDirection.DOWN}
+    }
+    candidates = lookback_dirs | (live_directions & {EventDirection.UP, EventDirection.DOWN})
+    if candidates == {EventDirection.UP}:
+        return EventDirection.UP
+    if candidates == {EventDirection.DOWN}:
+        return EventDirection.DOWN
+    return EventDirection.NONE
 
 
 def classify_family(events: Sequence[MarketEvent]) -> str:

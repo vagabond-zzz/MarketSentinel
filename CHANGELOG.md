@@ -45,3 +45,23 @@ Hardening of Signal episode identity, pipeline batching, cooldown vs. Core state
 | `SignalComposer.consume_batch` / `active_signals` | new |
 | `EventDeduper` | reject timestamp rewind |
 | Rules / Feature Engine / Scheduler / Runtime | not modified |
+
+## M6.2 — Episode-aware cooldown and NONE attribution
+
+Small correction before Runtime Integration. Event Rule thresholds, Feature Engine, and `MarketEngine` are unchanged.
+
+### Cooldown identity
+
+- Cooldown keys on `signal.id` (one market episode), not `symbol + family`.
+- Same episode: NOTICE emit → NOTICE suppress → IMPORTANT escalation emit.
+- After an episode ends, a new Signal with the same symbol/family/priority gets a first alert.
+- An UP → DOWN reversal (new Signal ID) has independent first-alert eligibility.
+- v0.2 does not add a second family-level rate limiter.
+
+### NONE attribution
+
+- `EventDirection.NONE` is assigned to at most one active Signal episode.
+- Unique UP or DOWN tape event in the current batch: NONE follows that batch direction.
+- No batch direction, and look-back/live state has exactly one compatible directional tape episode: NONE may join it.
+- Active UP and DOWN with no unique target: do not guess; keep/create a standalone NONE episode.
+- Invariant: one `MarketEvent` ID belongs to at most one active Signal.

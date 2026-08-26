@@ -1,5 +1,5 @@
 from market_sentinel.clock import FakeClock
-from market_sentinel.domain.enums import EventType, SignalPriority
+from market_sentinel.domain.enums import EventDirection, EventType, SignalPriority
 from market_sentinel.signals.pipeline import SignalPipeline
 from tests.unit.events.helpers import make_features
 
@@ -130,3 +130,54 @@ def test_cooldown_suppresses_alert_but_still_updates_signal_state() -> None:
     )
     assert second.traces[0].event_ids == updated.event_ids
     assert "day_high_breakout" in " ".join(second.traces[0].rule_names)
+
+
+def test_new_episode_after_expiry_has_independent_first_alert() -> None:
+    clock = FakeClock(wall=50.0, monotonic=0.0)
+    pipeline = SignalPipeline(clock)
+    previous = make_features(market_timestamp=1_700_000_000.0)
+    first_features = make_features(
+        market_timestamp=1_700_000_010.0,
+        change_1m=0.006,
+        session_high_ref=100.0,
+        session_high_obs=100.0,
+    )
+    first = pipeline.process(previous, first_features)
+    assert len(first.alert_candidates) == 1
+    first_id = first.alert_candidates[0].id
+
+    later = make_features(
+        market_timestamp=1_700_000_200.0,
+        change_1m=0.006,
+        session_high_ref=100.0,
+        session_high_obs=100.0,
+    )
+    second = pipeline.process(first_features, later)
+    assert len(second.alert_candidates) == 1
+    assert second.alert_candidates[0].id != first_id
+    assert second.alert_candidates[0].family == first.alert_candidates[0].family
+    assert second.alert_candidates[0].priority is first.alert_candidates[0].priority
+
+
+def test_reversal_episode_has_independent_first_alert() -> None:
+    clock = FakeClock(wall=60.0, monotonic=0.0)
+    pipeline = SignalPipeline(clock)
+    previous = make_features(market_timestamp=1_700_000_000.0)
+    up_features = make_features(
+        market_timestamp=1_700_000_010.0,
+        change_1m=0.006,
+        session_high_ref=100.0,
+        session_high_obs=100.0,
+    )
+    up = pipeline.process(previous, up_features)
+    down_features = make_features(
+        market_timestamp=1_700_000_020.0,
+        change_1m=-0.006,
+        session_high_ref=100.0,
+        session_high_obs=100.0,
+    )
+    down = pipeline.process(up_features, down_features)
+    assert up.alert_candidates[0].direction is EventDirection.UP
+    assert len(down.alert_candidates) == 1
+    assert down.alert_candidates[0].id != up.alert_candidates[0].id
+    assert down.alert_candidates[0].direction is EventDirection.DOWN

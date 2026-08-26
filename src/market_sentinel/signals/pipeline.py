@@ -52,9 +52,7 @@ class SignalPipeline:
         signal_updates = self.composer.active_signals(current.symbol)
         traces = tuple(self.composer.trace_for(item.id) for item in signal_updates)
         alert_candidates = tuple(
-            signal
-            for signal in signal_updates
-            if self._cooldown.allow(signal.symbol, signal.family, signal.priority)
+            signal for signal in signal_updates if self._cooldown.allow(signal.id, signal.priority)
         )
         return SignalPipelineResult(
             accepted_events=accepted_events,

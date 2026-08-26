@@ -1,6 +1,10 @@
 from market_sentinel.clock import FakeClock
 from market_sentinel.domain.enums import EventDirection, EventType
-from market_sentinel.signals.cluster import cluster_members, partition_lineage_episodes
+from market_sentinel.signals.cluster import (
+    cluster_members,
+    partition_lineage_episodes,
+    resolve_none_target,
+)
 from market_sentinel.signals.composer import SignalComposer
 from tests.unit.events.helpers import make_features
 from tests.unit.signals.helpers import make_event
@@ -74,11 +78,53 @@ def test_cluster_members_keep_none_and_drop_opposite_direction() -> None:
     assert down not in members
     assert none in members
     assert up in members
-    episodes = partition_lineage_episodes([up, down, none])
-    directions = {item[0] for item in episodes}
-    assert directions == {EventDirection.UP, EventDirection.DOWN}
+    episodes = partition_lineage_episodes([up, down, none], none_target=EventDirection.NONE)
     by_dir = dict(episodes)
-    assert none in by_dir[EventDirection.UP]
-    assert none in by_dir[EventDirection.DOWN]
-    assert down not in by_dir[EventDirection.UP]
-    assert up not in by_dir[EventDirection.DOWN]
+    assert none not in by_dir[EventDirection.UP]
+    assert none not in by_dir[EventDirection.DOWN]
+    assert none in by_dir[EventDirection.NONE]
+
+
+def test_none_event_is_not_copied_into_both_up_and_down_episodes() -> None:
+    composer = SignalComposer(FakeClock())
+    up, _ = composer.consume(_compose(EventDirection.UP, 10.0), make_features(change_1m=0.006))
+    down, _ = composer.consume(_compose(EventDirection.DOWN, 20.0), make_features(change_1m=-0.006))
+    volume = _compose(EventDirection.NONE, 30.0, EventType.VOLUME_SPIKE)
+    none_signal, _ = composer.consume(volume, make_features(volume_ratio_5m=1.8))
+    live = composer.active_signals("00700.HK")
+    homes = [signal for signal in live if volume.id in signal.event_ids]
+    assert len(homes) == 1
+    assert homes[0].id == none_signal.id
+    assert homes[0].direction is EventDirection.NONE
+    assert none_signal.id != up.id
+    assert none_signal.id != down.id
+    assert {item.direction for item in live} == {
+        EventDirection.UP,
+        EventDirection.DOWN,
+        EventDirection.NONE,
+    }
+
+
+def test_none_follows_unique_batch_direction() -> None:
+    up = _compose(EventDirection.UP, 10.0)
+    volume = _compose(EventDirection.NONE, 11.0, EventType.VOLUME_SPIKE)
+    assert resolve_none_target([up, volume], [up, volume], frozenset()) is EventDirection.UP
+    episodes = partition_lineage_episodes([up, volume], none_target=EventDirection.UP)
+    by_dir = dict(episodes)
+    assert volume in by_dir[EventDirection.UP]
+    assert EventDirection.NONE not in by_dir
+
+
+def test_none_joins_unique_lookback_episode_when_batch_has_no_direction() -> None:
+    up = _compose(EventDirection.UP, 10.0)
+    volume = _compose(EventDirection.NONE, 20.0, EventType.VOLUME_SPIKE)
+    assert (
+        resolve_none_target([volume], [up, volume], frozenset({EventDirection.UP}))
+        is EventDirection.UP
+    )
+    both = resolve_none_target(
+        [volume],
+        [up, _compose(EventDirection.DOWN, 15.0), volume],
+        frozenset({EventDirection.UP, EventDirection.DOWN}),
+    )
+    assert both is EventDirection.NONE

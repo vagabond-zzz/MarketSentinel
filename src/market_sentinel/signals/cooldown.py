@@ -12,29 +12,28 @@ _PRIORITY_RANK = {
 
 
 class CooldownGate:
-    """Per-symbol, per-signal-family cooldown on the monotonic clock.
+    """Per-signal-episode cooldown on the monotonic clock.
 
-    Same or lower priority inside the cooldown is suppressed. A strictly
-    higher priority escalates and resets the cooldown window.
+    Identity is ``signal.id``. A finished episode must not suppress the first
+    alert of a new episode, even when symbol/family/priority match.
     """
 
     def __init__(self, clock: Clock, cooldown_s: float = 300.0) -> None:
         self._clock = clock
         self._cooldown_s = cooldown_s
-        self._last: dict[tuple[str, str], tuple[float, SignalPriority]] = {}
+        self._last: dict[str, tuple[float, SignalPriority]] = {}
 
-    def allow(self, symbol: str, family: str, priority: SignalPriority) -> bool:
+    def allow(self, signal_id: str, priority: SignalPriority) -> bool:
         now = self._clock.monotonic_time()
-        key = (symbol, family)
-        previous = self._last.get(key)
+        previous = self._last.get(signal_id)
         if previous is None:
-            self._last[key] = (now, priority)
+            self._last[signal_id] = (now, priority)
             return True
         last_mono, last_priority = previous
         if now - last_mono >= self._cooldown_s:
-            self._last[key] = (now, priority)
+            self._last[signal_id] = (now, priority)
             return True
         if _PRIORITY_RANK[priority] > _PRIORITY_RANK[last_priority]:
-            self._last[key] = (now, priority)
+            self._last[signal_id] = (now, priority)
             return True
         return False

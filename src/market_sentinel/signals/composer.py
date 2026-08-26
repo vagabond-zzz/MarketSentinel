@@ -14,6 +14,7 @@ from market_sentinel.signals.cluster import (
     classify_family,
     lineage_of,
     partition_lineage_episodes,
+    resolve_none_target,
 )
 from market_sentinel.signals.copy import compose_priority, render_copy
 
@@ -38,6 +39,7 @@ class SignalComposer:
         self._accepted: dict[str, list[MarketEvent]] = defaultdict(list)
         self._active: dict[tuple[str, str, EventDirection], Signal] = {}
         self._traces: dict[str, SignalTrace] = {}
+        self._home: dict[str, tuple[str, str, EventDirection]] = {}
 
     def active_signals(self, symbol: str) -> tuple[Signal, ...]:
         rows = [
@@ -93,7 +95,19 @@ class SignalComposer:
             if not any(lineage_of(item.type) == lineage for item in batch):
                 continue
             lineage_recent = [item for item in recent if lineage_of(item.type) == lineage]
-            for direction, members in partition_lineage_episodes(lineage_recent):
+            lineage_batch = [item for item in batch if lineage_of(item.type) == lineage]
+            live_dirs = frozenset(
+                direction
+                for (sym, lin, direction) in self._active
+                if sym == symbol and lin == lineage
+            )
+            none_target = resolve_none_target(lineage_batch, lineage_recent, live_dirs)
+            compose_recent = self._events_for_partition(
+                symbol, lineage, lineage_recent, lineage_batch, none_target
+            )
+            for direction, members in partition_lineage_episodes(
+                compose_recent, none_target=none_target
+            ):
                 if not any(item.id in new_ids for item in members):
                     continue
                 produced.append(
@@ -108,6 +122,37 @@ class SignalComposer:
                     )
                 )
         return produced
+
+    def _events_for_partition(
+        self,
+        symbol: str,
+        lineage: str,
+        recent: Sequence[MarketEvent],
+        batch: Sequence[MarketEvent],
+        none_target: EventDirection,
+    ) -> list[MarketEvent]:
+        batch_ids = {item.id for item in batch}
+        selected: list[MarketEvent] = []
+        for event in recent:
+            if event.direction is not EventDirection.NONE:
+                selected.append(event)
+                continue
+            home = self._home.get(event.id)
+            if home is None:
+                if event.id in batch_ids:
+                    selected.append(event)
+                continue
+            home_symbol, home_lineage, home_dir = home
+            if home_symbol != symbol or home_lineage != lineage:
+                continue
+            if home_dir is none_target:
+                selected.append(event)
+            elif home_dir is EventDirection.NONE and none_target in {
+                EventDirection.UP,
+                EventDirection.DOWN,
+            }:
+                selected.append(event)
+        return selected
 
     def _compose_episode(
         self,
@@ -142,6 +187,8 @@ class SignalComposer:
             signal_created_timestamp=created_at,
         )
         self._active[(symbol, lineage, direction)] = signal
+        for item in members:
+            self._home[item.id] = (symbol, lineage, direction)
         trace = SignalTrace(
             signal_id=signal.id,
             event_ids=signal.event_ids,
@@ -175,6 +222,8 @@ class SignalComposer:
             if none_signal is not None and none_signal.market_timestamp >= cutoff:
                 self._active.pop((symbol, lineage, EventDirection.NONE), None)
                 stolen_none.add(none_key)
+                for event_id in none_signal.event_ids:
+                    self._home[event_id] = (symbol, lineage, direction)
                 return none_signal.id, none_signal.signal_created_timestamp
         return uuid.uuid4().hex, self._clock.wall_time()
 
@@ -184,3 +233,6 @@ class SignalComposer:
         for key in expired:
             signal = self._active.pop(key)
             self._traces.pop(signal.id, None)
+            for event_id in signal.event_ids:
+                if self._home.get(event_id) == key:
+                    self._home.pop(event_id, None)
