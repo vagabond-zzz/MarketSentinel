@@ -45,10 +45,12 @@ class MarketEngine:
         self._feature_engine = feature_engine or FeatureEngine()
         self.pipeline = pipeline or SignalPipeline(clock)
         self._warming = warming or WarmingPolicy()
+        self._fetched_symbols: set[str] = set()
 
     async def tick(self) -> EngineTickResult:
         enabled = self.watchlist.enabled_symbols()
         due = self.scheduler.due_symbols(enabled)
+        self._fetched_symbols = set()
         if due:
             await self._fetch_due(due)
         due_set = set(due)
@@ -79,12 +81,22 @@ class MarketEngine:
                 self.buffers.append(snapshot)
                 self.states.update_latest(snapshot)
                 self.health.observe(symbol, snapshot)
+                self._fetched_symbols.add(symbol)
             self.scheduler.mark_fetched(symbol)
 
     def _process_symbol(self, symbol: str) -> SymbolTickResult:
         level_before = self.scheduler.get_level(symbol)
         stage = "init"
         try:
+            if symbol not in self._fetched_symbols:
+                self._project_health(symbol)
+                current = self.states.get(symbol)
+                return self._tick_result(
+                    symbol,
+                    level_before=level_before,
+                    features=current.features if current is not None else None,
+                    pipeline=SignalPipelineResult((), (), (), ()),
+                )
             stage = "features"
             buffer = self.buffers.buffer(symbol)
             if buffer is None:
