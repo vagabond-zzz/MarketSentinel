@@ -12,3 +12,7 @@ class WatchlistFullError(MarketSentinelError):
 
 class WatchlistSymbolError(MarketSentinelError):
     """Raised when a watchlist symbol is missing."""
+
+
+class InvalidSchedulerLevelError(MarketSentinelError):
+    """Raised when a scheduler level is not a known enum value."""
