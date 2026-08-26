@@ -48,4 +48,4 @@ source = ["market_sentinel"]
 branch = true
 
 [tool.coverage.report]
-fail_under = 0
+fail_under = 85
