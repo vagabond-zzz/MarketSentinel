@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from market_sentinel.domain.enums import FeedStatus, SchedulerLevel
+from market_sentinel.domain.features import MarketFeatures
+from market_sentinel.domain.signals import Signal
 
 
 @dataclass(frozen=True)
@@ -41,3 +43,5 @@ class MarketState:
     feed_status: FeedStatus
     feed_latency: float | None
     last_update_age: float | None
+    features: MarketFeatures | None = None
+    active_signals: tuple[Signal, ...] = ()

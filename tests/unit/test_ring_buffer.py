@@ -96,3 +96,12 @@ def test_market_state_store_keeps_latest_snapshot() -> None:
     assert state.latest is second
     assert stored is not None
     assert stored.latest is second
+
+
+def test_symbol_buffers_exposes_ring_buffer() -> None:
+    buffers = SymbolBuffers()
+    buffers.append(_snapshot("00700.HK", 1.0, 600.0))
+    buffer = buffers.buffer("00700.HK")
+    assert buffer is not None
+    assert buffer.latest() is not None
+    assert buffers.buffer("600519.SH") is None

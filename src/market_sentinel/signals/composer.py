@@ -236,3 +236,10 @@ class SignalComposer:
             for event_id in signal.event_ids:
                 if self._home.get(event_id) == key:
                     self._home.pop(event_id, None)
+
+    def prune(self, symbol: str, now_ts: float) -> None:
+        cutoff = now_ts - self._lookback_s
+        self._accepted[symbol] = [
+            item for item in self._accepted[symbol] if item.market_timestamp >= cutoff
+        ]
+        self._prune_active(now_ts)

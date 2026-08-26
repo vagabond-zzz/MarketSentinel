@@ -83,3 +83,5 @@ def test_market_state_holds_latest_snapshot_and_health() -> None:
     assert state.latest is snapshot
     assert state.level is SchedulerLevel.COLD
     assert state.feed_status is FeedStatus.LIVE
+    assert state.features is None
+    assert state.active_signals == ()

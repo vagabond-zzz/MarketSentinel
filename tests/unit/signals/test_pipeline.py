@@ -181,3 +181,52 @@ def test_reversal_episode_has_independent_first_alert() -> None:
     assert len(down.alert_candidates) == 1
     assert down.alert_candidates[0].id != up.alert_candidates[0].id
     assert down.alert_candidates[0].direction is EventDirection.DOWN
+
+
+def test_quiet_tick_keeps_active_signal_but_clears_alert_candidates() -> None:
+    clock = FakeClock(wall=70.0, monotonic=0.0)
+    pipeline = SignalPipeline(clock)
+    previous = make_features(market_timestamp=1_700_000_000.0)
+    active = make_features(
+        market_timestamp=1_700_000_010.0,
+        change_1m=0.006,
+        session_high_ref=100.0,
+        session_high_obs=100.0,
+    )
+    first = pipeline.process(previous, active)
+    assert first.alert_candidates
+    signal_id = first.alert_candidates[0].id
+
+    quiet = make_features(
+        market_timestamp=1_700_000_020.0,
+        session_high_ref=100.0,
+        session_high_obs=100.0,
+    )
+    second = pipeline.process(active, quiet)
+    assert second.accepted_events == ()
+    assert len(second.signal_updates) == 1
+    assert second.signal_updates[0].id == signal_id
+    assert second.alert_candidates == ()
+
+
+def test_expired_episode_is_dropped_from_active_signals() -> None:
+    clock = FakeClock(wall=80.0, monotonic=0.0)
+    pipeline = SignalPipeline(clock)
+    previous = make_features(market_timestamp=1_700_000_000.0)
+    active = make_features(
+        market_timestamp=1_700_000_010.0,
+        change_1m=0.006,
+        session_high_ref=100.0,
+        session_high_obs=100.0,
+    )
+    first = pipeline.process(previous, active)
+    assert first.signal_updates
+    expired = make_features(
+        market_timestamp=1_700_000_110.0,
+        session_high_ref=100.0,
+        session_high_obs=100.0,
+    )
+    later = pipeline.process(active, expired)
+    assert later.accepted_events == ()
+    assert later.signal_updates == ()
+    assert later.alert_candidates == ()

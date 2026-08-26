@@ -19,6 +19,9 @@ class SymbolBuffers:
             return None
         return buffer.latest()
 
+    def buffer(self, symbol: str) -> RingBuffer | None:
+        return self._buffers.get(symbol)
+
     def at_or_before(self, symbol: str, timestamp: float) -> MarketSnapshot | None:
         buffer = self._buffers.get(symbol)
         if buffer is None:

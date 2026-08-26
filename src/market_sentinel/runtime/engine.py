@@ -3,11 +3,18 @@ from __future__ import annotations
 import logging
 
 from market_sentinel.clock import Clock
+from market_sentinel.domain.enums import SchedulerLevel
+from market_sentinel.domain.features import MarketFeatures
+from market_sentinel.domain.signals import SignalPipelineResult
+from market_sentinel.features.engine import FeatureEngine
 from market_sentinel.health.feed_health import FeedHealthTracker
 from market_sentinel.market_data.buffers import SymbolBuffers
 from market_sentinel.market_data.state import MarketStateStore
+from market_sentinel.orchestration.warming import WarmingPolicy
 from market_sentinel.providers.base import MarketProvider
+from market_sentinel.runtime.results import EngineTickResult, SymbolTickResult
 from market_sentinel.scheduler.scheduler import AdaptiveScheduler
+from market_sentinel.signals.pipeline import SignalPipeline
 from market_sentinel.watchlist.watchlist import Watchlist
 
 logger = logging.getLogger(__name__)
@@ -24,6 +31,9 @@ class MarketEngine:
         buffers: SymbolBuffers,
         states: MarketStateStore,
         health: FeedHealthTracker,
+        feature_engine: FeatureEngine | None = None,
+        pipeline: SignalPipeline | None = None,
+        warming: WarmingPolicy | None = None,
     ) -> None:
         self.clock = clock
         self.watchlist = watchlist
@@ -32,13 +42,23 @@ class MarketEngine:
         self.buffers = buffers
         self.states = states
         self.health = health
+        self._feature_engine = feature_engine or FeatureEngine()
+        self.pipeline = pipeline or SignalPipeline(clock)
+        self._warming = warming or WarmingPolicy()
 
-    async def tick(self) -> None:
+    async def tick(self) -> EngineTickResult:
         enabled = self.watchlist.enabled_symbols()
         due = self.scheduler.due_symbols(enabled)
         if due:
             await self._fetch_due(due)
-        self._project(enabled)
+        due_set = set(due)
+        results: list[SymbolTickResult] = []
+        for symbol in due:
+            results.append(self._process_symbol(symbol))
+        for symbol in enabled:
+            if symbol not in due_set:
+                self._project_health(symbol)
+        return EngineTickResult(symbol_results=tuple(results))
 
     async def _fetch_due(self, due: list[str]) -> None:
         try:
@@ -61,12 +81,90 @@ class MarketEngine:
                 self.health.observe(symbol, snapshot)
             self.scheduler.mark_fetched(symbol)
 
-    def _project(self, symbols: list[str]) -> None:
-        for symbol in symbols:
+    def _process_symbol(self, symbol: str) -> SymbolTickResult:
+        level_before = self.scheduler.get_level(symbol)
+        stage = "init"
+        try:
+            stage = "features"
+            buffer = self.buffers.buffer(symbol)
+            if buffer is None:
+                self._project_health(symbol)
+                return self._tick_result(
+                    symbol,
+                    level_before=level_before,
+                    features=None,
+                    pipeline=SignalPipelineResult((), (), (), ()),
+                )
+
+            features = self._feature_engine.compute(buffer)
+            stage = "pipeline"
+            current_state = self.states.get(symbol)
+            previous = current_state.features if current_state is not None else None
+            if features is None:
+                pipeline_result = SignalPipelineResult((), (), (), ())
+            else:
+                pipeline_result = self.pipeline.process(previous, features)
+
+            stage = "warming"
+            request = self._warming.request(symbol, features, pipeline_result.accepted_events)
+            self.scheduler.set_level(symbol, request.level)
+            level_after = self.scheduler.get_level(symbol)
+
+            stage = "state"
             self.states.apply_runtime(
                 symbol,
-                level=self.scheduler.get_level(symbol),
+                level=level_after,
                 feed_status=self.health.status(symbol),
                 feed_latency=self.health.feed_latency(symbol),
                 last_update_age=self.health.last_update_age(symbol),
+                features=features,
+                active_signals=pipeline_result.signal_updates,
             )
+            return SymbolTickResult(
+                symbol=symbol,
+                features=features,
+                accepted_events=pipeline_result.accepted_events,
+                signal_updates=pipeline_result.signal_updates,
+                traces=pipeline_result.traces,
+                alert_candidates=pipeline_result.alert_candidates,
+                level_before=level_before,
+                level_after=level_after,
+            )
+        except Exception:
+            logger.exception("symbol %s failed at stage %s", symbol, stage)
+            self._project_health(symbol)
+            current = self.states.get(symbol)
+            return self._tick_result(
+                symbol,
+                level_before=level_before,
+                features=current.features if current is not None else None,
+                pipeline=SignalPipelineResult((), (), (), ()),
+            )
+
+    def _project_health(self, symbol: str) -> None:
+        self.states.apply_runtime(
+            symbol,
+            level=self.scheduler.get_level(symbol),
+            feed_status=self.health.status(symbol),
+            feed_latency=self.health.feed_latency(symbol),
+            last_update_age=self.health.last_update_age(symbol),
+        )
+
+    def _tick_result(
+        self,
+        symbol: str,
+        *,
+        level_before: SchedulerLevel,
+        features: MarketFeatures | None,
+        pipeline: SignalPipelineResult,
+    ) -> SymbolTickResult:
+        return SymbolTickResult(
+            symbol=symbol,
+            features=features,
+            accepted_events=pipeline.accepted_events,
+            signal_updates=pipeline.signal_updates,
+            traces=pipeline.traces,
+            alert_candidates=pipeline.alert_candidates,
+            level_before=level_before,
+            level_after=self.scheduler.get_level(symbol),
+        )

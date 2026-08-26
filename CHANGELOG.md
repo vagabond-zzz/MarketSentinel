@@ -65,3 +65,47 @@ Small correction before Runtime Integration. Event Rule thresholds, Feature Engi
 - No batch direction, and look-back/live state has exactly one compatible directional tape episode: NONE may join it.
 - Active UP and DOWN with no unique target: do not guess; keep/create a standalone NONE episode.
 - Invariant: one `MarketEvent` ID belongs to at most one active Signal.
+
+## M7 — Runtime Integration
+
+`MarketEngine.tick()` now runs the v0.2 pipeline after fetch/health. Core logic stays in the steppable `async tick()`; there is no `while True` + `sleep()` inside the engine. CLI v2, Replay/perf docs wrap-up, and Cursor are not in this milestone.
+
+### Data flow
+
+```text
+due → fetch → normalize → ring buffer → feed health
+  → FeatureEngine.compute → SignalPipeline.process → WarmingPolicy
+  → AdaptiveScheduler.set_level → MarketState projection → EngineTickResult
+```
+
+### Durable state vs tick output
+
+- `MarketState` is persistent: latest snapshot, scheduler level, feed status/latency/age, latest `MarketFeatures`, and `active_signals` (multiple episodes; not `last_signal`).
+- `EngineTickResult` / `SymbolTickResult` are this tick's edge-triggered output (`accepted_events`, `signal_updates`, `traces`, `alert_candidates`, level before/after).
+
+### Alert candidates
+
+- `alert_candidates` are Signals that newly gained reminder eligibility on this tick.
+- An active Signal remaining in `MarketState` does not re-emit an alert candidate on a quiet follow-up tick.
+
+### Cooldown vs attention
+
+- Cooldown may suppress `alert_candidates` while `signal_updates` still refresh `active_signals`.
+- Expired episodes are pruned from composer state and therefore from `active_signals`.
+- `WarmingPolicy` maps current features/events to a `LevelRequest`. Notification cooldown is not an input; a suppressed alert can remain HOT.
+- Engine applies `AdaptiveScheduler.set_level` without `force`, so existing dwell still blocks immediate downgrade.
+
+### Failure isolation
+
+- Feature or pipeline errors are logged with symbol and stage, then other symbols continue.
+- The failed symbol keeps its last known safe features/signals.
+
+### API
+
+| Item | Change |
+|---|---|
+| `MarketState` | `features`, `active_signals` |
+| `EngineTickResult` / `SymbolTickResult` | new tick output |
+| `MarketEngine.tick()` | returns `EngineTickResult` |
+| `WarmingPolicy` / `LevelRequest` | new orchestration boundary |
+| CLI v2 / Cursor / `notified_timestamp` | not implemented |

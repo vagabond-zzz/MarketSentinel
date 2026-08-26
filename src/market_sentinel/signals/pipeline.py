@@ -3,7 +3,7 @@ from __future__ import annotations
 from market_sentinel.clock import Clock
 from market_sentinel.domain.events import MarketEvent
 from market_sentinel.domain.features import MarketFeatures
-from market_sentinel.domain.signals import SignalPipelineResult
+from market_sentinel.domain.signals import Signal, SignalPipelineResult, SignalTrace
 from market_sentinel.events.detector import EventDetector
 from market_sentinel.signals.composer import SignalComposer
 from market_sentinel.signals.cooldown import CooldownGate
@@ -11,10 +11,7 @@ from market_sentinel.signals.dedupe import EventDeduper
 
 
 class SignalPipeline:
-    """Feature pair → detect all → dedupe all → compose episodes → cooldown once.
-
-    Not wired into MarketEngine (M7).
-    """
+    """Feature pair → detect all → dedupe all → compose episodes → cooldown once."""
 
     def __init__(
         self,
@@ -41,22 +38,24 @@ class SignalPipeline:
             if kept is not None:
                 accepted.append(kept)
         accepted_events = tuple(accepted)
-        if not accepted_events:
-            return SignalPipelineResult(
-                accepted_events=(),
-                signal_updates=(),
-                traces=(),
-                alert_candidates=(),
-            )
-        self.composer.consume_batch(accepted_events, current)
+        produced: list[tuple[Signal, SignalTrace]] = []
+        if accepted_events:
+            produced = self.composer.consume_batch(accepted_events, current)
+        else:
+            self.composer.prune(current.symbol, current.market_timestamp)
         signal_updates = self.composer.active_signals(current.symbol)
         traces = tuple(self.composer.trace_for(item.id) for item in signal_updates)
-        alert_candidates = tuple(
-            signal for signal in signal_updates if self._cooldown.allow(signal.id, signal.priority)
-        )
+        seen: set[str] = set()
+        alerts: list[Signal] = []
+        for signal, _trace in produced:
+            if signal.id in seen:
+                continue
+            seen.add(signal.id)
+            if self._cooldown.allow(signal.id, signal.priority):
+                alerts.append(signal)
         return SignalPipelineResult(
             accepted_events=accepted_events,
             signal_updates=signal_updates,
             traces=traces,
-            alert_candidates=alert_candidates,
+            alert_candidates=tuple(alerts),
         )
