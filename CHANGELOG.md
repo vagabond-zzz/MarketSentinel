@@ -109,3 +109,27 @@ due → fetch → normalize → ring buffer → feed health
 | `MarketEngine.tick()` | returns `EngineTickResult` |
 | `WarmingPolicy` / `LevelRequest` | new orchestration boundary |
 | CLI v2 / Cursor / `notified_timestamp` | not implemented |
+
+## M8 — CLI v2 / Diagnostics
+
+Diagnostics CLI for Core acceptance and as a reference before Cursor Host work. Feature math, Event thresholds, Dedupe, Cluster, Cooldown, Signal episodes, Scheduler dwell, and `MarketEngine` pipeline are unchanged.
+
+### Three information planes
+
+- Persistent state comes from `MarketState` (price, level, feed, features, `active_signals`).
+- `EVENTS THIS TICK` comes from `SymbolTickResult.accepted_events` only.
+- `ALERTS THIS TICK` comes from `SymbolTickResult.alert_candidates` only.
+
+An active episode remaining in `MarketState.active_signals` is not re-printed as a new alert on a quiet follow-up tick.
+
+### Display
+
+- Missing values render as `N/A` (never `0`, `0.00%`, or `1.00x`).
+- CLI formats decimal fractions as percents (`0.006` → `+0.60%`) and volume ratios as `1.80x`.
+- Multiple live episodes (UP / DOWN / VWAP / NONE) are all listed under `ACTIVE SIGNALS`.
+- ASCII-only chrome; no color, rich, or textual.
+
+### Commands
+
+- `run --once` still ticks, prints, and exits.
+- `run --verbose` adds `Scheduler: COLD -> HOT`, timestamps, and ids.

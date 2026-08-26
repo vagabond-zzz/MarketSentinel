@@ -6,7 +6,7 @@ import logging
 import sys
 from pathlib import Path
 
-from market_sentinel.cli.display import format_dashboard
+from market_sentinel.cli.display import format_dashboard, format_updated
 from market_sentinel.clock import SystemClock
 from market_sentinel.health.feed_health import FeedHealthTracker
 from market_sentinel.market_data.buffers import SymbolBuffers
@@ -14,6 +14,7 @@ from market_sentinel.market_data.state import MarketStateStore
 from market_sentinel.providers.fake import FakeProvider
 from market_sentinel.providers.replay import ReplayProvider
 from market_sentinel.runtime.engine import MarketEngine
+from market_sentinel.runtime.results import EngineTickResult
 from market_sentinel.scheduler.scheduler import AdaptiveScheduler
 from market_sentinel.watchlist.watchlist import Watchlist
 
@@ -51,6 +52,11 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="run diagnostics")
     run.add_argument("--once", action="store_true", help="run a single tick and exit")
+    run.add_argument(
+        "--verbose",
+        action="store_true",
+        help="show tick diagnostics (ids, timestamps, scheduler transition)",
+    )
     watchlist = sub.add_parser("watchlist", help="manage watched symbols")
     watch_sub = watchlist.add_subparsers(dest="watchlist_command", required=True)
     add = watch_sub.add_parser("add")
@@ -110,20 +116,25 @@ async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
         health=FeedHealthTracker(clock),
     )
     if args.once:
-        await engine.tick()
-        _print_dashboard(engine)
+        result = await engine.tick()
+        _print_dashboard(engine, result, verbose=args.verbose)
         return 0
     try:
         while True:
-            await engine.tick()
-            _print_dashboard(engine)
+            result = await engine.tick()
+            _print_dashboard(engine, result, verbose=args.verbose)
             await asyncio.sleep(engine.scheduler.next_wait_s(engine.watchlist.enabled_symbols()))
     except KeyboardInterrupt:
         return 0
     return 0
 
 
-def _print_dashboard(engine: MarketEngine) -> None:
+def _print_dashboard(
+    engine: MarketEngine,
+    tick_result: EngineTickResult,
+    *,
+    verbose: bool,
+) -> None:
     symbols = engine.watchlist.enabled_symbols() or [
         item.symbol for item in engine.watchlist.list()
     ]
@@ -136,6 +147,9 @@ def _print_dashboard(engine: MarketEngine) -> None:
             feed,
             states,
             watchlist_count=len(engine.watchlist.list()),
+            tick_result=tick_result,
+            updated=format_updated(engine.clock.wall_time()),
+            verbose=verbose,
         )
     )
 

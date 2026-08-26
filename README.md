@@ -2,7 +2,7 @@
 
 Low-latency market monitoring core for developer hosts (Cursor, DeepSeek Harness, ZCode).
 
-Current stage: **v0.2 Event Engine** (M7 Runtime Integration). High-frequency market updates never call an LLM (`Token = 0`). M8 CLI v2 and M9 wrap-up are not implemented.
+Current stage: **v0.2 Event Engine** (M8 CLI v2). High-frequency market updates never call an LLM (`Token = 0`). M9 wrap-up is not implemented.
 
 ## Requirements
 
@@ -34,20 +34,22 @@ Default pytest is offline. Do not depend on live market HTTP.
 uv run market-sentinel --watchlist data/watchlist.json watchlist add 00700.HK
 uv run market-sentinel --watchlist data/watchlist.json watchlist list
 uv run market-sentinel --watchlist data/watchlist.json run --once
+uv run market-sentinel --watchlist data/watchlist.json run --once --verbose
 ```
 
 `--provider` defaults to `fake`. `replay` reads a JSONL fixture. `http` is not part of the offline v0.1 Core path.
 
 ## v0.2 status (in progress)
 
-Done through M7:
+Done through M8:
 
 - Feature Engine, Event rules, dedupe, cluster, cooldown, Signal composer
 - `MarketEngine.tick()` pipeline: features → events → signals → warming → `EngineTickResult`
 - `MarketState.features` and `MarketState.active_signals` (multiple live episodes)
 - `alert_candidates` are edge-triggered, not durable notification state
+- Diagnostics CLI: persistent state vs `EVENTS THIS TICK` vs `ALERTS THIS TICK`
 
-Not in this stage: CLI v2, Cursor UI, DSH / ZCode adapters, LLM, `notified_timestamp`.
+Not in this stage: M9 replay/perf/docs wrap-up, Cursor UI, DSH / ZCode adapters, LLM, `notified_timestamp`.
 
 ## v0.1 status
 
