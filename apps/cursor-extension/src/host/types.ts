@@ -10,7 +10,7 @@ export type ActualState =
   | "STOPPING"
   | "STOPPED";
 
-export type ProviderName = "fake" | "replay";
+export type ProviderName = "fake" | "replay" | "longbridge";
 
 export interface HostConfig {
   coreRoot: string;

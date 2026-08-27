@@ -13,6 +13,8 @@ Python Core is **not** bundled. The extension spawns:
 uv run --directory <coreRoot> market-sentinel --provider fake daemon
 ```
 
+For live A-shares, set `marketSentinel.provider` to `longbridge` and export `LONGBRIDGE_APP_KEY` / `LONGBRIDGE_APP_SECRET` / `LONGBRIDGE_ACCESS_TOKEN` in the environment inherited by the child process (not in settings). Install the SDK with `uv sync --extra live`. See repository `docs/12_v0.4_Longbridge_Provider_Setup.md`.
+
 Wire protocol is JSONL Protocol v1 (`protocol_version === 1`).
 
 ## Install from VSIX
@@ -37,7 +39,7 @@ This extension is `extensionKind: ["ui"]` (local Desktop). Remote SSH / Codespac
 - `marketSentinel.coreRoot`
 - `marketSentinel.uvPath`
 - `marketSentinel.watchlist`
-- `marketSentinel.provider` (`fake` | `replay`)
+- `marketSentinel.provider` (`fake` | `replay` | `longbridge`)
 - `marketSentinel.replayPath`
 - `marketSentinel.enableHoverDetails` (default true)
 - `marketSentinel.alertToast` (`off` | `critical`, default `off`)

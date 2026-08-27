@@ -59,6 +59,15 @@ describe("parseHostSettings", () => {
     expect(parsed.ok).toBe(false);
   });
 
+  it("accepts longbridge without embedding credentials", () => {
+    const parsed = parseHostSettings({ provider: "longbridge" }, ["D:/repo"]);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.config.provider).toBe("longbridge");
+      expect(JSON.stringify(parsed.config)).not.toMatch(/LONGBRIDGE_/);
+    }
+  });
+
   it("rejects http provider", () => {
     const parsed = parseHostSettings({ provider: "http" }, ["D:/repo"]);
     expect(parsed.ok).toBe(false);

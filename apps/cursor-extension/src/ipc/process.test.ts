@@ -142,6 +142,22 @@ describe("ProcessManager", () => {
     expect(spawned[0]?.options.shell).toBe(false);
   });
 
+  it("spawns longbridge provider without secrets on argv", async () => {
+    const { manager, spawned } = managerWith(undefined, { provider: "longbridge" });
+    await manager.start([]);
+    expect(spawned[0]?.args).toEqual([
+      "run",
+      "--directory",
+      "D:/repo",
+      "market-sentinel",
+      "--provider",
+      "longbridge",
+      "daemon",
+    ]);
+    expect(spawned[0]?.args.join(" ")).not.toMatch(/LONGBRIDGE_/);
+    expect(JSON.stringify(spawned[0]?.options.env ?? {})).not.toMatch(/LONGBRIDGE_/);
+  });
+
   it("sends hello then set_watchlist then start", async () => {
     const { manager, commands } = managerWith();
     await manager.start([{ symbol: "00700.HK", enabled: true }]);

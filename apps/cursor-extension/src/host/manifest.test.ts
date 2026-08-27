@@ -40,6 +40,13 @@ describe("extension manifest", () => {
     expect(properties["marketSentinel.alertToast"]).toEqual(
       expect.objectContaining({ type: "string", default: "off", enum: ["off", "critical"] }),
     );
+    expect(properties["marketSentinel.provider"]).toEqual(
+      expect.objectContaining({
+        type: "string",
+        default: "fake",
+        enum: ["fake", "replay", "longbridge"],
+      }),
+    );
   });
 
   it("records the local VSIX publisher and ui-only extensionKind", () => {

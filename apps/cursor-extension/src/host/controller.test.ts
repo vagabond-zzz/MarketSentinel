@@ -434,6 +434,16 @@ describe("HostController", () => {
     expect(harness.lines.some((line) => line.includes("restart core to apply"))).toBe(true);
   });
 
+  it("treats longbridge as a restart-needed provider choice without secrets", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    harness.settings.provider = "longbridge";
+    await harness.controller.onConfigurationChanged(["provider"]);
+    expect(harness.controller.restartNeeded).toBe(true);
+    expect(harness.spawned).toHaveLength(1);
+    expect(harness.lines.join("\n")).not.toMatch(/LONGBRIDGE_/);
+  });
+
   it("restartCore while PAUSED does not spawn a ticking daemon", async () => {
     const harness = createHarness();
     await harness.controller.start();

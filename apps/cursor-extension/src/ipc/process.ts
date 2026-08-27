@@ -17,7 +17,7 @@ export type DelayFn = (ms: number) => Promise<void>;
 export interface ProcessManagerOptions {
   uvPath?: string;
   coreRoot: string;
-  provider?: "fake" | "replay";
+  provider?: "fake" | "replay" | "longbridge";
   replayPath?: string;
   watchlist?: WatchlistItem[];
   spawnFn?: SpawnFn;

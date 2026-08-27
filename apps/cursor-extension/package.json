@@ -81,9 +81,9 @@
         },
         "marketSentinel.provider": {
           "type": "string",
-          "enum": ["fake", "replay"],
+          "enum": ["fake", "replay", "longbridge"],
           "default": "fake",
-          "description": "Core market data provider. http is not available in v0.3."
+          "description": "Core market data provider. longbridge uses process environment credentials (LONGBRIDGE_APP_KEY / SECRET / ACCESS_TOKEN). Do not put secrets in settings. http is a deprecated Core stub."
         },
         "marketSentinel.replayPath": {
           "type": "string",

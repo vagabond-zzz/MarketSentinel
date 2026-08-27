@@ -69,10 +69,10 @@ export function parseProvider(raw: unknown): ProviderName {
   if (raw === undefined || raw === "") {
     return "fake";
   }
-  if (raw === "fake" || raw === "replay") {
+  if (raw === "fake" || raw === "replay" || raw === "longbridge") {
     return raw;
   }
-  throw new HostConfigError('marketSentinel.provider must be "fake" or "replay"');
+  throw new HostConfigError('marketSentinel.provider must be "fake", "replay", or "longbridge"');
 }
 
 export function parseEnableHoverDetails(raw: unknown): boolean {
