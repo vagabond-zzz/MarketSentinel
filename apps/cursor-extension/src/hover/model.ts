@@ -214,6 +214,20 @@ export function mapHover(input: HoverInput): HoverModel {
     );
   }
 
+  if (market.watchlist_count === 0 && market.symbols.length === 0) {
+    return withUnread(
+      {
+        title: "Market Sentinel",
+        enableDetails,
+        headline: "Market Sentinel · No symbols configured",
+        lifecycleMessage: "No symbols configured",
+        outputHint: "Configure marketSentinel.watchlist to start monitoring",
+        symbols: [],
+      },
+      unread,
+    );
+  }
+
   const { hot, warm } = countLevels(market.symbols);
   return withUnread(
     {

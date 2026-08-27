@@ -33,6 +33,7 @@ describe("HostController ↔ Python daemon", () => {
       try {
         await controller.start();
         expect(controller.actualState).toBe("RUNNING");
+        expect(controller.statusBarModel().kind).not.toBe("IDLE");
         const pid = controller.lastPid;
         await controller.pause();
         expect(controller.actualState).toBe("PAUSED");
@@ -43,6 +44,37 @@ describe("HostController ↔ Python daemon", () => {
         if (pid !== undefined) {
           expect(processExists(pid)).toBe(false);
         }
+      } catch (error) {
+        await controller.shutdown().catch(() => undefined);
+        throw error;
+      }
+    },
+    40_000,
+  );
+
+  it.skipIf(uvPath === undefined)(
+    "empty watchlist stays IDLE, not STALE",
+    async () => {
+      const repo = findRepoRoot();
+      const controller = new HostController({
+        readSettings: () => ({
+          coreRoot: repo,
+          uvPath,
+          watchlist: [],
+          provider: "fake",
+        }),
+        workspaceFolders: () => [repo],
+        logger: createLogger(),
+        helloTimeoutMs: 20_000,
+        defaultTimeoutMs: 10_000,
+      });
+      try {
+        await controller.start();
+        expect(controller.actualState).toBe("RUNNING");
+        expect(controller.statusBarModel().kind).toBe("IDLE");
+        expect(controller.statusBarModel().tone).toBe("default");
+        expect(controller.hoverModel().lifecycleMessage).toBe("No symbols configured");
+        await controller.shutdown();
       } catch (error) {
         await controller.shutdown().catch(() => undefined);
         throw error;

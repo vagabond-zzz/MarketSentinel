@@ -144,6 +144,45 @@ describe("mapStatusBar", () => {
     expect(view.text).toBe("MS STARTING");
   });
 
+  it("maps an empty watchlist to IDLE instead of STALE", () => {
+    const view = mapStatusBar({
+      ...running,
+      market: { watchlist_count: 0, feed_status: "DISCONNECTED", symbols: [] },
+    });
+    expect(view.kind).toBe("IDLE");
+    expect(view.text).toBe("MS IDLE");
+    expect(view.tone).toBe("default");
+  });
+
+  it("keeps unread on IDLE without changing kind", () => {
+    const view = mapStatusBar({
+      ...running,
+      market: { watchlist_count: 0, feed_status: "DISCONNECTED", symbols: [] },
+      unreadAlertCount: 2,
+    });
+    expect(view.kind).toBe("IDLE");
+    expect(view.text).toBe("MS IDLE · 2");
+    expect(view.tone).toBe("default");
+  });
+
+  it("maps a configured watchlist with DISCONNECTED feed to STALE", () => {
+    const view = mapStatusBar({
+      ...running,
+      market: market({ feed_status: "DISCONNECTED", symbols: [symbol({ feed_status: "DISCONNECTED" })] }),
+    });
+    expect(view.kind).toBe("STALE");
+    expect(view.tone).toBe("error");
+  });
+
+  it("does not treat watchlist_count=0 with leftover symbols as IDLE", () => {
+    expect(
+      mapStatusBar({
+        ...running,
+        market: { watchlist_count: 0, feed_status: "DISCONNECTED", symbols: [symbol()] },
+      }).kind,
+    ).toBe("STALE");
+  });
+
   it("maps HOT over WARM over NORMAL", () => {
     expect(
       mapStatusBar({

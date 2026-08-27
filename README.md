@@ -17,12 +17,13 @@ Included:
 - Cursor / VS Code **Desktop** extension
 - Python daemon via **uv**
 - JSONL Protocol v1
-- StatusBar (`DISCONNECTED` / `STARTING` / `PAUSED` / `STALE` / `ALERT` / `HOT` / `WARM` / `NORMAL`)
+- StatusBar (`DISCONNECTED` / `STARTING` / `PAUSED` / `IDLE` / `STALE` / `ALERT` / `HOT` / `WARM` / `NORMAL`)
 - Hover (persistent `WireMarketState`)
 - Pause / Resume / Restart Core / Show Output
 - Unread alert badge (unsolicited `alert` edges only)
 - Optional critical toast (`marketSentinel.alertToast`)
 - Reset Alert Badge
+- Empty watchlist is `IDLE` (not `STALE`); a configured symbol with stale/disconnected feed is still `STALE`
 
 Python Core is **not** bundled in the VSIX. Developer install still needs a Core checkout and `uv`.
 

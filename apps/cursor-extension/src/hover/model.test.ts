@@ -67,6 +67,23 @@ describe("mapHover", () => {
     expect(view.headline).toBe("Market Sentinel · Core starting");
   });
 
+  it("maps an empty watchlist to configuration copy instead of Feed DISCONNECTED", () => {
+    const empty = { watchlist_count: 0, feed_status: "DISCONNECTED" as const, symbols: [] };
+    const view = mapHover({ actual: "RUNNING", market: empty });
+    expect(view.lifecycleMessage).toBe("No symbols configured");
+    expect(view.outputHint).toBe("Configure marketSentinel.watchlist to start monitoring");
+    expect(view.feed).toBeUndefined();
+    expect(view.symbolCount).toBeUndefined();
+    expect(view.hotCount).toBeUndefined();
+    expect(view.warmCount).toBeUndefined();
+    expect(view.symbols).toEqual([]);
+    expect(view.headline).toBe("Market Sentinel · No symbols configured");
+
+    const compact = mapHover({ actual: "RUNNING", enableHoverDetails: false, market: empty });
+    expect(compact.headline).toBe("Market Sentinel · No symbols configured");
+    expect(compact.enableDetails).toBe(false);
+  });
+
   it("surfaces aggregate LIVE, DELAYED, STALE, and DISCONNECTED feeds", () => {
     expect(mapHover({ actual: "RUNNING", market: market({ feed_status: "LIVE" }) }).feed).toBe("LIVE");
     expect(mapHover({ actual: "RUNNING", market: market({ feed_status: "DELAYED" }) }).feed).toBe(

@@ -40,6 +40,10 @@ Unread badge and optional critical toast come only from unsolicited Protocol `al
 
 Local developer VSIX via `@vscode/vsce` (`pnpm package:vsix`). Identity `market-sentinel-local.market-sentinel` is a local publisher id, not Marketplace. `extensionKind: ["ui"]`. Python Core is not bundled. Extension Host smoke uses `@vscode/test-electron`. Host-level IPC covers hello → set_watchlist → start → pause → resume → get_state → shutdown. Restart invariant: unread survives Core crash; `active_signals` still do not increment unread; a new `alert` edge increments unread. No tag, no Marketplace publish, Python version stays 0.2.0.
 
+### M8.1 — Empty watchlist IDLE
+
+Host StatusBar maps RUNNING + empty watchlist (`watchlist_count === 0` and `symbols === []`) to `IDLE` with default tone. A configured symbol whose feed is STALE/DISCONNECTED still maps to `STALE`. Hover says “No symbols configured” instead of presenting Core `feed_status=DISCONNECTED` as a data outage. Unread is unchanged.
+
 ## v0.2.0 — 2026-08-26
 
 Market Event Engine: deterministic Features, six Event Rules, Dedupe / Cluster / episode-aware Cooldown, Signal lifecycle, COLD/WARM/HOT Runtime integration, CLI diagnostics, Replay E2E, and coverage/performance gates.

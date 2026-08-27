@@ -74,6 +74,23 @@ describe("renderHoverMarkdown", () => {
     expect(text).not.toMatch(/600519\.SH[\s\S]*Price:/);
   });
 
+  it("renders empty-watchlist copy without Feed DISCONNECTED", () => {
+    const empty = { watchlist_count: 0, feed_status: "DISCONNECTED" as const, symbols: [] };
+    const text = renderHoverMarkdown(mapHover({ actual: "RUNNING", market: empty }));
+    expect(text).toContain("Market Sentinel");
+    expect(text).toContain("No symbols configured");
+    expect(text).toContain("Configure marketSentinel.watchlist to start monitoring");
+    expect(text).not.toContain("Feed:");
+    expect(text).not.toContain("DISCONNECTED");
+    expect(text).not.toContain("Symbols:");
+    expect(text).not.toContain("HOT:");
+    expect(
+      renderHoverMarkdown(
+        mapHover({ actual: "RUNNING", enableHoverDetails: false, market: empty }),
+      ),
+    ).toBe("Market Sentinel · No symbols configured");
+  });
+
   it("keeps STALE/DISCONNECTED feeds visible at the top", () => {
     expect(
       renderHoverMarkdown(

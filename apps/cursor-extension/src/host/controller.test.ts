@@ -501,7 +501,7 @@ describe("HostController", () => {
       },
     });
     await harness.controller.start();
-    expect(harness.controller.statusBarModel().kind).toBe("STALE");
+    expect(harness.controller.statusBarModel().kind).toBe("IDLE");
 
     harness.children[0]?.stdout.write(
       JSON.stringify({
@@ -564,7 +564,7 @@ describe("HostController", () => {
 
     await harness.controller.pause();
     expect(harness.controller.statusBarModel().kind).toBe("PAUSED");
-    expect(views).toContain("STALE");
+    expect(views).toContain("IDLE");
     expect(views).toContain("HOT");
     expect(views).toContain("ALERT");
     expect(views).toContain("PAUSED");
@@ -898,6 +898,25 @@ describe("HostController", () => {
     expect(harness.controller.hoverModel().symbols[0]?.level).toBe("HOT");
     now = 1_000 + 15_000;
     expect(harness.controller.statusBarModel().kind).toBe("HOT");
+  });
+
+  it("keeps unread when Core reports an empty watchlist", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate()]);
+    expect(harness.controller.unreadAlertCount).toBe(1);
+    writeState(harness.children[0], {
+      watchlist_count: 0,
+      feed_status: "DISCONNECTED",
+      symbols: [],
+    });
+    expect(harness.controller.unreadAlertCount).toBe(1);
+    expect(harness.controller.statusBarModel().kind).toBe("IDLE");
+    expect(harness.controller.statusBarModel().text).toBe("MS IDLE · 1");
+    expect(harness.controller.hoverModel().lifecycleMessage).toBe("No symbols configured");
+    harness.controller.resetAlertBadge();
+    expect(harness.controller.unreadAlertCount).toBe(0);
+    expect(harness.controller.statusBarModel().text).toBe("MS IDLE");
   });
 
   it("hot-applies alertToast without restarting Core", async () => {

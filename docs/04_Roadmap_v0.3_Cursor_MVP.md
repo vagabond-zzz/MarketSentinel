@@ -161,6 +161,8 @@ StatusBar → Hover → Detail
 | M7 Alert handling | done |
 | M8 Host integration tests / packaging | done (Release Candidate; not tagged) |
 
+M8.1 Host UI: empty watchlist is StatusBar `IDLE`, not `STALE`. Core `feed_status` is unchanged.
+
 v0.3 Host watchlist source of truth is `marketSentinel.watchlist` (settings). The daemon holds a non-persistent runtime Watchlist updated via `set_watchlist` and does not write `data/watchlist.json`.
 
 M8 Release Candidate identity (local VSIX, not Marketplace):

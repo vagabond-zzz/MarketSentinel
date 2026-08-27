@@ -6,6 +6,7 @@ export type StatusBarKind =
   | "DISCONNECTED"
   | "STARTING"
   | "PAUSED"
+  | "IDLE"
   | "STALE"
   | "ALERT"
   | "HOT"
@@ -105,6 +106,10 @@ export function mapStatusBar(input: StatusBarInput): StatusBarModel {
 
   if (input.market === undefined) {
     return model("STARTING", "default", input);
+  }
+
+  if (input.market.watchlist_count === 0 && input.market.symbols.length === 0) {
+    return model("IDLE", "default", input);
   }
 
   const feed = input.market.feed_status;

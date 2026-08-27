@@ -52,10 +52,18 @@ function apply(kindInput: Parameters<typeof mapStatusBar>[0], hoverActual = kind
 }
 
 describe("StatusBarItem adapter", () => {
-  it("applies DISCONNECTED, STARTING, NORMAL, WARM, HOT, STALE, and PAUSED without throwing", () => {
+  it("applies DISCONNECTED, STARTING, IDLE, NORMAL, WARM, HOT, STALE, and PAUSED without throwing", () => {
     expect(apply({ ...running, actual: "DISCONNECTED" }).status.kind).toBe("DISCONNECTED");
     expect(vscodeState.statusBar.text).toBe("MS DISCONNECTED");
     expect(apply({ ...running, actual: "STARTING" }).status.kind).toBe("STARTING");
+    const idle = apply({
+      ...running,
+      market: { watchlist_count: 0, feed_status: "DISCONNECTED", symbols: [] },
+    });
+    expect(idle.status.kind).toBe("IDLE");
+    expect(idle.status.tone).toBe("default");
+    expect(vscodeState.statusBar.text).toBe("MS IDLE");
+    expect(vscodeState.statusBar.backgroundColor).toBeUndefined();
     expect(apply({ ...running, market: market() }).status.kind).toBe("NORMAL");
     expect(
       apply({
