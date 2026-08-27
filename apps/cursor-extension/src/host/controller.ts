@@ -1,0 +1,346 @@
+import { ProtocolError } from "../ipc/errors";
+import {
+  ProcessManager,
+  type DelayFn,
+  type ProcessManagerOptions,
+  type SpawnFn,
+} from "../ipc/process";
+import type { WatchlistItem } from "../protocol/types";
+import { parseHostSettings } from "./config";
+import type {
+  ActualState,
+  DesiredState,
+  HostConfig,
+  HostLogger,
+  RawSettings,
+  SettingKey,
+} from "./types";
+import { HOT_SETTING_KEYS, RESTART_SETTING_KEYS } from "./types";
+
+export const DEFAULT_BACKOFF_MS = [1_000, 3_000, 10_000] as const;
+export const DEFAULT_MAX_RETRIES = 3;
+
+const RESTART_HINT = "Market Sentinel core configuration changed; restart core to apply.";
+
+export interface HostControllerOptions {
+  readSettings: () => RawSettings;
+  workspaceFolders: () => string[];
+  logger: HostLogger;
+  spawnFn?: SpawnFn;
+  delay?: DelayFn;
+  createManager?: (options: ProcessManagerOptions) => ProcessManager;
+  backoffMs?: readonly number[];
+  maxRetries?: number;
+  helloTimeoutMs?: number;
+  defaultTimeoutMs?: number;
+}
+
+function defaultDelay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+export class HostController {
+  private readonly options: HostControllerOptions;
+  private readonly backoffMs: readonly number[];
+  private readonly maxRetries: number;
+  private readonly createManager: (options: ProcessManagerOptions) => ProcessManager;
+  private readonly delayFn: DelayFn;
+
+  private desiredInternal: DesiredState = "RUNNING";
+  private actualInternal: ActualState = "STOPPED";
+  private manager: ProcessManager | undefined;
+  private spawnConfig: Omit<HostConfig, "watchlist"> | undefined;
+  private lastAcked: WatchlistItem[] = [];
+  private retryCount = 0;
+  private restartNeededInternal = false;
+  private disposed = false;
+  private restartInFlight = false;
+  private lastErrorInternal: string | undefined;
+  private coreVersionInternal: string | undefined;
+  private managerGeneration = 0;
+
+  constructor(options: HostControllerOptions) {
+    this.options = options;
+    this.backoffMs = options.backoffMs ?? DEFAULT_BACKOFF_MS;
+    this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.createManager = options.createManager ?? ((opts) => new ProcessManager(opts));
+    this.delayFn = options.delay ?? defaultDelay;
+  }
+
+  get desiredState(): DesiredState {
+    return this.desiredInternal;
+  }
+
+  get actualState(): ActualState {
+    return this.actualInternal;
+  }
+
+  get restartNeeded(): boolean {
+    return this.restartNeededInternal;
+  }
+
+  get lastError(): string | undefined {
+    return this.lastErrorInternal;
+  }
+
+  get lastCoreVersion(): string | undefined {
+    return this.coreVersionInternal;
+  }
+
+  get lastAcknowledgedWatchlist(): WatchlistItem[] {
+    return this.lastAcked.map((item) => ({ ...item }));
+  }
+
+  async start(): Promise<void> {
+    this.desiredInternal = "RUNNING";
+    try {
+      await this.connectFromSettings();
+    } catch (error) {
+      this.failDisconnected(error);
+    }
+  }
+
+  async shutdown(): Promise<void> {
+    this.disposed = true;
+    this.restartInFlight = false;
+    if (this.actualInternal === "STOPPED" && this.manager === undefined) {
+      return;
+    }
+    this.actualInternal = "STOPPING";
+    await this.disposeManager();
+    this.actualInternal = "STOPPED";
+  }
+
+  async pause(): Promise<void> {
+    this.desiredInternal = "PAUSED";
+    if (this.actualInternal === "DISCONNECTED" || this.actualInternal === "STOPPED") {
+      this.options.logger.host("pause requested while disconnected; core will stay stopped");
+      return;
+    }
+    if (this.manager === undefined || !this.manager.connected) {
+      this.actualInternal = "DISCONNECTED";
+      return;
+    }
+    try {
+      await this.manager.pause();
+      this.actualInternal = "PAUSED";
+    } catch (error) {
+      this.options.logger.host(`pause failed: ${this.errorMessage(error)}`);
+    }
+  }
+
+  async resume(): Promise<void> {
+    this.desiredInternal = "RUNNING";
+    this.retryCount = 0;
+    if (this.actualInternal === "PAUSED" && this.manager !== undefined && this.manager.connected) {
+      try {
+        await this.manager.resume();
+        this.actualInternal = "RUNNING";
+        return;
+      } catch (error) {
+        this.options.logger.host(`resume failed: ${this.errorMessage(error)}`);
+        this.actualInternal = "DISCONNECTED";
+      }
+    }
+    try {
+      await this.connectFromSettings();
+    } catch (error) {
+      this.failDisconnected(error);
+    }
+  }
+
+  async restartCore(): Promise<void> {
+    this.retryCount = 0;
+    await this.disposeManager();
+    this.restartNeededInternal = false;
+    if (this.desiredInternal === "PAUSED") {
+      this.actualInternal = "STOPPED";
+      this.options.logger.host("restartCore skipped spawn because desiredState is PAUSED");
+      return;
+    }
+    try {
+      await this.connectFromSettings();
+    } catch (error) {
+      this.failDisconnected(error);
+    }
+  }
+
+  async onConfigurationChanged(keys: readonly string[]): Promise<void> {
+    const relevant = keys.filter((key) => this.isSettingKey(key));
+    if (relevant.length === 0) {
+      return;
+    }
+    if (relevant.some((key) => (RESTART_SETTING_KEYS as readonly string[]).includes(key))) {
+      this.restartNeededInternal = true;
+      this.options.logger.host(RESTART_HINT);
+    }
+    if (relevant.includes("watchlist")) {
+      await this.applyWatchlistHotUpdate();
+    }
+  }
+
+  private isSettingKey(key: string): key is SettingKey {
+    return (
+      (HOT_SETTING_KEYS as readonly string[]).includes(key) ||
+      (RESTART_SETTING_KEYS as readonly string[]).includes(key)
+    );
+  }
+
+  private async applyWatchlistHotUpdate(): Promise<void> {
+    const parsed = parseHostSettings(this.options.readSettings(), this.options.workspaceFolders());
+    if (!parsed.ok) {
+      this.options.logger.host(`watchlist setting ignored: ${parsed.error}`);
+      return;
+    }
+    if (this.manager === undefined || !this.manager.connected) {
+      return;
+    }
+    try {
+      await this.manager.setWatchlist(parsed.config.watchlist);
+      this.lastAcked = this.manager.acknowledgedWatchlist;
+    } catch (error) {
+      this.options.logger.host(`watchlist update rejected: ${this.errorMessage(error)}`);
+    }
+  }
+
+  private async connectFromSettings(): Promise<void> {
+    const parsed = parseHostSettings(this.options.readSettings(), this.options.workspaceFolders());
+    if (!parsed.ok) {
+      throw new Error(parsed.error);
+    }
+    this.spawnConfig = {
+      coreRoot: parsed.config.coreRoot,
+      uvPath: parsed.config.uvPath,
+      provider: parsed.config.provider,
+      replayPath: parsed.config.replayPath,
+    };
+    await this.spawnAndStart(parsed.config.watchlist);
+  }
+
+  private async connectWithRuntimeWatchlist(): Promise<void> {
+    if (this.spawnConfig === undefined) {
+      await this.connectFromSettings();
+      return;
+    }
+    const parsed = parseHostSettings(this.options.readSettings(), this.options.workspaceFolders());
+    const watchlist = parsed.ok ? parsed.config.watchlist : this.lastAcked;
+    await this.spawnAndStart(watchlist);
+  }
+
+  private async spawnAndStart(watchlist: WatchlistItem[]): Promise<void> {
+    if (this.spawnConfig === undefined) {
+      throw new Error("spawn configuration is missing");
+    }
+    await this.disposeManager();
+    this.actualInternal = "STARTING";
+    const generation = ++this.managerGeneration;
+    const spawnSnapshot = this.spawnConfig;
+    const manager = this.createManager({
+      coreRoot: spawnSnapshot.coreRoot,
+      uvPath: spawnSnapshot.uvPath,
+      provider: spawnSnapshot.provider,
+      replayPath: spawnSnapshot.replayPath,
+      watchlist,
+      spawnFn: this.options.spawnFn,
+      helloTimeoutMs: this.options.helloTimeoutMs,
+      defaultTimeoutMs: this.options.defaultTimeoutMs,
+      onStderr: (chunk) => this.options.logger.core(chunk),
+      onProtocolError: (error) => {
+        this.options.logger.host(`protocol error ${error.code}: ${error.message}`);
+      },
+      onReady: (coreVersion) => {
+        this.coreVersionInternal = coreVersion;
+        this.options.logger.host(
+          `core ready core_version=${coreVersion} (diagnostics only; wire compatibility is protocol_version)`,
+        );
+      },
+      onDisconnected: (reason) => {
+        if (generation !== this.managerGeneration) {
+          return;
+        }
+        this.options.logger.host(`core disconnected: ${reason}`);
+        void this.handleUnexpectedDisconnect();
+      },
+    });
+    this.manager = manager;
+    await manager.start(watchlist);
+    this.lastAcked = manager.acknowledgedWatchlist;
+    this.actualInternal = "RUNNING";
+    this.retryCount = 0;
+    this.lastErrorInternal = undefined;
+  }
+
+  private async handleUnexpectedDisconnect(): Promise<void> {
+    this.manager = undefined;
+    this.actualInternal = "DISCONNECTED";
+    if (this.disposed || this.desiredInternal !== "RUNNING") {
+      this.options.logger.host("core exited while desiredState is not RUNNING; not auto-restarting");
+      return;
+    }
+    if (this.restartInFlight) {
+      return;
+    }
+    this.restartInFlight = true;
+    try {
+      while (!this.disposed && this.desiredInternal === "RUNNING") {
+        if (this.retryCount >= this.maxRetries) {
+          this.options.logger.host("auto-restart gave up after 3 attempts");
+          this.actualInternal = "DISCONNECTED";
+          return;
+        }
+        const wait = this.backoffMs[Math.min(this.retryCount, this.backoffMs.length - 1)] ?? 0;
+        this.retryCount += 1;
+        this.options.logger.host(`restart attempt ${this.retryCount} after ${wait}ms`);
+        await this.delayFn(wait);
+        if (this.disposed || this.desiredInternal !== "RUNNING") {
+          return;
+        }
+        try {
+          await this.connectWithRuntimeWatchlist();
+          return;
+        } catch (error) {
+          this.failDisconnected(error);
+        }
+      }
+    } finally {
+      this.restartInFlight = false;
+    }
+  }
+
+  private async disposeManager(): Promise<void> {
+    this.managerGeneration += 1;
+    const manager = this.manager;
+    this.manager = undefined;
+    if (manager !== undefined) {
+      await manager.shutdown();
+    }
+  }
+
+  private failDisconnected(error: unknown): void {
+    const message = this.errorMessage(error);
+    this.lastErrorInternal = message;
+    this.actualInternal = "DISCONNECTED";
+    this.options.logger.host(message);
+    if (error instanceof ProtocolError) {
+      this.options.logger.host(`core error code=${error.code} request_id=${error.requestId ?? ""}`);
+    }
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      const extra =
+        "code" in error && typeof (error as { code?: unknown }).code === "string"
+          ? ` code=${(error as { code: string }).code}`
+          : "";
+      if (/ENOENT/i.test(error.message) || extra.includes("ENOENT")) {
+        const uvPath = this.spawnConfig?.uvPath ?? this.options.readSettings().uvPath ?? "uv";
+        const coreRoot = this.spawnConfig?.coreRoot ?? "";
+        return `uv executable not found (uvPath=${uvPath}, coreRoot=${coreRoot}): ${error.message}`;
+      }
+      return error.message;
+    }
+    return String(error);
+  }
+}

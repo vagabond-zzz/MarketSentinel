@@ -30,6 +30,8 @@ export interface ProcessManagerOptions {
   onState?: (message: StateMessage) => void;
   onAlert?: (message: AlertMessage) => void;
   onProtocolError?: (error: ProtocolError) => void;
+  onReady?: (coreVersion: string) => void;
+  onDisconnected?: (reason: string) => void;
 }
 
 function defaultDelay(ms: number): Promise<void> {
@@ -59,6 +61,8 @@ export class ProcessManager {
   private exitHandler: ((code: number | null, signal: NodeJS.Signals | null) => void) | undefined;
   private errorHandler: ((error: Error) => void) | undefined;
   private stopping = false;
+  private live = false;
+  private disconnectSent = false;
 
   constructor(options: ProcessManagerOptions) {
     this.options = options;
@@ -75,6 +79,10 @@ export class ProcessManager {
 
   get acknowledgedWatchlist(): WatchlistItem[] {
     return this.ackedWatchlist.map((item) => ({ ...item }));
+  }
+
+  get connected(): boolean {
+    return this.client !== undefined;
   }
 
   daemonArgs(): { command: string; args: string[] } {
@@ -202,6 +210,8 @@ export class ProcessManager {
   }
 
   private async spawnAndHandshake(watchlist: WatchlistItem[]): Promise<void> {
+    this.live = false;
+    this.disconnectSent = false;
     this.phaseInternal = "STARTING";
     const { command, args } = this.daemonArgs();
     const spawnFn = this.options.spawnFn ?? spawn;
@@ -243,6 +253,7 @@ export class ProcessManager {
       if (ready.type !== "ready") {
         throw new ProtocolError("unexpected_type", `expected ready, got ${ready.type}`);
       }
+      this.options.onReady?.(ready.core_version);
       const ack = await client.request({ type: "set_watchlist", items: watchlist });
       if (ack.type !== "ack") {
         throw new ProtocolError("unexpected_type", `expected ack, got ${ack.type}`);
@@ -252,6 +263,7 @@ export class ProcessManager {
       if (started.type !== "ack") {
         throw new ProtocolError("unexpected_type", `expected ack, got ${started.type}`);
       }
+      this.live = true;
       this.phaseInternal = "RUNNING";
     } catch (error) {
       return this.failStart(error);
@@ -273,12 +285,12 @@ export class ProcessManager {
       this.phaseInternal = "DISCONNECTED";
       this.cleanup({ rejectPending: true, reason: "child exit" });
     };
-    this.errorHandler = () => {
+    this.errorHandler = (error: Error) => {
       if (this.stopping) {
         return;
       }
       this.phaseInternal = "DISCONNECTED";
-      this.cleanup({ rejectPending: true, reason: "child error" });
+      this.cleanup({ rejectPending: true, reason: error.message });
     };
     child.stdout?.on("data", this.stdoutHandler);
     child.stderr?.on("data", this.stderrHandler);
@@ -302,6 +314,11 @@ export class ProcessManager {
   }
 
   private cleanup(opts: { rejectPending: boolean; reason: string }): void {
+    const notifyDisconnect = this.live && !this.stopping && !this.disconnectSent;
+    this.live = false;
+    if (notifyDisconnect) {
+      this.disconnectSent = true;
+    }
     const child = this.child;
     const client = this.client;
     if (child !== undefined) {
@@ -330,6 +347,9 @@ export class ProcessManager {
         client.notifyClosed(opts.reason);
       }
       client.dispose();
+    }
+    if (notifyDisconnect) {
+      this.options.onDisconnected?.(opts.reason);
     }
   }
 }
