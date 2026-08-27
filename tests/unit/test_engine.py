@@ -53,6 +53,75 @@ async def test_tick_fetches_enabled_symbols_and_updates_state(tmp_path: Path) ->
     assert clock.monotonic_time() == 0.0
 
 
+async def test_older_quote_is_suppressed(tmp_path: Path) -> None:
+    clock, provider, engine = _engine(tmp_path)
+    engine.watchlist.add("600519.SH")
+    provider.set_quote("600519.SH", price=100.0, market_timestamp=50.0, volume=10.0)
+    await engine.tick()
+    first = engine.buffers.latest("600519.SH")
+    assert first is not None
+    clock.advance(10.0)
+    provider.set_quote("600519.SH", price=90.0, market_timestamp=40.0, volume=11.0)
+    result = await engine.tick()
+    latest = engine.buffers.latest("600519.SH")
+    assert latest is not None
+    assert latest.price == 100.0
+    assert latest.market_timestamp == 50.0
+    assert engine.diagnostics.out_of_order_count == 1
+    row = result.for_symbol("600519.SH")
+    assert row is not None
+    assert row.accepted_events == ()
+
+
+async def test_duplicate_timestamp_replaces_without_second_buffer_row(tmp_path: Path) -> None:
+    clock, provider, engine = _engine(tmp_path)
+    engine.watchlist.add("600519.SH")
+    provider.set_quote("600519.SH", price=100.0, market_timestamp=50.0)
+    await engine.tick()
+    clock.advance(10.0)
+    provider.set_quote("600519.SH", price=101.0, market_timestamp=50.0)
+    await engine.tick()
+    buffer = engine.buffers.buffer("600519.SH")
+    assert buffer is not None
+    assert len(buffer.since(0.0)) == 1
+    latest = engine.buffers.latest("600519.SH")
+    assert latest is not None
+    assert latest.price == 101.0
+    assert engine.diagnostics.duplicate_timestamp_count == 1
+
+
+async def test_timeout_does_not_reprocess_stale_buffer(tmp_path: Path) -> None:
+    clock, provider, engine = _engine(tmp_path)
+    engine.watchlist.add("600519.SH")
+    provider.set_quote("600519.SH", price=100.0, market_timestamp=clock.wall_time() - 0.2)
+    first = await engine.tick()
+    assert first.for_symbol("600519.SH") is not None
+    clock.advance(10.0)
+    provider.set_timeout(True)
+    second = await engine.tick()
+    row = second.for_symbol("600519.SH")
+    assert row is not None
+    assert row.accepted_events == ()
+    assert row.alert_candidates == ()
+    assert engine.diagnostics.last_fetch_error == "TimeoutError"
+
+
+async def test_missing_quote_does_not_reuse_previous_vendor_tick(tmp_path: Path) -> None:
+    clock, provider, engine = _engine(tmp_path)
+    engine.watchlist.add("600519.SH")
+    provider.set_quote("600519.SH", price=100.0, market_timestamp=clock.wall_time() - 0.2)
+    await engine.tick()
+    clock.advance(10.0)
+    provider.fail_symbol("600519.SH")
+    result = await engine.tick()
+    row = result.for_symbol("600519.SH")
+    assert row is not None
+    assert row.accepted_events == ()
+    latest = engine.buffers.latest("600519.SH")
+    assert latest is not None
+    assert latest.price == 100.0
+
+
 async def test_tick_timeout_is_not_disconnected(tmp_path: Path) -> None:
     _, provider, engine = _engine(tmp_path)
     engine.watchlist.add("00700.HK")

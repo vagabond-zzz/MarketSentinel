@@ -70,6 +70,7 @@ async def test_tick_cycle_disable_disconnect_and_recovery(tmp_path: Path) -> Non
     clock.advance(10.0)
     await engine.tick()
     assert engine.health.status(TEN_SYMBOLS[1]) is FeedStatus.LIVE
+    assert engine.diagnostics.recovery_count >= 1
 
     for _ in range(8):
         clock.advance(10.0)

@@ -79,6 +79,25 @@ def test_lunch_gap_does_not_reuse_morning_anchor() -> None:
     assert features.volume_1m is None
 
 
+def test_lunch_is_same_calendar_session_not_a_reset() -> None:
+    from market_sentinel.market_data.session import is_same_session, session_id
+
+    assert session_id(OPEN) == session_id(AFTERNOON)
+    assert is_same_session(OPEN, AFTERNOON)
+    assert not is_same_session(OPEN, NEXT_OPEN)
+
+
+def test_new_session_volume_reset_is_not_a_negative_spike() -> None:
+    yesterday = _snap(OPEN, 99.0, 1_000_000.0)
+    today = _snap(NEXT_OPEN, 100.0, 2_000.0)
+    today_later = _snap(NEXT_OPEN + 10.0, 101.0, 2_100.0)
+    features = _engine().compute(_buffer([yesterday, today, today_later]))
+    assert features is not None
+    assert features.volume_1m is None
+    assert features.change_1m is None
+    assert features.change_day == (101.0 - 100.0) / 100.0
+
+
 def test_volume_delta_does_not_cross_session() -> None:
     yesterday = _snap(OPEN - 24 * 3600.0, 99.0, 1_000_000.0)
     today = _snap(NEXT_OPEN, 100.0, 2_000.0)

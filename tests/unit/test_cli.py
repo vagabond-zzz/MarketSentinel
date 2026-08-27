@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from market_sentinel.cli.display import format_dashboard
 from market_sentinel.cli.main import main
 from market_sentinel.domain.enums import FeedStatus, SchedulerLevel
@@ -68,7 +70,20 @@ def test_http_provider_is_not_implemented(tmp_path: Path, capsys) -> None:
     path = tmp_path / "watchlist.json"
     assert main(["--watchlist", str(path), "--provider", "http", "run", "--once"]) == 2
     err = capsys.readouterr().err
-    assert "HttpQuoteProvider is not implemented; use fake or replay." in err
+    assert "HttpQuoteProvider is not implemented; use fake, replay, or longbridge." in err
+
+
+def test_longbridge_provider_requires_credentials(
+    tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("LONGBRIDGE_APP_KEY", raising=False)
+    monkeypatch.delenv("LONGBRIDGE_APP_SECRET", raising=False)
+    monkeypatch.delenv("LONGBRIDGE_ACCESS_TOKEN", raising=False)
+    path = tmp_path / "watchlist.json"
+    assert main(["--watchlist", str(path), "--provider", "longbridge", "run", "--once"]) == 2
+    err = capsys.readouterr().err
+    assert "LONGBRIDGE_APP_KEY" in err
+    assert "LONGBRIDGE_ACCESS_TOKEN" in err
 
 
 def test_run_once_verbose_includes_scheduler_transition(tmp_path: Path, capsys) -> None:

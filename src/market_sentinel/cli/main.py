@@ -8,12 +8,12 @@ from pathlib import Path
 
 from market_sentinel.cli.display import format_dashboard, format_updated
 from market_sentinel.clock import SystemClock
+from market_sentinel.errors import ProviderAuthError
 from market_sentinel.health.feed_health import FeedHealthTracker
 from market_sentinel.ipc.daemon import MarketDaemon
 from market_sentinel.market_data.buffers import SymbolBuffers
 from market_sentinel.market_data.state import MarketStateStore
-from market_sentinel.providers.fake import FakeProvider
-from market_sentinel.providers.replay import ReplayProvider
+from market_sentinel.providers.factory import create_provider
 from market_sentinel.runtime.engine import MarketEngine
 from market_sentinel.runtime.results import EngineTickResult
 from market_sentinel.scheduler.scheduler import AdaptiveScheduler
@@ -51,7 +51,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--provider",
-        choices=("fake", "replay", "http"),
+        choices=("fake", "replay", "longbridge", "http"),
         default="fake",
     )
     parser.add_argument(
@@ -101,17 +101,15 @@ def _handle_watchlist(watchlist: Watchlist, args: argparse.Namespace) -> int:
 
 
 async def _handle_daemon(args: argparse.Namespace) -> int:
-    if args.provider == "http":
-        print("HttpQuoteProvider is not implemented; use fake or replay.", file=sys.stderr)
-        return 2
     clock = SystemClock()
-    if args.provider == "replay":
-        if args.replay is None:
-            print("--replay path is required for replay provider", file=sys.stderr)
-            return 2
-        provider: FakeProvider | ReplayProvider = ReplayProvider(args.replay, clock)
-    else:
-        provider = FakeProvider(clock)
+    try:
+        provider = create_provider(args.provider, clock, replay_path=args.replay)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    except ProviderAuthError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     engine = MarketEngine(
         clock=clock,
         watchlist=Watchlist(persist=False),
@@ -127,18 +125,15 @@ async def _handle_daemon(args: argparse.Namespace) -> int:
 
 
 async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
-    if args.provider == "http":
-        print("HttpQuoteProvider is not implemented; use fake or replay.", file=sys.stderr)
-        return 2
     clock = SystemClock()
-    provider: FakeProvider | ReplayProvider
-    if args.provider == "replay":
-        if args.replay is None:
-            print("--replay path is required for replay provider", file=sys.stderr)
-            return 2
-        provider = ReplayProvider(args.replay, clock)
-    else:
-        provider = FakeProvider(clock)
+    try:
+        provider = create_provider(args.provider, clock, replay_path=args.replay)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    except ProviderAuthError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     engine = MarketEngine(
         clock=clock,
         watchlist=watchlist,

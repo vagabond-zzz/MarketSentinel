@@ -58,6 +58,9 @@ class FeedHealthTracker:
             logger.warning("provider error %s: %s", symbol, error)
         return self.status(symbol)
 
+    def peek_status(self, symbol: str) -> FeedStatus:
+        return self._compute(self._symbols.get(symbol))
+
     def status(self, symbol: str) -> FeedStatus:
         record = self._symbols.get(symbol)
         status = self._compute(record)

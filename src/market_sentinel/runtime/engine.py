@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 from market_sentinel.clock import Clock
-from market_sentinel.domain.enums import SchedulerLevel
+from market_sentinel.domain.enums import FeedStatus, SchedulerLevel
 from market_sentinel.domain.features import MarketFeatures
+from market_sentinel.domain.models import MarketSnapshot
 from market_sentinel.domain.signals import SignalPipelineResult
 from market_sentinel.features.engine import FeatureEngine
 from market_sentinel.health.feed_health import FeedHealthTracker
@@ -18,6 +20,14 @@ from market_sentinel.signals.pipeline import SignalPipeline
 from market_sentinel.watchlist.watchlist import Watchlist
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class EngineDiagnostics:
+    out_of_order_count: int = 0
+    duplicate_timestamp_count: int = 0
+    recovery_count: int = 0
+    last_fetch_error: str | None = None
 
 
 class MarketEngine:
@@ -46,6 +56,7 @@ class MarketEngine:
         self.pipeline = pipeline or SignalPipeline(clock)
         self._warming = warming or WarmingPolicy()
         self._fetched_symbols: set[str] = set()
+        self.diagnostics = EngineDiagnostics()
 
     async def tick(self) -> EngineTickResult:
         enabled = self.watchlist.enabled_symbols()
@@ -67,22 +78,48 @@ class MarketEngine:
             snapshots = await self.provider.fetch_quotes(due)
         except Exception as exc:
             logger.warning("provider fetch failed: %s", exc)
+            self.diagnostics.last_fetch_error = type(exc).__name__
             for symbol in due:
                 self.health.observe(symbol, error=exc)
                 self.scheduler.mark_fetched(symbol)
             return
 
+        self.diagnostics.last_fetch_error = None
         found = {item.symbol: item for item in snapshots}
         for symbol in due:
             snapshot = found.get(symbol)
             if snapshot is None:
                 self.health.observe(symbol, error=RuntimeError("missing quote"))
             else:
-                self.buffers.append(snapshot)
-                self.states.update_latest(snapshot)
-                self.health.observe(symbol, snapshot)
-                self._fetched_symbols.add(symbol)
+                self._ingest_snapshot(symbol, snapshot)
             self.scheduler.mark_fetched(symbol)
+
+    def _ingest_snapshot(self, symbol: str, snapshot: MarketSnapshot) -> None:
+        previous_status = self.health.peek_status(symbol)
+        latest = self.buffers.latest(symbol)
+        if latest is not None and snapshot.market_timestamp < latest.market_timestamp:
+            self.diagnostics.out_of_order_count += 1
+            if self.diagnostics.out_of_order_count == 1:
+                logger.warning(
+                    "suppressing older quote %s market_ts=%s latest=%s",
+                    symbol,
+                    snapshot.market_timestamp,
+                    latest.market_timestamp,
+                )
+            self.health.observe(symbol, snapshot)
+            return
+        if latest is not None and snapshot.market_timestamp == latest.market_timestamp:
+            self.diagnostics.duplicate_timestamp_count += 1
+        self.buffers.append(snapshot)
+        self.states.update_latest(snapshot)
+        self.health.observe(symbol, snapshot)
+        after = self.health.peek_status(symbol)
+        if previous_status in {FeedStatus.STALE, FeedStatus.DISCONNECTED} and after in {
+            FeedStatus.LIVE,
+            FeedStatus.DELAYED,
+        }:
+            self.diagnostics.recovery_count += 1
+        self._fetched_symbols.add(symbol)
 
     def _process_symbol(self, symbol: str) -> SymbolTickResult:
         level_before = self.scheduler.get_level(symbol)
