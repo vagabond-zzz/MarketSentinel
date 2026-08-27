@@ -9,6 +9,7 @@ from pathlib import Path
 from market_sentinel.cli.display import format_dashboard, format_updated
 from market_sentinel.clock import SystemClock
 from market_sentinel.health.feed_health import FeedHealthTracker
+from market_sentinel.ipc.daemon import MarketDaemon
 from market_sentinel.market_data.buffers import SymbolBuffers
 from market_sentinel.market_data.state import MarketStateStore
 from market_sentinel.providers.fake import FakeProvider
@@ -22,7 +23,14 @@ from market_sentinel.watchlist.watchlist import Watchlist
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        stream=sys.stderr,
+        level=logging.INFO,
+        format="%(levelname)s %(name)s: %(message)s",
+        force=True,
+    )
+    if args.command == "daemon":
+        return asyncio.run(_handle_daemon(args))
     watchlist = Watchlist(args.watchlist)
 
     if args.command == "watchlist":
@@ -68,6 +76,7 @@ def _build_parser() -> argparse.ArgumentParser:
     enable.add_argument("symbol")
     disable = watch_sub.add_parser("disable")
     disable.add_argument("symbol")
+    sub.add_parser("daemon", help="JSONL stdio host protocol")
     return parser
 
 
@@ -89,6 +98,32 @@ def _handle_watchlist(watchlist: Watchlist, args: argparse.Namespace) -> int:
         flag = "on" if item.enabled else "off"
         print(f"{item.symbol} {flag}")
     return 0
+
+
+async def _handle_daemon(args: argparse.Namespace) -> int:
+    if args.provider == "http":
+        print("HttpQuoteProvider is not implemented; use fake or replay.", file=sys.stderr)
+        return 2
+    clock = SystemClock()
+    if args.provider == "replay":
+        if args.replay is None:
+            print("--replay path is required for replay provider", file=sys.stderr)
+            return 2
+        provider: FakeProvider | ReplayProvider = ReplayProvider(args.replay, clock)
+    else:
+        provider = FakeProvider(clock)
+    engine = MarketEngine(
+        clock=clock,
+        watchlist=Watchlist(persist=False),
+        provider=provider,
+        scheduler=AdaptiveScheduler(clock),
+        buffers=SymbolBuffers(),
+        states=MarketStateStore(),
+        health=FeedHealthTracker(clock),
+    )
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)
+    return await MarketDaemon(engine, stdin=sys.stdin, stdout=sys.stdout).run()
 
 
 async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:

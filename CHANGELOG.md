@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.3 — in progress (`feat/v0.3-cursor-host`)
+
+Python JSONL daemon and Protocol v1. No Cursor UI, no TypeScript IPC client (M3+).
+
+### M0 — Node / pnpm workspace
+
+Root `package.json`, `pnpm-workspace.yaml`, and `apps/cursor-extension` skeleton with `pnpm test` / `lint` / `typecheck` / `build`. No StatusBar/Hover.
+
+### M1 — Protocol v1 DTO / codec / mapping
+
+Versioned JSONL envelope, explicit wire DTOs, and `MarketState` → DTO mapper. Core models are not `asdict`'d onto the wire.
+
+### M2 — Python daemon transport
+
+`market-sentinel daemon`: Windows-safe stdin, flushed JSONL stdout, stderr logging, daemon phase machine, runtime-only `set_watchlist`, command/tick lock, graceful shutdown. Integration test runs `uv run ... daemon`.
+
 ## v0.2.0 — 2026-08-26
 
 Market Event Engine: deterministic Features, six Event Rules, Dedupe / Cluster / episode-aware Cooldown, Signal lifecycle, COLD/WARM/HOT Runtime integration, CLI diagnostics, Replay E2E, and coverage/performance gates.

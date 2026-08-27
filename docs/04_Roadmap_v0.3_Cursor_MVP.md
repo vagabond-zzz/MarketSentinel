@@ -146,3 +146,20 @@ StatusBar → Hover → Detail
 - 详情 WebView。
 
 优先级：**提醒可靠 > 视觉漂亮**。
+
+## 11. Implementation status (v0.3)
+
+| Milestone | Status |
+|---|---|
+| M0 Node / pnpm workspace | done |
+| M1 Protocol v1 DTO / codec / mapping | done |
+| M2 Python daemon JSONL transport | done |
+| M3 TypeScript protocol + IPC client | not started |
+| M4 Cursor extension lifecycle | not started |
+| M5 Minimal StatusBar | not started |
+| M6 Hover | not started |
+| M7 Alert handling | not started |
+| M8 Host integration tests / packaging | not started |
+
+v0.3 Host watchlist source of truth is `marketSentinel.watchlist` (settings). The daemon holds a non-persistent runtime Watchlist updated via `set_watchlist` and does not write `data/watchlist.json`.
+
