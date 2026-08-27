@@ -2,7 +2,7 @@
 
 ## v0.3 — in progress (`feat/v0.3-cursor-host`)
 
-Python JSONL daemon, Protocol v1, and a vscode-free TypeScript IPC client / process manager (M3). No Cursor UI (M4+).
+Python JSONL daemon, Protocol v1, vscode-free IPC, and Cursor extension lifecycle/commands (M4). No StatusBar/Hover (M5+).
 
 ### M0 — Node / pnpm workspace
 
@@ -19,6 +19,10 @@ Versioned JSONL envelope, explicit wire DTOs, and `MarketState` → DTO mapper. 
 ### M3 — TypeScript protocol guards, JSONL IPC client, process manager
 
 Hand-written Protocol v1 guards (no zod), JSONL line decoder, `IpcClient` request map, and `ProcessManager` (`uv run --directory <coreRoot> ... daemon`, `shell: false`). Handshake is hello → set_watchlist → start. `active_signals` stay on state; alerts only come from `alert` messages. No `vscode` import in these modules.
+
+### M4 — Cursor extension lifecycle, settings, commands
+
+`HostController` keeps `desiredState` (RUNNING/PAUSED) separate from process actual state. Trusted-workspace-only desktop extension: `onStartupFinished` + pause/resume/restartCore/showOutput. Watchlist hot-applies; coreRoot/uvPath/provider/replayPath require `restartCore`. Crash while RUNNING retries 1s/3s/10s (max 3). Crash while PAUSED does not auto-start. `ready.core_version` is diagnostics-only.
 
 ## v0.2.0 — 2026-08-26
 

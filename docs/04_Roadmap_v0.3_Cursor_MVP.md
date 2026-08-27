@@ -155,7 +155,7 @@ StatusBar → Hover → Detail
 | M1 Protocol v1 DTO / codec / mapping | done |
 | M2 Python daemon JSONL transport | done |
 | M3 TypeScript protocol + IPC client | done |
-| M4 Cursor extension lifecycle | not started |
+| M4 Cursor extension lifecycle | done |
 | M5 Minimal StatusBar | not started |
 | M6 Hover | not started |
 | M7 Alert handling | not started |
