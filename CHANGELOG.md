@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — v0.4 Release Candidate (live session smoke pending)
+
+Longbridge A-share Quote Pull is the production live Provider. Package versions stay **0.3.0** and Protocol stays **1** until the external Release Audit. Do not tag `v0.4.0` yet.
+
+- `LongbridgeQuoteProvider` (`--provider longbridge` / `marketSentinel.provider`)
+- SH/SZ only; volume passed through (unit UNKNOWN); **turnover = None**
+- Vendor `timestamp` as `market_timestamp`; `received_timestamp` from Clock
+- Fail closed on bad fields, timeout, auth, rate limit; no stale snapshot replay
+- Engine suppresses older quotes; duplicate timestamps replace
+- Optional extra: `uv sync --extra live` (`longbridge==4.5.0`)
+- Credentials: `LONGBRIDGE_*` environment variables only
+- Tencent remains an experimental probe, not a supported Provider
+- Fake / Replay regression unchanged
+- Live in-session smoke **PENDING** (credentials + A-share hours)
+
 ## v0.3.0 — 2026-08-27
 
 Cursor Host MVP. Python Core and the desktop extension are both 0.3.0. Wire compatibility remains Protocol v1.

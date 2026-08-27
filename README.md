@@ -2,7 +2,7 @@
 
 Low-latency market monitoring core for developer hosts (Cursor, DeepSeek Harness, ZCode).
 
-**Current version: v0.3.0 — Cursor Host.** Python Core and the desktop Cursor extension share package version 0.3.0. Wire compatibility is **Protocol v1** (`protocol_version === 1`), not the product version. High-frequency market updates never call an LLM (`Token = 0`).
+**Current tagged release: v0.3.0 — Cursor Host.** A v0.4 Longbridge live-data **Release Candidate** is on `feat/v0.4-live-market-data` (package versions still 0.3.0; Protocol v1). In-session live smoke is **pending**. High-frequency market updates never call an LLM (`Token = 0`).
 
 ## Positioning
 
@@ -51,7 +51,7 @@ Open a **trusted** workspace. Set `marketSentinel.coreRoot` when the window is n
 | `marketSentinel.coreRoot` | Python Core checkout (`pyproject.toml`). Required when no single workspace folder is open, and for multi-root windows. |
 | `marketSentinel.uvPath` | `uv` executable (`shell: false`). |
 | `marketSentinel.watchlist` | Host watchlist intent (Core still enforces 10-symbol limit). |
-| `marketSentinel.provider` | `fake` (default) or `replay`. |
+| `marketSentinel.provider` | `fake` (default), `replay`, or `longbridge`. |
 | `marketSentinel.replayPath` | Required when provider is `replay`. |
 | `marketSentinel.enableHoverDetails` | Full StatusBar hover (default `true`). Host-only. |
 | `marketSentinel.alertToast` | `off` (default) or `critical`. Host-only. |
@@ -62,17 +62,18 @@ Open a **trusted** workspace. Set `marketSentinel.coreRoot` when the window is n
 2. Open a trusted workspace.
 3. Configure `marketSentinel.coreRoot` if needed.
 4. Confirm `uvPath`.
-5. Set `provider` to `fake` or `replay`.
-6. Configure `watchlist`.
-7. Reload the window.
-8. StatusBar item appears (`MS …`).
-9. Hover shows feed / symbols (or a lifecycle message).
-10. Pause / Resume.
-11. Restart Core.
-12. Show Output.
-13. Reset Alert Badge.
-14. Close Cursor.
-15. Confirm no leftover `market-sentinel daemon` / Python child.
+5. Set `provider` to `fake`, `replay`, or `longbridge`.
+6. Configure `watchlist` (SH/SZ for live Longbridge).
+7. For `longbridge`, set `LONGBRIDGE_APP_KEY` / `SECRET` / `ACCESS_TOKEN` in the environment inherited by Cursor (not in settings.json). See `docs/12_v0.4_Longbridge_Provider_Setup.md`.
+8. Reload the window.
+9. StatusBar item appears (`MS …`).
+10. Hover shows feed / symbols (or a lifecycle message).
+11. Pause / Resume.
+12. Restart Core.
+13. Show Output.
+14. Reset Alert Badge.
+15. Close Cursor.
+16. Confirm no leftover `market-sentinel daemon` / Python child.
 
 This checklist is manual. Automated tests cover Protocol IPC, HostController, StatusBar mapping, and an Extension Host smoke activate/deactivate path.
 
@@ -87,6 +88,7 @@ The default `python` on some machines is 3.11. Always use `uv run`.
 
 ```bash
 uv sync
+uv sync --extra live   # only if using --provider longbridge
 pnpm install
 ```
 
@@ -119,7 +121,7 @@ uv run market-sentinel --watchlist data/watchlist.json run --once
 uv run market-sentinel --watchlist data/watchlist.json run --once --verbose
 ```
 
-`--provider` defaults to `fake`. `replay` reads a JSONL fixture (`--replay path`). `http` is not implemented as a Core provider.
+`--provider` defaults to `fake`. `replay` reads a JSONL fixture (`--replay path`). `longbridge` is the v0.4 live A-share provider (`uv sync --extra live` + env credentials). `http` remains an unimplemented stub.
 
 Host protocol (v0.3.0; stdout is JSONL Protocol v1 only):
 
@@ -193,9 +195,9 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Volume ratio needs about **20 in-session 1-minute baselines** before it is defined (`None` until then, never treated as 0).
 - Session id is the **UTC+8 calendar day**. That matches current A/H MVP examples; there is no full exchange calendar.
 - `MarketBar` is an adaptive-polling **sampled/observed** 1-minute bar, not an exchange official K-line.
-- VWAP needs reliable cumulative **turnover and volume**.
-- No live HTTP provider.
-- Python runtime is **not bundled** in the VSIX (developer install: `coreRoot` + `uvPath`).
+- VWAP needs reliable cumulative **turnover and volume** (live Longbridge currently maps `turnover` to `None`).
+- Live Longbridge in-session smoke is **pending** (credentials + A-share hours). Tencent HTTP is experimental probe only.
+- Python runtime is **not bundled** in the VSIX (developer install: `coreRoot` + `uvPath`). Optional `uv sync --extra live` for the Longbridge SDK.
 - Desktop Cursor / VS Code only (`extensionKind: ui`). Web / browser Cursor is unsupported. Remote SSH / Codespaces is not validated.
 - Untrusted workspaces are unsupported because the host starts a local Python Core.
 - Unread alert count is Host-local and resets on extension reload (not written to workspaceState).
