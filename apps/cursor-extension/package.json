@@ -2,11 +2,92 @@
   "name": "@market-sentinel/cursor-extension",
   "private": true,
   "version": "0.3.0",
-  "description": "Cursor host for Market Sentinel (v0.3; UI not implemented yet)",
+  "displayName": "Market Sentinel",
+  "description": "Cursor host for Market Sentinel (v0.3; StatusBar/Hover not implemented yet)",
   "main": "./out/extension.js",
   "engines": {
     "vscode": "^1.90.0",
     "node": ">=20"
+  },
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:marketSentinel.pause",
+    "onCommand:marketSentinel.resume",
+    "onCommand:marketSentinel.restartCore",
+    "onCommand:marketSentinel.showOutput"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Market Sentinel starts a local Python Core via uv in the workspace, so it requires a trusted workspace."
+    },
+    "virtualWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "marketSentinel.pause",
+        "title": "Market Sentinel: Pause Monitoring"
+      },
+      {
+        "command": "marketSentinel.resume",
+        "title": "Market Sentinel: Resume Monitoring"
+      },
+      {
+        "command": "marketSentinel.restartCore",
+        "title": "Market Sentinel: Restart Core"
+      },
+      {
+        "command": "marketSentinel.showOutput",
+        "title": "Market Sentinel: Show Output"
+      }
+    ],
+    "configuration": {
+      "title": "Market Sentinel",
+      "properties": {
+        "marketSentinel.coreRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Market Sentinel Core checkout (directory containing pyproject.toml). Required when no single workspace folder is open."
+        },
+        "marketSentinel.uvPath": {
+          "type": "string",
+          "default": "uv",
+          "description": "uv executable used to spawn the Python Core. Spawned with shell:false; no python/conda fallback."
+        },
+        "marketSentinel.watchlist": {
+          "type": "array",
+          "default": [],
+          "description": "Host watchlist intent. Core enforces the 10-symbol limit and symbol validation.",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "required": ["symbol"],
+                "properties": {
+                  "symbol": { "type": "string" },
+                  "enabled": { "type": "boolean", "default": true }
+                }
+              }
+            ]
+          }
+        },
+        "marketSentinel.provider": {
+          "type": "string",
+          "enum": ["fake", "replay"],
+          "default": "fake",
+          "description": "Core market data provider. http is not available in v0.3."
+        },
+        "marketSentinel.replayPath": {
+          "type": "string",
+          "default": "",
+          "description": "Replay fixture path. Required when provider is replay."
+        }
+      }
+    }
   },
   "scripts": {
     "test": "vitest run",
@@ -17,6 +98,7 @@
   "devDependencies": {
     "@eslint/js": "^9.34.0",
     "@types/node": "^22.18.0",
+    "@types/vscode": "^1.90.0",
     "eslint": "^9.34.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.42.0",

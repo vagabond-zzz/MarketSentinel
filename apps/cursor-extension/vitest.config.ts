@@ -1,8 +1,17 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+
+const dir = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
     environment: "node",
+  },
+  resolve: {
+    alias: {
+      vscode: path.join(dir, "vitest", "vscode-mock.ts"),
+    },
   },
 });
