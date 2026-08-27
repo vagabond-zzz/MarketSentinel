@@ -2,7 +2,7 @@
 
 ## v0.3 — in progress (`feat/v0.3-cursor-host`)
 
-Python JSONL daemon, Protocol v1, vscode-free IPC, Cursor lifecycle/commands (M4), and a minimal StatusBar (M5). Hover/toast are M6+.
+Python JSONL daemon, Protocol v1, vscode-free IPC, Cursor lifecycle/commands (M4), a minimal StatusBar (M5), and StatusBar hover details (M6). Toast/unread badge are M7.
 
 ### M0 — Node / pnpm workspace
 
@@ -26,7 +26,11 @@ Hand-written Protocol v1 guards (no zod), JSONL line decoder, `IpcClient` reques
 
 ### M5 — Minimal StatusBar
 
-StatusBar maps host lifecycle + Protocol v1 `state`/`alert` to `DISCONNECTED | PAUSED | STARTING | STALE | ALERT | HOT | WARM | NORMAL`. Feed STALE/DISCONNECTED is never shown as NORMAL. `ALERT` comes only from `alert` messages (15s hold; `elapsed === hold` is expired), never from `state.active_signals`. RUNNING without a MarketState maps to STARTING, not NORMAL. Click opens the Output Channel. No Hover/unread/toast.
+StatusBar maps host lifecycle + Protocol v1 `state`/`alert` to `DISCONNECTED | PAUSED | STARTING | STALE | ALERT | HOT | WARM | NORMAL`. Feed STALE/DISCONNECTED is never shown as NORMAL. `ALERT` comes only from `alert` messages (15s hold; `elapsed === hold` is expired), never from `state.active_signals`. RUNNING without a MarketState maps to STARTING, not NORMAL. Click opens the Output Channel. No unread/toast.
+
+### M6 — Hover Details
+
+StatusBar hover is read-only persistent-state inspection. `HoverModel` maps host lifecycle + `WireMarketState` (no vscode). Markdown is rendered separately; `MarkdownString.isTrusted` stays false and there are no command links. `marketSentinel.enableHoverDetails` (default true) is a Host-only hot setting and does not restart Core. `active_signals` can appear in Hover but never become StatusBar `ALERT`.
 
 ## v0.2.0 — 2026-08-26
 

@@ -130,6 +130,36 @@ function createLogger(): { logger: HostLogger; lines: string[] } {
   };
 }
 
+function wireSymbol(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    symbol: "00700.HK",
+    price: 602.5,
+    scheduler_level: "COLD",
+    feed_status: "LIVE",
+    change_1m: 0.008,
+    change_5m: 0.0126,
+    change_15m: null,
+    volume_ratio_1m: null,
+    volume_ratio_5m: 2.63,
+    ema5: null,
+    ema20: null,
+    rsi14: 67.4,
+    vwap: null,
+    active_signals: [],
+    ...overrides,
+  };
+}
+
+function writeState(child: FakeChild | undefined, state: Record<string, unknown>): void {
+  child?.stdout.write(
+    JSON.stringify({
+      protocol_version: 1,
+      type: "state",
+      state,
+    }) + "\n",
+  );
+}
+
 interface Harness {
   controller: HostController;
   children: FakeChild[];
@@ -582,6 +612,141 @@ describe("HostController", () => {
     expect(harness.controller.statusBarModel().kind).toBe("ALERT");
     now = 1_000 + 15_000;
     timers.at(-1)?.();
+    expect(harness.controller.statusBarModel().kind).toBe("NORMAL");
+  });
+
+  it("builds HoverModel from state without turning active_signals into ALERT", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeState(harness.children[0], {
+      watchlist_count: 2,
+      feed_status: "LIVE",
+      symbols: [
+        wireSymbol({
+          scheduler_level: "HOT",
+          active_signals: [
+            {
+              id: "live",
+              family: "price_volume",
+              direction: "up",
+              priority: "important",
+              title: "t",
+              summary: "量价同步扩张",
+            },
+          ],
+        }),
+        wireSymbol({ symbol: "600519.SH", scheduler_level: "COLD" }),
+      ],
+    });
+    const snapshot = harness.controller.uiSnapshot();
+    expect(snapshot.statusBar.kind).toBe("HOT");
+    expect(snapshot.hover.feed).toBe("LIVE");
+    expect(snapshot.hover.symbols.map((item) => item.symbol)).toEqual(["00700.HK", "600519.SH"]);
+    expect(snapshot.hover.symbols[0]?.signals[0]?.family).toBe("price_volume");
+    expect(snapshot.hover.headline).not.toMatch(/ALERT|NEW/);
+  });
+
+  it("maps STALE feed into Hover without looking live", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeState(harness.children[0], {
+      watchlist_count: 1,
+      feed_status: "STALE",
+      symbols: [wireSymbol({ feed_status: "STALE", scheduler_level: "HOT" })],
+    });
+    expect(harness.controller.statusBarModel().kind).toBe("STALE");
+    expect(harness.controller.hoverModel().feed).toBe("STALE");
+    expect(harness.controller.hoverModel().lifecycleMessage).toBeUndefined();
+  });
+
+  it("uses starting-style Hover when RUNNING has no MarketState", async () => {
+    const harness = createHarness({
+      script: (child) => scriptDaemon(child, harness.commands, { failGetState: true }),
+    });
+    await harness.controller.start();
+    expect(harness.controller.actualState).toBe("RUNNING");
+    expect(harness.controller.hoverModel().lifecycleMessage).toBe("Core starting");
+    expect(harness.controller.hoverModel().symbols).toEqual([]);
+  });
+
+  it("shows paused and disconnected Hover copy instead of last market prices", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeState(harness.children[0], {
+      watchlist_count: 1,
+      feed_status: "LIVE",
+      symbols: [wireSymbol({ scheduler_level: "HOT" })],
+    });
+    await harness.controller.pause();
+    expect(harness.controller.hoverModel().lifecycleMessage).toBe("Monitoring paused");
+    expect(harness.controller.hoverModel().symbols).toEqual([]);
+    harness.children[0]?.emit("exit", 1, null);
+    await vi.waitFor(() => {
+      expect(harness.controller.actualState).toBe("DISCONNECTED");
+    });
+    expect(harness.controller.hoverModel().lifecycleMessage).toBe("Core disconnected");
+    expect(harness.controller.hoverModel().outputHint).toMatch(/Output/);
+  });
+
+  it("hot-applies enableHoverDetails without restarting Core", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    const before = harness.spawned.length;
+    const commandsBefore = harness.commands.length;
+    writeState(harness.children[0], {
+      watchlist_count: 1,
+      feed_status: "LIVE",
+      symbols: [wireSymbol()],
+    });
+    harness.settings.enableHoverDetails = false;
+    await harness.controller.onConfigurationChanged(["enableHoverDetails"]);
+    expect(harness.spawned).toHaveLength(before);
+    expect(harness.commands).toHaveLength(commandsBefore);
+    expect(harness.controller.restartNeeded).toBe(false);
+    expect(harness.controller.hoverModel().enableDetails).toBe(false);
+    expect(harness.controller.hoverModel().headline).toBe(
+      "Market Sentinel · LIVE · symbols=1 · HOT=0 · WARM=0",
+    );
+  });
+
+  it("does not extend ALERT hold when Hover is read", async () => {
+    let now = 1_000;
+    const harness = createHarness({
+      now: () => now,
+      alertHoldMs: 15_000,
+      setTimeoutFn: (() => 1 as unknown as ReturnType<typeof setTimeout>) as typeof setTimeout,
+      clearTimeoutFn: () => undefined,
+    });
+    await harness.controller.start();
+    writeState(harness.children[0], {
+      watchlist_count: 1,
+      feed_status: "LIVE",
+      symbols: [wireSymbol()],
+    });
+    harness.children[0]?.stdout.write(
+      JSON.stringify({
+        protocol_version: 1,
+        type: "alert",
+        candidates: [
+          {
+            id: "a1",
+            symbol: "00700.HK",
+            family: "tape",
+            direction: "up",
+            priority: "important",
+            title: "alert",
+            summary: "edge",
+          },
+        ],
+        market_timestamp: 1,
+      }) + "\n",
+    );
+    expect(harness.controller.statusBarModel().kind).toBe("ALERT");
+    now = 1_000 + 10_000;
+    harness.controller.hoverModel();
+    harness.controller.uiSnapshot();
+    expect(harness.controller.statusBarModel().kind).toBe("ALERT");
+    now = 1_000 + 15_000;
     expect(harness.controller.statusBarModel().kind).toBe("NORMAL");
   });
 });

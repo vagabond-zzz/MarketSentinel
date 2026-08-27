@@ -5,13 +5,14 @@ import {
   type ProcessManagerOptions,
   type SpawnFn,
 } from "../ipc/process";
+import { mapHover, type HoverModel } from "../hover/model";
 import type { WatchlistItem, WireMarketState } from "../protocol/types";
 import {
   DEFAULT_ALERT_HOLD_MS,
   mapStatusBar,
   type StatusBarModel,
 } from "../statusbar/map";
-import { parseHostSettings } from "./config";
+import { parseEnableHoverDetails, parseHostSettings } from "./config";
 import type {
   ActualState,
   DesiredState,
@@ -20,7 +21,7 @@ import type {
   RawSettings,
   SettingKey,
 } from "./types";
-import { HOT_SETTING_KEYS, RESTART_SETTING_KEYS } from "./types";
+import { HOST_UI_SETTING_KEYS, HOT_SETTING_KEYS, RESTART_SETTING_KEYS } from "./types";
 
 export const DEFAULT_BACKOFF_MS = [1_000, 3_000, 10_000] as const;
 export const DEFAULT_MAX_RETRIES = 3;
@@ -119,6 +120,18 @@ export class HostController {
     });
   }
 
+  hoverModel(): HoverModel {
+    return mapHover({
+      actual: this.actualInternal,
+      market: this.lastMarket,
+      enableHoverDetails: parseEnableHoverDetails(this.options.readSettings().enableHoverDetails),
+    });
+  }
+
+  uiSnapshot(): { statusBar: StatusBarModel; hover: HoverModel } {
+    return { statusBar: this.statusBarModel(), hover: this.hoverModel() };
+  }
+
   async start(): Promise<void> {
     this.desiredInternal = "RUNNING";
     try {
@@ -210,11 +223,15 @@ export class HostController {
     if (relevant.includes("watchlist")) {
       await this.applyWatchlistHotUpdate();
     }
+    if (relevant.some((key) => (HOST_UI_SETTING_KEYS as readonly string[]).includes(key))) {
+      this.emitUi();
+    }
   }
 
   private isSettingKey(key: string): key is SettingKey {
     return (
       (HOT_SETTING_KEYS as readonly string[]).includes(key) ||
+      (HOST_UI_SETTING_KEYS as readonly string[]).includes(key) ||
       (RESTART_SETTING_KEYS as readonly string[]).includes(key)
     );
   }

@@ -75,6 +75,10 @@ export function parseProvider(raw: unknown): ProviderName {
   throw new HostConfigError('marketSentinel.provider must be "fake" or "replay"');
 }
 
+export function parseEnableHoverDetails(raw: unknown): boolean {
+  return raw !== false;
+}
+
 export function parseHostSettings(
   raw: RawSettings,
   workspaceFolders: readonly string[],

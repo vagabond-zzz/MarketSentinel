@@ -31,6 +31,17 @@ describe("extension manifest", () => {
     expect(ids).not.toContain("marketSentinel.resetAlertBadge");
   });
 
+  it("defaults enableHoverDetails to true as a host-only setting", () => {
+    const properties = (
+      pkg.contributes.configuration as {
+        properties: Record<string, { type: string; default: unknown }>;
+      }
+    ).properties;
+    expect(properties["marketSentinel.enableHoverDetails"]).toEqual(
+      expect.objectContaining({ type: "boolean", default: true }),
+    );
+  });
+
   it("requires a trusted workspace because it spawns a local Python Core", () => {
     expect(pkg.capabilities.untrustedWorkspaces.supported).toBe(false);
     expect(pkg.capabilities.untrustedWorkspaces.description).toMatch(/Python Core/);

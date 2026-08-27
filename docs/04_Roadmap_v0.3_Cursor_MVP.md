@@ -157,7 +157,7 @@ StatusBar → Hover → Detail
 | M3 TypeScript protocol + IPC client | done |
 | M4 Cursor extension lifecycle | done |
 | M5 Minimal StatusBar | done |
-| M6 Hover | not started |
+| M6 Hover | done |
 | M7 Alert handling | not started |
 | M8 Host integration tests / packaging | not started |
 

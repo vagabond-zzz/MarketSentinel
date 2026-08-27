@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseHostSettings, parseWatchlist, resolveCoreRoot } from "./config";
+import { parseEnableHoverDetails, parseHostSettings, parseWatchlist, resolveCoreRoot } from "./config";
 
 describe("resolveCoreRoot", () => {
   it("uses an explicit coreRoot regardless of workspace count", () => {
@@ -32,6 +32,14 @@ describe("parseWatchlist", () => {
 
   it("rejects a non-array", () => {
     expect(() => parseWatchlist("00700.HK")).toThrow(/array/);
+  });
+});
+
+describe("parseEnableHoverDetails", () => {
+  it("defaults to true and only disables on explicit false", () => {
+    expect(parseEnableHoverDetails(undefined)).toBe(true);
+    expect(parseEnableHoverDetails(true)).toBe(true);
+    expect(parseEnableHoverDetails(false)).toBe(false);
   });
 });
 

@@ -1,5 +1,16 @@
 export type ConfigMap = Record<string, unknown>;
 
+export class MarkdownString {
+  value: string;
+  isTrusted = false;
+  supportHtml = false;
+  supportThemeIcons = false;
+
+  constructor(value = "") {
+    this.value = value;
+  }
+}
+
 export const vscodeState = {
   folders: [] as { uri: { fsPath: string } }[],
   settings: {} as ConfigMap,
@@ -9,7 +20,7 @@ export const vscodeState = {
   configListeners: [] as Array<(event: { affectsConfiguration: (key: string) => boolean }) => void>,
   statusBar: {
     text: "",
-    tooltip: "" as string | undefined,
+    tooltip: undefined as string | MarkdownString | undefined,
     shown: false,
     command: undefined as string | undefined,
     backgroundColor: undefined as { id: string } | undefined,
@@ -25,7 +36,7 @@ export function resetVscodeMock(): void {
   vscodeState.configListeners = [];
   vscodeState.statusBar = {
     text: "",
-    tooltip: "",
+    tooltip: undefined,
     shown: false,
     command: undefined,
     backgroundColor: undefined,
@@ -58,7 +69,7 @@ export const window = {
   createStatusBarItem(_alignment?: number, _priority?: number) {
     return {
       text: "",
-      tooltip: undefined as string | undefined,
+      tooltip: undefined as string | MarkdownString | undefined,
       command: undefined as string | undefined,
       backgroundColor: undefined as ThemeColor | undefined,
       show() {
@@ -118,4 +129,5 @@ export default {
   workspace,
   StatusBarAlignment,
   ThemeColor,
+  MarkdownString,
 };

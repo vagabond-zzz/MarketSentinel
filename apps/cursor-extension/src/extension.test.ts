@@ -1,8 +1,16 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { activate, deactivate } from "./extension";
 import { HOST_COMMANDS } from "./host/types";
-import { resetVscodeMock, vscodeState } from "../vitest/vscode-mock";
+import { MarkdownString, resetVscodeMock, vscodeState } from "../vitest/vscode-mock";
+
+function tooltipMarkdown(): MarkdownString {
+  const tooltip = vscodeState.statusBar.tooltip;
+  expect(tooltip).toBeInstanceOf(MarkdownString);
+  const markdown = tooltip as MarkdownString;
+  expect(markdown.isTrusted).toBe(false);
+  return markdown;
+}
 
 describe("extension adapter", () => {
   afterEach(async () => {
@@ -21,9 +29,27 @@ describe("extension adapter", () => {
     expect(vscodeState.statusBar.shown).toBe(true);
     expect(vscodeState.statusBar.text).toContain("DISCONNECTED");
     expect(vscodeState.statusBar.command).toBe(HOST_COMMANDS.showOutput);
+    expect(tooltipMarkdown().value).toContain("Core disconnected");
     await vscodeState.commands.get(HOST_COMMANDS.showOutput)?.();
     expect(vscodeState.outputShown).toBe(true);
     await deactivate();
     await deactivate();
+  });
+
+  it("updates StatusBar tooltip from HoverModel without trusting Markdown", async () => {
+    const context = { subscriptions: [] as Array<{ dispose: () => void }> };
+    await activate(context as never);
+    const markdown = tooltipMarkdown();
+    expect(markdown.value).toContain("Market Sentinel");
+    expect(markdown.value).toContain("Click the StatusBar to view Output");
+    expect(markdown.isTrusted).toBe(false);
+
+    vscodeState.settings["marketSentinel.enableHoverDetails"] = false;
+    vscodeState.configListeners[0]?.({
+      affectsConfiguration: (key) => key === "marketSentinel.enableHoverDetails",
+    });
+    await vi.waitFor(() => {
+      expect(tooltipMarkdown().value).toBe("Market Sentinel · Core disconnected");
+    });
   });
 });

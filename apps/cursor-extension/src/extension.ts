@@ -3,6 +3,8 @@ import * as vscode from "vscode";
 import { HostController } from "./host/controller";
 import { bindCommands } from "./host/session";
 import { HOST_COMMANDS, type RawSettings } from "./host/types";
+import { renderHoverMarkdown } from "./hover/render";
+import type { HoverModel } from "./hover/model";
 import type { StatusBarModel } from "./statusbar/map";
 
 let controller: HostController | undefined;
@@ -15,6 +17,7 @@ function readSettings(): RawSettings {
     watchlist: cfg.get("watchlist"),
     provider: cfg.get("provider"),
     replayPath: cfg.get<string>("replayPath"),
+    enableHoverDetails: cfg.get<boolean>("enableHoverDetails"),
   };
 }
 
@@ -26,9 +29,15 @@ function splitCoreLines(chunk: string, write: (line: string) => void): void {
   }
 }
 
-function applyStatusBar(item: vscode.StatusBarItem, model: StatusBarModel): void {
+function applyStatusBar(
+  item: vscode.StatusBarItem,
+  model: StatusBarModel,
+  hover: HoverModel,
+): void {
   item.text = model.text;
-  item.tooltip = model.tooltip;
+  const tooltip = new vscode.MarkdownString(renderHoverMarkdown(hover));
+  tooltip.isTrusted = false;
+  item.tooltip = tooltip;
   item.command = HOST_COMMANDS.showOutput;
   if (model.tone === "error") {
     item.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
@@ -56,10 +65,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     workspaceFolders: () =>
       vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [],
     logger,
-    onStatusBar: (model) => applyStatusBar(statusBar, model),
+    onStatusBar: (model) => applyStatusBar(statusBar, model, host.hoverModel()),
   });
   controller = host;
-  applyStatusBar(statusBar, host.statusBarModel());
+  applyStatusBar(statusBar, host.statusBarModel(), host.hoverModel());
   const commands = bindCommands(host, { show: () => output.show() }, logger);
   for (const [id, handler] of Object.entries(commands)) {
     context.subscriptions.push(vscode.commands.registerCommand(id, handler));
@@ -67,9 +76,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(output, statusBar);
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) => {
-      const keys = ["watchlist", "coreRoot", "uvPath", "provider", "replayPath"].filter((key) =>
-        event.affectsConfiguration(`marketSentinel.${key}`),
-      );
+      const keys = [
+        "watchlist",
+        "coreRoot",
+        "uvPath",
+        "provider",
+        "replayPath",
+        "enableHoverDetails",
+      ].filter((key) => event.affectsConfiguration(`marketSentinel.${key}`));
       if (keys.length > 0) {
         void host.onConfigurationChanged(keys);
       }

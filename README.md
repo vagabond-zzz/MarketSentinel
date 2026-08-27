@@ -2,7 +2,7 @@
 
 Low-latency market monitoring core for developer hosts (Cursor, DeepSeek Harness, ZCode).
 
-Current version: **v0.2.0 — Market Event Engine**. v0.3 Cursor Host is in progress on `feat/v0.3-cursor-host` (Python JSONL daemon + desktop Cursor extension lifecycle; StatusBar/Hover not yet). High-frequency market updates never call an LLM (`Token = 0`). There is no live HTTP provider, no `notified_timestamp`, and no LLM / News / MCP.
+Current version: **v0.2.0 — Market Event Engine**. v0.3 Cursor Host is in progress on `feat/v0.3-cursor-host` (Python JSONL daemon + desktop Cursor extension lifecycle, StatusBar, and Hover). High-frequency market updates never call an LLM (`Token = 0`). There is no live HTTP provider, no `notified_timestamp`, and no LLM / News / MCP.
 
 ## Positioning
 
@@ -57,7 +57,7 @@ The Cursor package (`apps/cursor-extension`) includes a vscode-free JSONL IPC cl
 uv run --directory <repo> market-sentinel --provider fake daemon
 ```
 
-Handshake order is `hello` → `set_watchlist` → `start`. Host commands: Pause / Resume / Restart Core / Show Output. StatusBar shows DISCONNECTED / PAUSED / STALE / ALERT / HOT / WARM / NORMAL. Hover is M6+.
+Handshake order is `hello` → `set_watchlist` → `start`. Host commands: Pause / Resume / Restart Core / Show Output. StatusBar shows DISCONNECTED / PAUSED / STALE / ALERT / HOT / WARM / NORMAL. Hover inspects `WireMarketState` (disable with `marketSentinel.enableHoverDetails`).
 
 The Cursor extension is **desktop-only** (Node `child_process`). It is not a Web extension.
 
@@ -123,7 +123,7 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Session id is the **UTC+8 calendar day**. That matches current A/H MVP examples; there is no full exchange calendar.
 - `MarketBar` is an adaptive-polling **sampled/observed** 1-minute bar, not an exchange official K-line.
 - VWAP needs reliable cumulative **turnover and volume**.
-- No Cursor Hover / WebView yet (v0.3 M6–M8). StatusBar is minimal text (`MS <kind>`), not a polished visual.
+- No Cursor WebView yet (v0.3 M7–M8). StatusBar is minimal text (`MS <kind>`); Hover inspects persistent `WireMarketState`.
 - Desktop Cursor/VS Code extension only. Web / browser Cursor environments are not supported. Remote SSH / Codespaces is not formally verified.
 - Developer install requires `uv` plus a Core checkout path (`marketSentinel.coreRoot`, or a single trusted workspace folder).
 - Untrusted workspaces are unsupported because the host starts a local Python Core.

@@ -26,6 +26,7 @@ export interface RawSettings {
   watchlist?: unknown;
   provider?: unknown;
   replayPath?: string;
+  enableHoverDetails?: unknown;
 }
 
 export interface HostLogger {
@@ -34,9 +35,13 @@ export interface HostLogger {
 }
 
 export const HOT_SETTING_KEYS = ["watchlist"] as const;
+export const HOST_UI_SETTING_KEYS = ["enableHoverDetails"] as const;
 export const RESTART_SETTING_KEYS = ["coreRoot", "uvPath", "provider", "replayPath"] as const;
 
-export type SettingKey = (typeof HOT_SETTING_KEYS)[number] | (typeof RESTART_SETTING_KEYS)[number];
+export type SettingKey =
+  | (typeof HOT_SETTING_KEYS)[number]
+  | (typeof HOST_UI_SETTING_KEYS)[number]
+  | (typeof RESTART_SETTING_KEYS)[number];
 
 export const HOST_COMMANDS = {
   pause: "marketSentinel.pause",

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.3.0",
   "displayName": "Market Sentinel",
-  "description": "Cursor host for Market Sentinel (v0.3; Hover/alerts not implemented yet)",
+  "description": "Cursor host for Market Sentinel (v0.3; alerts/toast not implemented yet)",
   "main": "./out/extension.js",
   "engines": {
     "vscode": "^1.90.0",
@@ -85,6 +85,11 @@
           "type": "string",
           "default": "",
           "description": "Replay fixture path. Required when provider is replay."
+        },
+        "marketSentinel.enableHoverDetails": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show full market details in the StatusBar hover. Host-only; changing it does not restart the Python Core."
         }
       }
     }
