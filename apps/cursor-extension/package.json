@@ -10,11 +10,7 @@
     "node": ">=20"
   },
   "activationEvents": [
-    "onStartupFinished",
-    "onCommand:marketSentinel.pause",
-    "onCommand:marketSentinel.resume",
-    "onCommand:marketSentinel.restartCore",
-    "onCommand:marketSentinel.showOutput"
+    "onStartupFinished"
   ],
   "capabilities": {
     "untrustedWorkspaces": {

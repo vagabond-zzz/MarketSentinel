@@ -10,16 +10,12 @@ describe("extension manifest", () => {
     capabilities: { untrustedWorkspaces: { supported: boolean; description: string } };
   };
 
-  it("activates onStartupFinished and explicit commands, never *", () => {
-    expect(pkg.activationEvents).toContain("onStartupFinished");
-    expect(pkg.activationEvents).toContain("onCommand:marketSentinel.pause");
-    expect(pkg.activationEvents).toContain("onCommand:marketSentinel.resume");
-    expect(pkg.activationEvents).toContain("onCommand:marketSentinel.restartCore");
-    expect(pkg.activationEvents).toContain("onCommand:marketSentinel.showOutput");
+  it("activates onStartupFinished and never *", () => {
+    expect(pkg.activationEvents).toEqual(["onStartupFinished"]);
     expect(pkg.activationEvents).not.toContain("*");
   });
 
-  it("does not register StatusBar or resetAlertBadge", () => {
+  it("contributes the four host commands without a StatusBar contribution", () => {
     const ids = pkg.contributes.commands.map((item) => item.command);
     expect(ids).toEqual([
       "marketSentinel.pause",
