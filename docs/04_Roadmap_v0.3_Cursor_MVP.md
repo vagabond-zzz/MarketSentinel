@@ -147,7 +147,7 @@ StatusBar → Hover → Detail
 
 优先级：**提醒可靠 > 视觉漂亮**。
 
-## 11. Implementation status (v0.3)
+## 11. Implementation status (v0.3.0 complete)
 
 | Milestone | Status |
 |---|---|
@@ -159,20 +159,36 @@ StatusBar → Hover → Detail
 | M5 Minimal StatusBar | done |
 | M6 Hover | done |
 | M7 Alert handling | done |
-| M8 Host integration tests / packaging | done (Release Candidate; not tagged) |
-
-M8.1 Host UI: empty watchlist is StatusBar `IDLE`, not `STALE`. Core `feed_status` is unchanged.
+| M8 Host integration tests / packaging | done |
+| M8.1 Empty watchlist IDLE | done |
 
 v0.3 Host watchlist source of truth is `marketSentinel.watchlist` (settings). The daemon holds a non-persistent runtime Watchlist updated via `set_watchlist` and does not write `data/watchlist.json`.
 
-M8 Release Candidate identity (local VSIX, not Marketplace):
+Local VSIX identity (not Marketplace):
 
 ```text
 publisher: market-sentinel-local
 name: market-sentinel
 id: market-sentinel-local.market-sentinel
+version: 0.3.0
 extensionKind: ["ui"]
 ```
 
-`market-sentinel-local` is a developer/local publisher identifier. Changing it later changes the extension identifier. Python Core is not bundled; install still needs `coreRoot` + `uvPath`. Do not tag `v0.3.0` or enter v0.4 until a separate release audit.
+`market-sentinel-local` is a developer/local publisher identifier. Changing it later changes the extension identifier. Python Core is not bundled; install still needs `coreRoot` + `uvPath`.
+
+## 12. Future / v0.4
+
+Not in v0.3.0. Do not implement until a separate v0.4 kickoff:
+
+- live HTTP provider
+- Marketplace publisher identity
+- Remote SSH / Codespaces
+- bundled Python runtime
+- unread persisted across reload
+- WebView / alert history panel
+- `notified_timestamp`
+- LLM / News / MCP
+- DSH / ZCode adapters
+- trading advice
+
 

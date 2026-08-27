@@ -2,32 +2,32 @@
 
 Low-latency market monitoring core for developer hosts (Cursor, DeepSeek Harness, ZCode).
 
-Current Core package: **v0.2.0**. Cursor Host **v0.3 Release Candidate** is on `feat/v0.3-cursor-host`. Wire compatibility is **Protocol v1** (`protocol_version`), not the Python package version. High-frequency market updates never call an LLM (`Token = 0`). There is no live HTTP provider, no `notified_timestamp`, and no LLM / News / MCP.
+**Current version: v0.3.0 — Cursor Host.** Python Core and the desktop Cursor extension share package version 0.3.0. Wire compatibility is **Protocol v1** (`protocol_version === 1`), not the product version. High-frequency market updates never call an LLM (`Token = 0`).
 
 ## Positioning
 
 Market Sentinel watches a small watchlist, turns quotes into Features / Events / Signals, and keeps alerts rare. It is a Core plus diagnostics CLI plus a desktop Cursor host, not a trading product.
 
-## v0.3 Cursor Host (Release Candidate)
+## v0.3.0 Cursor Host
 
 Desktop Cursor / VS Code extension that spawns the Python daemon over stdin/stdout JSONL (Protocol v1).
 
 Included:
 
-- Cursor / VS Code **Desktop** extension
-- Python daemon via **uv**
-- JSONL Protocol v1
-- StatusBar (`DISCONNECTED` / `STARTING` / `PAUSED` / `IDLE` / `STALE` / `ALERT` / `HOT` / `WARM` / `NORMAL`)
+- Python Core
+- Protocol v1 JSONL daemon
+- Cursor / VS Code **Desktop** Host
+- StatusBar (`DISCONNECTED` / `STARTING` / `PAUSED` / `IDLE` / `NORMAL` / `WARM` / `HOT` / `STALE` / `ALERT`)
 - Hover (persistent `WireMarketState`)
 - Pause / Resume / Restart Core / Show Output
 - Unread alert badge (unsolicited `alert` edges only)
 - Optional critical toast (`marketSentinel.alertToast`)
-- Reset Alert Badge
+- Local VSIX (`pnpm package:vsix`)
 - Empty watchlist is `IDLE` (not `STALE`); a configured symbol with stale/disconnected feed is still `STALE`
 
 Python Core is **not** bundled in the VSIX. Developer install still needs a Core checkout and `uv`.
 
-Extension identifier: `market-sentinel-local.market-sentinel`. Publisher `market-sentinel-local` is a **local VSIX id**, not a Marketplace publisher.
+Extension identifier: `market-sentinel-local.market-sentinel`. Publisher `market-sentinel-local` is a **local/developer VSIX id**, not a Marketplace publisher.
 
 ### Developer install
 
@@ -121,7 +121,7 @@ uv run market-sentinel --watchlist data/watchlist.json run --once --verbose
 
 `--provider` defaults to `fake`. `replay` reads a JSONL fixture (`--replay path`). `http` is not implemented as a Core provider.
 
-Host protocol (v0.3; stdout is JSONL only):
+Host protocol (v0.3.0; stdout is JSONL Protocol v1 only):
 
 ```bash
 uv run market-sentinel --provider fake daemon
