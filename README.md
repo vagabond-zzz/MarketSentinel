@@ -2,7 +2,7 @@
 
 Low-latency market monitoring core for developer hosts (Cursor, DeepSeek Harness, ZCode).
 
-Current version: **v0.2.0 — Market Event Engine**. v0.3 Cursor Host is in progress on `feat/v0.3-cursor-host` (Python JSONL daemon + protocol; no Cursor UI yet). High-frequency market updates never call an LLM (`Token = 0`). There is no live HTTP provider, no `notified_timestamp`, and no LLM / News / MCP.
+Current version: **v0.2.0 — Market Event Engine**. v0.3 Cursor Host is in progress on `feat/v0.3-cursor-host` (Python JSONL daemon + TypeScript IPC client; no Cursor UI yet). High-frequency market updates never call an LLM (`Token = 0`). There is no live HTTP provider, no `notified_timestamp`, and no LLM / News / MCP.
 
 ## Positioning
 
@@ -43,13 +43,28 @@ uv run market-sentinel --watchlist data/watchlist.json run --once --verbose
 
 `--provider` defaults to `fake`. `replay` reads a JSONL fixture (`--replay path`). `http` is not implemented as a Core provider.
 
-Host protocol (v0.3 M2; stdout is JSONL only):
+Host protocol (v0.3; stdout is JSONL only):
 
 ```bash
 uv run market-sentinel --provider fake daemon
 ```
 
 Commands are JSON lines on stdin (`hello`, `start`, `pause`, `resume`, `set_watchlist`, `get_state`, `shutdown`). Logs go to stderr. `set_watchlist` is runtime-only and does not write `data/watchlist.json`.
+
+The Cursor package (`apps/cursor-extension`) includes a vscode-free JSONL IPC client and Python process manager. Spawn is argv-based (`shell: false`):
+
+```text
+uv run --directory <repo> market-sentinel --provider fake daemon
+```
+
+Handshake order is `hello` → `set_watchlist` → `start`. Host UI (StatusBar / Hover / commands) is M4+.
+
+```bash
+pnpm test
+pnpm lint
+pnpm typecheck
+pnpm build
+```
 
 ## Architecture
 
@@ -106,7 +121,7 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Session id is the **UTC+8 calendar day**. That matches current A/H MVP examples; there is no full exchange calendar.
 - `MarketBar` is an adaptive-polling **sampled/observed** 1-minute bar, not an exchange official K-line.
 - VWAP needs reliable cumulative **turnover and volume**.
-- No Cursor StatusBar / Hover / WebView yet (v0.3 M3–M8).
+- No Cursor StatusBar / Hover / WebView yet (v0.3 M4–M8).
 - No formal HTTP live provider.
 - No `notified_timestamp` (alert candidate ≠ notified).
 - No LLM, News, MCP, auto-trading, or buy/sell advice.

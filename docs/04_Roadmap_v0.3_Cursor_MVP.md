@@ -154,7 +154,7 @@ StatusBar → Hover → Detail
 | M0 Node / pnpm workspace | done |
 | M1 Protocol v1 DTO / codec / mapping | done |
 | M2 Python daemon JSONL transport | done |
-| M3 TypeScript protocol + IPC client | not started |
+| M3 TypeScript protocol + IPC client | done |
 | M4 Cursor extension lifecycle | not started |
 | M5 Minimal StatusBar | not started |
 | M6 Hover | not started |

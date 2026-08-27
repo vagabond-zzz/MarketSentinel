@@ -2,7 +2,7 @@
 
 ## v0.3 — in progress (`feat/v0.3-cursor-host`)
 
-Python JSONL daemon and Protocol v1. No Cursor UI, no TypeScript IPC client (M3+).
+Python JSONL daemon, Protocol v1, and a vscode-free TypeScript IPC client / process manager (M3). No Cursor UI (M4+).
 
 ### M0 — Node / pnpm workspace
 
@@ -15,6 +15,10 @@ Versioned JSONL envelope, explicit wire DTOs, and `MarketState` → DTO mapper. 
 ### M2 — Python daemon transport
 
 `market-sentinel daemon`: Windows-safe stdin, flushed JSONL stdout, stderr logging, daemon phase machine, runtime-only `set_watchlist`, command/tick lock, graceful shutdown. Integration test runs `uv run ... daemon`.
+
+### M3 — TypeScript protocol guards, JSONL IPC client, process manager
+
+Hand-written Protocol v1 guards (no zod), JSONL line decoder, `IpcClient` request map, and `ProcessManager` (`uv run --directory <coreRoot> ... daemon`, `shell: false`). Handshake is hello → set_watchlist → start. `active_signals` stay on state; alerts only come from `alert` messages. No `vscode` import in these modules.
 
 ## v0.2.0 — 2026-08-26
 
