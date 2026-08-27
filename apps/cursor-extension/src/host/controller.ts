@@ -5,7 +5,12 @@ import {
   type ProcessManagerOptions,
   type SpawnFn,
 } from "../ipc/process";
-import type { WatchlistItem } from "../protocol/types";
+import type { WatchlistItem, WireMarketState } from "../protocol/types";
+import {
+  DEFAULT_ALERT_HOLD_MS,
+  mapStatusBar,
+  type StatusBarModel,
+} from "../statusbar/map";
 import { parseHostSettings } from "./config";
 import type {
   ActualState,
@@ -33,6 +38,11 @@ export interface HostControllerOptions {
   maxRetries?: number;
   helloTimeoutMs?: number;
   defaultTimeoutMs?: number;
+  now?: () => number;
+  alertHoldMs?: number;
+  setTimeoutFn?: typeof setTimeout;
+  clearTimeoutFn?: typeof clearTimeout;
+  onStatusBar?: (model: StatusBarModel) => void;
 }
 
 function defaultDelay(ms: number): Promise<void> {
@@ -60,6 +70,9 @@ export class HostController {
   private lastErrorInternal: string | undefined;
   private coreVersionInternal: string | undefined;
   private managerGeneration = 0;
+  private lastMarket: WireMarketState | undefined;
+  private lastAlertAt: number | undefined;
+  private alertHoldTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(options: HostControllerOptions) {
     this.options = options;
@@ -93,6 +106,19 @@ export class HostController {
     return this.lastAcked.map((item) => ({ ...item }));
   }
 
+  statusBarModel(): StatusBarModel {
+    return mapStatusBar({
+      actual: this.actualInternal,
+      desired: this.desiredInternal,
+      market: this.lastMarket,
+      lastAlertAt: this.lastAlertAt,
+      now: (this.options.now ?? Date.now)(),
+      alertHoldMs: this.options.alertHoldMs ?? DEFAULT_ALERT_HOLD_MS,
+      lastError: this.lastErrorInternal,
+      restartNeeded: this.restartNeededInternal,
+    });
+  }
+
   async start(): Promise<void> {
     this.desiredInternal = "RUNNING";
     try {
@@ -105,29 +131,33 @@ export class HostController {
   async shutdown(): Promise<void> {
     this.disposed = true;
     this.restartInFlight = false;
+    this.clearAlertHold();
     if (this.actualInternal === "STOPPED" && this.manager === undefined) {
+      this.emitUi();
       return;
     }
-    this.actualInternal = "STOPPING";
+    this.setActual("STOPPING");
     await this.disposeManager();
-    this.actualInternal = "STOPPED";
+    this.setActual("STOPPED");
   }
 
   async pause(): Promise<void> {
     this.desiredInternal = "PAUSED";
     if (this.actualInternal === "DISCONNECTED" || this.actualInternal === "STOPPED") {
       this.options.logger.host("pause requested while disconnected; core will stay stopped");
+      this.emitUi();
       return;
     }
     if (this.manager === undefined || !this.manager.connected) {
-      this.actualInternal = "DISCONNECTED";
+      this.setActual("DISCONNECTED");
       return;
     }
     try {
       await this.manager.pause();
-      this.actualInternal = "PAUSED";
+      this.setActual("PAUSED");
     } catch (error) {
       this.options.logger.host(`pause failed: ${this.errorMessage(error)}`);
+      this.emitUi();
     }
   }
 
@@ -137,11 +167,11 @@ export class HostController {
     if (this.actualInternal === "PAUSED" && this.manager !== undefined && this.manager.connected) {
       try {
         await this.manager.resume();
-        this.actualInternal = "RUNNING";
+        this.setActual("RUNNING");
         return;
       } catch (error) {
         this.options.logger.host(`resume failed: ${this.errorMessage(error)}`);
-        this.actualInternal = "DISCONNECTED";
+        this.setActual("DISCONNECTED");
       }
     }
     try {
@@ -156,7 +186,7 @@ export class HostController {
     await this.disposeManager();
     this.restartNeededInternal = false;
     if (this.desiredInternal === "PAUSED") {
-      this.actualInternal = "STOPPED";
+      this.setActual("STOPPED");
       this.options.logger.host("restartCore skipped spawn because desiredState is PAUSED");
       return;
     }
@@ -175,6 +205,7 @@ export class HostController {
     if (relevant.some((key) => (RESTART_SETTING_KEYS as readonly string[]).includes(key))) {
       this.restartNeededInternal = true;
       this.options.logger.host(RESTART_HINT);
+      this.emitUi();
     }
     if (relevant.includes("watchlist")) {
       await this.applyWatchlistHotUpdate();
@@ -234,7 +265,7 @@ export class HostController {
       throw new Error("spawn configuration is missing");
     }
     await this.disposeManager();
-    this.actualInternal = "STARTING";
+    this.setActual("STARTING");
     const generation = ++this.managerGeneration;
     const spawnSnapshot = this.spawnConfig;
     const manager = this.createManager({
@@ -263,18 +294,40 @@ export class HostController {
         this.options.logger.host(`core disconnected: ${reason}`);
         void this.handleUnexpectedDisconnect();
       },
+      onState: (message) => {
+        if (generation !== this.managerGeneration) {
+          return;
+        }
+        this.lastMarket = message.state;
+        this.emitUi();
+      },
+      onAlert: () => {
+        if (generation !== this.managerGeneration) {
+          return;
+        }
+        this.noteAlert();
+      },
     });
     this.manager = manager;
     await manager.start(watchlist);
     this.lastAcked = manager.acknowledgedWatchlist;
-    this.actualInternal = "RUNNING";
+    try {
+      const snapshot = await manager.getState();
+      this.lastMarket = snapshot.state;
+    } catch (error) {
+      this.options.logger.host(`get_state after start failed: ${this.errorMessage(error)}`);
+    }
+    this.setActual("RUNNING");
     this.retryCount = 0;
     this.lastErrorInternal = undefined;
   }
 
   private async handleUnexpectedDisconnect(): Promise<void> {
     this.manager = undefined;
-    this.actualInternal = "DISCONNECTED";
+    this.lastMarket = undefined;
+    this.lastAlertAt = undefined;
+    this.clearAlertHold();
+    this.setActual("DISCONNECTED");
     if (this.disposed || this.desiredInternal !== "RUNNING") {
       this.options.logger.host("core exited while desiredState is not RUNNING; not auto-restarting");
       return;
@@ -287,7 +340,7 @@ export class HostController {
       while (!this.disposed && this.desiredInternal === "RUNNING") {
         if (this.retryCount >= this.maxRetries) {
           this.options.logger.host("auto-restart gave up after 3 attempts");
-          this.actualInternal = "DISCONNECTED";
+          this.setActual("DISCONNECTED");
           return;
         }
         const wait = this.backoffMs[Math.min(this.retryCount, this.backoffMs.length - 1)] ?? 0;
@@ -321,11 +374,43 @@ export class HostController {
   private failDisconnected(error: unknown): void {
     const message = this.errorMessage(error);
     this.lastErrorInternal = message;
-    this.actualInternal = "DISCONNECTED";
+    this.lastMarket = undefined;
+    this.lastAlertAt = undefined;
+    this.clearAlertHold();
+    this.setActual("DISCONNECTED");
     this.options.logger.host(message);
     if (error instanceof ProtocolError) {
       this.options.logger.host(`core error code=${error.code} request_id=${error.requestId ?? ""}`);
     }
+  }
+
+  private noteAlert(): void {
+    this.lastAlertAt = (this.options.now ?? Date.now)();
+    this.clearAlertHold();
+    const hold = this.options.alertHoldMs ?? DEFAULT_ALERT_HOLD_MS;
+    const setTimeoutFn = this.options.setTimeoutFn ?? setTimeout;
+    this.alertHoldTimer = setTimeoutFn(() => {
+      this.alertHoldTimer = undefined;
+      this.emitUi();
+    }, hold);
+    this.emitUi();
+  }
+
+  private clearAlertHold(): void {
+    if (this.alertHoldTimer !== undefined) {
+      const clearTimeoutFn = this.options.clearTimeoutFn ?? clearTimeout;
+      clearTimeoutFn(this.alertHoldTimer);
+      this.alertHoldTimer = undefined;
+    }
+  }
+
+  private setActual(state: ActualState): void {
+    this.actualInternal = state;
+    this.emitUi();
+  }
+
+  private emitUi(): void {
+    this.options.onStatusBar?.(this.statusBarModel());
   }
 
   private errorMessage(error: unknown): string {

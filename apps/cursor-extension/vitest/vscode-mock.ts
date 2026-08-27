@@ -7,6 +7,13 @@ export const vscodeState = {
   outputLines: [] as string[],
   outputShown: false,
   configListeners: [] as Array<(event: { affectsConfiguration: (key: string) => boolean }) => void>,
+  statusBar: {
+    text: "",
+    tooltip: "" as string | undefined,
+    shown: false,
+    command: undefined as string | undefined,
+    backgroundColor: undefined as { id: string } | undefined,
+  },
 };
 
 export function resetVscodeMock(): void {
@@ -16,7 +23,23 @@ export function resetVscodeMock(): void {
   vscodeState.outputLines = [];
   vscodeState.outputShown = false;
   vscodeState.configListeners = [];
+  vscodeState.statusBar = {
+    text: "",
+    tooltip: "",
+    shown: false,
+    command: undefined,
+    backgroundColor: undefined,
+  };
 }
+
+export class ThemeColor {
+  constructor(public id: string) {}
+}
+
+export const StatusBarAlignment = {
+  Left: 1,
+  Right: 2,
+} as const;
 
 export const window = {
   createOutputChannel(_name: string) {
@@ -29,6 +52,27 @@ export const window = {
       },
       dispose() {
         return undefined;
+      },
+    };
+  },
+  createStatusBarItem(_alignment?: number, _priority?: number) {
+    return {
+      text: "",
+      tooltip: undefined as string | undefined,
+      command: undefined as string | undefined,
+      backgroundColor: undefined as ThemeColor | undefined,
+      show() {
+        vscodeState.statusBar.shown = true;
+        vscodeState.statusBar.text = this.text;
+        vscodeState.statusBar.tooltip = this.tooltip;
+        vscodeState.statusBar.command = this.command;
+        vscodeState.statusBar.backgroundColor = this.backgroundColor;
+      },
+      hide() {
+        vscodeState.statusBar.shown = false;
+      },
+      dispose() {
+        vscodeState.statusBar.shown = false;
       },
     };
   },
@@ -72,4 +116,6 @@ export default {
   window,
   commands,
   workspace,
+  StatusBarAlignment,
+  ThemeColor,
 };

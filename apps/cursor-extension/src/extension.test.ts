@@ -18,6 +18,9 @@ describe("extension adapter", () => {
     expect(vscodeState.commands.has(HOST_COMMANDS.restartCore)).toBe(true);
     expect(vscodeState.commands.has(HOST_COMMANDS.showOutput)).toBe(true);
     expect(vscodeState.outputLines.some((line) => line.startsWith("[host]"))).toBe(true);
+    expect(vscodeState.statusBar.shown).toBe(true);
+    expect(vscodeState.statusBar.text).toContain("DISCONNECTED");
+    expect(vscodeState.statusBar.command).toBe(HOST_COMMANDS.showOutput);
     await vscodeState.commands.get(HOST_COMMANDS.showOutput)?.();
     expect(vscodeState.outputShown).toBe(true);
     await deactivate();

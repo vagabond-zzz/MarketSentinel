@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.3.0",
   "displayName": "Market Sentinel",
-  "description": "Cursor host for Market Sentinel (v0.3; StatusBar/Hover not implemented yet)",
+  "description": "Cursor host for Market Sentinel (v0.3; Hover/alerts not implemented yet)",
   "main": "./out/extension.js",
   "engines": {
     "vscode": "^1.90.0",

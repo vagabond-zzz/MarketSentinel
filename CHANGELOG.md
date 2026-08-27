@@ -2,7 +2,7 @@
 
 ## v0.3 — in progress (`feat/v0.3-cursor-host`)
 
-Python JSONL daemon, Protocol v1, vscode-free IPC, and Cursor extension lifecycle/commands (M4). No StatusBar/Hover (M5+).
+Python JSONL daemon, Protocol v1, vscode-free IPC, Cursor lifecycle/commands (M4), and a minimal StatusBar (M5). Hover/toast are M6+.
 
 ### M0 — Node / pnpm workspace
 
@@ -23,6 +23,10 @@ Hand-written Protocol v1 guards (no zod), JSONL line decoder, `IpcClient` reques
 ### M4 — Cursor extension lifecycle, settings, commands
 
 `HostController` keeps `desiredState` (RUNNING/PAUSED) separate from process actual state. Trusted-workspace-only desktop extension: `onStartupFinished` + pause/resume/restartCore/showOutput. Watchlist hot-applies; coreRoot/uvPath/provider/replayPath require `restartCore`. Crash while RUNNING retries 1s/3s/10s (max 3). Crash while PAUSED does not auto-start. `ready.core_version` is diagnostics-only.
+
+### M5 — Minimal StatusBar
+
+StatusBar maps host lifecycle + Protocol v1 `state`/`alert` to `DISCONNECTED | PAUSED | STARTING | STALE | ALERT | HOT | WARM | NORMAL`. Feed STALE/DISCONNECTED is never shown as NORMAL. `ALERT` comes only from `alert` messages (15s hold), never from `state.active_signals`. Click opens the Output Channel. No Hover/unread/toast.
 
 ## v0.2.0 — 2026-08-26
 

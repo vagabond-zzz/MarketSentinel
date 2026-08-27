@@ -57,7 +57,7 @@ The Cursor package (`apps/cursor-extension`) includes a vscode-free JSONL IPC cl
 uv run --directory <repo> market-sentinel --provider fake daemon
 ```
 
-Handshake order is `hello` → `set_watchlist` → `start`. Host commands: Pause / Resume / Restart Core / Show Output. StatusBar and Hover are M5+.
+Handshake order is `hello` → `set_watchlist` → `start`. Host commands: Pause / Resume / Restart Core / Show Output. StatusBar shows DISCONNECTED / PAUSED / STALE / ALERT / HOT / WARM / NORMAL. Hover is M6+.
 
 The Cursor extension is **desktop-only** (Node `child_process`). It is not a Web extension.
 
@@ -123,7 +123,7 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Session id is the **UTC+8 calendar day**. That matches current A/H MVP examples; there is no full exchange calendar.
 - `MarketBar` is an adaptive-polling **sampled/observed** 1-minute bar, not an exchange official K-line.
 - VWAP needs reliable cumulative **turnover and volume**.
-- No Cursor StatusBar / Hover / WebView yet (v0.3 M5–M8).
+- No Cursor Hover / WebView yet (v0.3 M6–M8). StatusBar is minimal text (`MS <kind>`), not a polished visual.
 - Desktop Cursor/VS Code extension only. Web / browser Cursor environments are not supported. Remote SSH / Codespaces is not formally verified.
 - Developer install requires `uv` plus a Core checkout path (`marketSentinel.coreRoot`, or a single trusted workspace folder).
 - Untrusted workspaces are unsupported because the host starts a local Python Core.

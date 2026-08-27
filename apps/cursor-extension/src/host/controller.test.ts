@@ -75,6 +75,15 @@ function scriptDaemon(
             watchlist_count: items.length,
           }) + "\n",
         );
+      } else if (command.type === "get_state") {
+        child.stdout.write(
+          JSON.stringify({
+            protocol_version: 1,
+            type: "state",
+            request_id: command.request_id,
+            state: { watchlist_count: 0, feed_status: "DISCONNECTED", symbols: [] },
+          }) + "\n",
+        );
       } else if (command.type === "shutdown") {
         child.stdout.write(
           JSON.stringify({
@@ -126,6 +135,7 @@ function createHarness(
     script?: (child: FakeChild, generation: number) => void;
     settings?: RawSettings;
     folders?: string[];
+    onStatusBar?: (model: { kind: string }) => void;
   } = {},
 ): Harness {
   const children: FakeChild[] = [];
@@ -145,6 +155,7 @@ function createHarness(
     },
     helloTimeoutMs: 80,
     defaultTimeoutMs: 80,
+    onStatusBar: extras.onStatusBar,
     createManager: (options) => {
       const manager = new ProcessManager(options);
       managers.push(manager);
@@ -177,6 +188,7 @@ describe("HostController", () => {
       "hello",
       "set_watchlist",
       "start",
+      "get_state",
     ]);
     expect(harness.lines.some((line) => line.includes("core_version=0.2.0"))).toBe(true);
   });
@@ -231,6 +243,7 @@ describe("HostController", () => {
       "hello",
       "set_watchlist",
       "start",
+      "get_state",
       "pause",
       "resume",
     ]);
@@ -246,6 +259,7 @@ describe("HostController", () => {
       "hello",
       "set_watchlist",
       "start",
+      "get_state",
     ]);
   });
 
@@ -398,5 +412,82 @@ describe("HostController", () => {
     });
     await harness.controller.start();
     expect(harness.controller.actualState).toBe("DISCONNECTED");
+  });
+
+  it("maps StatusBar from host lifecycle, feed, scheduler level, and alert messages", async () => {
+    const views: string[] = [];
+    const harness = createHarness({
+      onStatusBar: (model) => {
+        views.push(model.kind);
+      },
+    });
+    await harness.controller.start();
+    expect(harness.controller.statusBarModel().kind).toBe("STALE");
+
+    harness.children[0]?.stdout.write(
+      JSON.stringify({
+        protocol_version: 1,
+        type: "state",
+        state: {
+          watchlist_count: 1,
+          feed_status: "LIVE",
+          symbols: [
+            {
+              symbol: "00700.HK",
+              price: 1,
+              scheduler_level: "HOT",
+              feed_status: "LIVE",
+              change_1m: null,
+              change_5m: null,
+              change_15m: null,
+              volume_ratio_1m: null,
+              volume_ratio_5m: null,
+              ema5: null,
+              ema20: null,
+              rsi14: null,
+              vwap: null,
+              active_signals: [
+                {
+                  id: "live",
+                  family: "tape",
+                  direction: "up",
+                  priority: "important",
+                  title: "t",
+                  summary: "s",
+                },
+              ],
+            },
+          ],
+        },
+      }) + "\n",
+    );
+    expect(harness.controller.statusBarModel().kind).toBe("HOT");
+
+    harness.children[0]?.stdout.write(
+      JSON.stringify({
+        protocol_version: 1,
+        type: "alert",
+        candidates: [
+          {
+            id: "a1",
+            symbol: "00700.HK",
+            family: "tape",
+            direction: "up",
+            priority: "important",
+            title: "alert",
+            summary: "edge",
+          },
+        ],
+        market_timestamp: 1,
+      }) + "\n",
+    );
+    expect(harness.controller.statusBarModel().kind).toBe("ALERT");
+
+    await harness.controller.pause();
+    expect(harness.controller.statusBarModel().kind).toBe("PAUSED");
+    expect(views).toContain("STALE");
+    expect(views).toContain("HOT");
+    expect(views).toContain("ALERT");
+    expect(views).toContain("PAUSED");
   });
 });

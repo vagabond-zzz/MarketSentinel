@@ -2,7 +2,8 @@ import * as vscode from "vscode";
 
 import { HostController } from "./host/controller";
 import { bindCommands } from "./host/session";
-import type { RawSettings } from "./host/types";
+import { HOST_COMMANDS, type RawSettings } from "./host/types";
+import type { StatusBarModel } from "./statusbar/map";
 
 let controller: HostController | undefined;
 
@@ -25,8 +26,23 @@ function splitCoreLines(chunk: string, write: (line: string) => void): void {
   }
 }
 
+function applyStatusBar(item: vscode.StatusBarItem, model: StatusBarModel): void {
+  item.text = model.text;
+  item.tooltip = model.tooltip;
+  item.command = HOST_COMMANDS.showOutput;
+  if (model.tone === "error") {
+    item.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+  } else if (model.tone === "warning") {
+    item.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
+  } else {
+    item.backgroundColor = undefined;
+  }
+  item.show();
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const output = vscode.window.createOutputChannel("Market Sentinel");
+  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
   const logger = {
     host: (message: string) => {
       output.appendLine(`[host] ${message}`);
@@ -40,13 +56,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     workspaceFolders: () =>
       vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [],
     logger,
+    onStatusBar: (model) => applyStatusBar(statusBar, model),
   });
   controller = host;
+  applyStatusBar(statusBar, host.statusBarModel());
   const commands = bindCommands(host, { show: () => output.show() }, logger);
   for (const [id, handler] of Object.entries(commands)) {
     context.subscriptions.push(vscode.commands.registerCommand(id, handler));
   }
-  context.subscriptions.push(output);
+  context.subscriptions.push(output, statusBar);
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) => {
       const keys = ["watchlist", "coreRoot", "uvPath", "provider", "replayPath"].filter((key) =>
