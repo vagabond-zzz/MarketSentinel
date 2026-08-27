@@ -84,8 +84,8 @@ function model(kind: StatusBarKind, tone: StatusBarTone, input: StatusBarInput):
 
 export function mapStatusBar(input: StatusBarInput): StatusBarModel {
   const hold = input.alertHoldMs ?? DEFAULT_ALERT_HOLD_MS;
-  const alertActive =
-    input.lastAlertAt !== undefined && input.now - input.lastAlertAt >= 0 && input.now - input.lastAlertAt <= hold;
+  const elapsed = input.lastAlertAt === undefined ? hold : input.now - input.lastAlertAt;
+  const alertActive = input.lastAlertAt !== undefined && elapsed >= 0 && elapsed < hold;
 
   if (input.actual === "STARTING") {
     return model("STARTING", "default", input);
@@ -101,7 +101,11 @@ export function mapStatusBar(input: StatusBarInput): StatusBarModel {
     return model("PAUSED", "default", input);
   }
 
-  const feed = input.market?.feed_status;
+  if (input.market === undefined) {
+    return model("STARTING", "default", input);
+  }
+
+  const feed = input.market.feed_status;
   if (feed === "STALE" || feed === "DISCONNECTED") {
     return model("STALE", "error", input);
   }

@@ -127,6 +127,23 @@ describe("mapStatusBar", () => {
     ).toBe("NORMAL");
   });
 
+  it("treats elapsed === alertHoldMs as expired so the hold timer can refresh", () => {
+    const held = {
+      ...running,
+      market: market(),
+      lastAlertAt: 1_000,
+      alertHoldMs: 15_000,
+    };
+    expect(mapStatusBar({ ...held, now: 1_000 + 14_999 }).kind).toBe("ALERT");
+    expect(mapStatusBar({ ...held, now: 1_000 + 15_000 }).kind).toBe("NORMAL");
+  });
+
+  it("maps RUNNING without MarketState to STARTING, not NORMAL", () => {
+    const view = mapStatusBar({ ...running, market: undefined });
+    expect(view.kind).toBe("STARTING");
+    expect(view.text).toBe("MS STARTING");
+  });
+
   it("maps HOT over WARM over NORMAL", () => {
     expect(
       mapStatusBar({

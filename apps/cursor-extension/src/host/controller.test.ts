@@ -29,7 +29,7 @@ function asChild(child: FakeChild): ChildProcess {
 function scriptDaemon(
   child: FakeChild,
   log: unknown[],
-  options: { protocolVersion?: number; hangWatchlist?: boolean } = {},
+  options: { protocolVersion?: number; hangWatchlist?: boolean; failGetState?: boolean } = {},
 ): void {
   const decoder = new JsonlDecoder();
   child.stdin.on("data", (chunk: Buffer | string) => {
@@ -76,6 +76,18 @@ function scriptDaemon(
           }) + "\n",
         );
       } else if (command.type === "get_state") {
+        if (options.failGetState) {
+          child.stdout.write(
+            JSON.stringify({
+              protocol_version: 1,
+              type: "error",
+              request_id: command.request_id,
+              code: "internal",
+              message: "state unavailable",
+            }) + "\n",
+          );
+          return;
+        }
         child.stdout.write(
           JSON.stringify({
             protocol_version: 1,
@@ -136,6 +148,10 @@ function createHarness(
     settings?: RawSettings;
     folders?: string[];
     onStatusBar?: (model: { kind: string }) => void;
+    now?: () => number;
+    alertHoldMs?: number;
+    setTimeoutFn?: typeof setTimeout;
+    clearTimeoutFn?: typeof clearTimeout;
   } = {},
 ): Harness {
   const children: FakeChild[] = [];
@@ -155,6 +171,10 @@ function createHarness(
     },
     helloTimeoutMs: 80,
     defaultTimeoutMs: 80,
+    now: extras.now,
+    alertHoldMs: extras.alertHoldMs,
+    setTimeoutFn: extras.setTimeoutFn,
+    clearTimeoutFn: extras.clearTimeoutFn,
     onStatusBar: extras.onStatusBar,
     createManager: (options) => {
       const manager = new ProcessManager(options);
@@ -489,5 +509,79 @@ describe("HostController", () => {
     expect(views).toContain("HOT");
     expect(views).toContain("ALERT");
     expect(views).toContain("PAUSED");
+  });
+
+  it("maps RUNNING without a MarketState snapshot to STARTING, not NORMAL", async () => {
+    const harness = createHarness({
+      script: (child) => scriptDaemon(child, harness.commands, { failGetState: true }),
+    });
+    await harness.controller.start();
+    expect(harness.controller.actualState).toBe("RUNNING");
+    expect(harness.controller.statusBarModel().kind).toBe("STARTING");
+  });
+
+  it("clears ALERT when the hold timer fires at elapsed === alertHoldMs", async () => {
+    let now = 1_000;
+    const timers: Array<() => void> = [];
+    const harness = createHarness({
+      now: () => now,
+      alertHoldMs: 15_000,
+      setTimeoutFn: ((callback: () => void) => {
+        timers.push(callback);
+        return 1 as unknown as ReturnType<typeof setTimeout>;
+      }) as typeof setTimeout,
+      clearTimeoutFn: () => undefined,
+    });
+    await harness.controller.start();
+    harness.children[0]?.stdout.write(
+      JSON.stringify({
+        protocol_version: 1,
+        type: "state",
+        state: {
+          watchlist_count: 1,
+          feed_status: "LIVE",
+          symbols: [
+            {
+              symbol: "00700.HK",
+              price: 1,
+              scheduler_level: "COLD",
+              feed_status: "LIVE",
+              change_1m: null,
+              change_5m: null,
+              change_15m: null,
+              volume_ratio_1m: null,
+              volume_ratio_5m: null,
+              ema5: null,
+              ema20: null,
+              rsi14: null,
+              vwap: null,
+              active_signals: [],
+            },
+          ],
+        },
+      }) + "\n",
+    );
+    harness.children[0]?.stdout.write(
+      JSON.stringify({
+        protocol_version: 1,
+        type: "alert",
+        candidates: [
+          {
+            id: "a1",
+            symbol: "00700.HK",
+            family: "tape",
+            direction: "up",
+            priority: "important",
+            title: "alert",
+            summary: "edge",
+          },
+        ],
+        market_timestamp: 1,
+      }) + "\n",
+    );
+    expect(harness.controller.statusBarModel().kind).toBe("ALERT");
+    now = 1_000 + 15_000;
+    timers.at(-1)?.();
+    expect(harness.controller.statusBarModel().kind).toBe("NORMAL");
   });
 });

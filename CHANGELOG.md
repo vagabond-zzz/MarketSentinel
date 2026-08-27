@@ -26,7 +26,7 @@ Hand-written Protocol v1 guards (no zod), JSONL line decoder, `IpcClient` reques
 
 ### M5 — Minimal StatusBar
 
-StatusBar maps host lifecycle + Protocol v1 `state`/`alert` to `DISCONNECTED | PAUSED | STARTING | STALE | ALERT | HOT | WARM | NORMAL`. Feed STALE/DISCONNECTED is never shown as NORMAL. `ALERT` comes only from `alert` messages (15s hold), never from `state.active_signals`. Click opens the Output Channel. No Hover/unread/toast.
+StatusBar maps host lifecycle + Protocol v1 `state`/`alert` to `DISCONNECTED | PAUSED | STARTING | STALE | ALERT | HOT | WARM | NORMAL`. Feed STALE/DISCONNECTED is never shown as NORMAL. `ALERT` comes only from `alert` messages (15s hold; `elapsed === hold` is expired), never from `state.active_signals`. RUNNING without a MarketState maps to STARTING, not NORMAL. Click opens the Output Channel. No Hover/unread/toast.
 
 ## v0.2.0 — 2026-08-26
 
