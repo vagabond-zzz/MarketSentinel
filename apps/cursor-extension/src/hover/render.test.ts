@@ -152,4 +152,16 @@ describe("renderHoverMarkdown", () => {
     expect(text).toBe("Market Sentinel · LIVE · symbols=2 · HOT=1 · WARM=0");
     expect(text).not.toContain("Price:");
   });
+
+  it("shows unread at the top when count is positive", () => {
+    const text = renderHoverMarkdown(
+      mapHover({
+        actual: "RUNNING",
+        unreadAlertCount: 2,
+        market: market(),
+      }),
+    );
+    expect(text).toContain("Unread alerts: 2");
+    expect(text.indexOf("Unread alerts: 2")).toBeLessThan(text.indexOf("Feed: LIVE"));
+  });
 });

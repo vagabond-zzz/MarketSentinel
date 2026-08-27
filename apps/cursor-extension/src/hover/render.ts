@@ -31,6 +31,9 @@ export function renderHoverMarkdown(model: HoverModel): string {
   }
 
   const lines = [model.title, ""];
+  if (model.unreadAlertCount > 0) {
+    lines.push(`Unread alerts: ${model.unreadAlertCount}`);
+  }
   if (model.lifecycleMessage !== undefined) {
     lines.push(model.lifecycleMessage);
     if (model.outputHint !== undefined) {

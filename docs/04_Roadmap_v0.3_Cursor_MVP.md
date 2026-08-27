@@ -158,7 +158,7 @@ StatusBar → Hover → Detail
 | M4 Cursor extension lifecycle | done |
 | M5 Minimal StatusBar | done |
 | M6 Hover | done |
-| M7 Alert handling | not started |
+| M7 Alert handling | done |
 | M8 Host integration tests / packaging | not started |
 
 v0.3 Host watchlist source of truth is `marketSentinel.watchlist` (settings). The daemon holds a non-persistent runtime Watchlist updated via `set_watchlist` and does not write `data/watchlist.json`.

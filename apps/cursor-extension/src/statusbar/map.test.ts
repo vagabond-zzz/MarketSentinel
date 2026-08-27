@@ -174,4 +174,37 @@ describe("mapStatusBar", () => {
       }).kind,
     ).toBe("ALERT");
   });
+
+  it("appends an unread badge without changing kind priority", () => {
+    expect(mapStatusBar({ ...running, market: market(), unreadAlertCount: 2 }).text).toBe(
+      "MS NORMAL · 2",
+    );
+    expect(
+      mapStatusBar({
+        ...running,
+        market: market({ symbols: [symbol({ scheduler_level: "HOT" })] }),
+        unreadAlertCount: 2,
+      }).text,
+    ).toBe("MS HOT · 2");
+    const stale = mapStatusBar({
+      ...running,
+      market: market({ feed_status: "STALE" }),
+      lastAlertAt: 1_000,
+      unreadAlertCount: 3,
+    });
+    expect(stale.kind).toBe("STALE");
+    expect(stale.text).toBe("MS STALE · 3");
+    expect(
+      mapStatusBar({
+        ...running,
+        actual: "PAUSED",
+        desired: "PAUSED",
+        market: market(),
+        unreadAlertCount: 2,
+      }).text,
+    ).toBe("MS PAUSED · 2");
+    expect(mapStatusBar({ ...running, market: market(), unreadAlertCount: 100 }).text).toBe(
+      "MS NORMAL · 99+",
+    );
+  });
 });

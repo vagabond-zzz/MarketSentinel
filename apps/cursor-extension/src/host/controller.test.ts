@@ -160,6 +160,33 @@ function writeState(child: FakeChild | undefined, state: Record<string, unknown>
   );
 }
 
+function writeAlert(
+  child: FakeChild | undefined,
+  candidates: Array<Record<string, unknown>>,
+): void {
+  child?.stdout.write(
+    JSON.stringify({
+      protocol_version: 1,
+      type: "alert",
+      candidates,
+      market_timestamp: 1,
+    }) + "\n",
+  );
+}
+
+function alertCandidate(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: "a1",
+    symbol: "00700.HK",
+    family: "price_volume",
+    direction: "up",
+    priority: "important",
+    title: "alert",
+    summary: "edge",
+    ...overrides,
+  };
+}
+
 interface Harness {
   controller: HostController;
   children: FakeChild[];
@@ -177,7 +204,8 @@ function createHarness(
     script?: (child: FakeChild, generation: number) => void;
     settings?: RawSettings;
     folders?: string[];
-    onStatusBar?: (model: { kind: string }) => void;
+    onUiSnapshot?: (snapshot: { statusBar: { kind: string; text: string } }) => void;
+    onAlertEdge?: (message: { candidates: unknown[] }) => void;
     now?: () => number;
     alertHoldMs?: number;
     setTimeoutFn?: typeof setTimeout;
@@ -205,7 +233,8 @@ function createHarness(
     alertHoldMs: extras.alertHoldMs,
     setTimeoutFn: extras.setTimeoutFn,
     clearTimeoutFn: extras.clearTimeoutFn,
-    onStatusBar: extras.onStatusBar,
+    onUiSnapshot: extras.onUiSnapshot,
+    onAlertEdge: extras.onAlertEdge,
     createManager: (options) => {
       const manager = new ProcessManager(options);
       managers.push(manager);
@@ -467,8 +496,8 @@ describe("HostController", () => {
   it("maps StatusBar from host lifecycle, feed, scheduler level, and alert messages", async () => {
     const views: string[] = [];
     const harness = createHarness({
-      onStatusBar: (model) => {
-        views.push(model.kind);
+      onUiSnapshot: (snapshot) => {
+        views.push(snapshot.statusBar.kind);
       },
     });
     await harness.controller.start();
@@ -748,5 +777,133 @@ describe("HostController", () => {
     expect(harness.controller.statusBarModel().kind).toBe("ALERT");
     now = 1_000 + 15_000;
     expect(harness.controller.statusBarModel().kind).toBe("NORMAL");
+    expect(harness.controller.unreadAlertCount).toBe(1);
+    expect(harness.controller.statusBarModel().text).toBe("MS NORMAL · 1");
+  });
+
+  it("increments unread only from unsolicited alert candidates", async () => {
+    const edges: number[] = [];
+    const harness = createHarness({
+      onAlertEdge: (message) => edges.push(message.candidates.length),
+    });
+    await harness.controller.start();
+    writeState(harness.children[0], {
+      watchlist_count: 1,
+      feed_status: "LIVE",
+      symbols: [
+        wireSymbol({
+          scheduler_level: "HOT",
+          active_signals: [
+            {
+              id: "live",
+              family: "price_volume",
+              direction: "up",
+              priority: "critical",
+              title: "t",
+              summary: "s",
+            },
+          ],
+        }),
+      ],
+    });
+    expect(harness.controller.unreadAlertCount).toBe(0);
+    expect(harness.controller.statusBarModel().kind).toBe("HOT");
+
+    writeAlert(harness.children[0], [alertCandidate()]);
+    expect(harness.controller.unreadAlertCount).toBe(1);
+    writeAlert(harness.children[0], [
+      alertCandidate({ id: "a2" }),
+      alertCandidate({ id: "a3" }),
+      alertCandidate({ id: "a4" }),
+    ]);
+    expect(harness.controller.unreadAlertCount).toBe(4);
+    writeAlert(harness.children[0], [alertCandidate({ id: "a1" })]);
+    expect(harness.controller.unreadAlertCount).toBe(5);
+    writeState(harness.children[0], {
+      watchlist_count: 1,
+      feed_status: "LIVE",
+      symbols: [wireSymbol({ scheduler_level: "WARM" })],
+    });
+    expect(harness.controller.unreadAlertCount).toBe(5);
+    expect(edges).toEqual([1, 3, 1]);
+    expect(
+      harness.lines.some((line) =>
+        line.includes("alert candidate symbol=00700.HK priority=important family=price_volume"),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps unread across Core crash/restart and ignores new active_signals", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeState(harness.children[0], {
+      watchlist_count: 1,
+      feed_status: "LIVE",
+      symbols: [wireSymbol()],
+    });
+    writeAlert(harness.children[0], [alertCandidate()]);
+    expect(harness.controller.unreadAlertCount).toBe(1);
+    harness.children[0]?.emit("exit", 1, null);
+    await vi.waitFor(() => {
+      expect(harness.controller.actualState).toBe("RUNNING");
+      expect(harness.managers.length).toBe(2);
+    });
+    expect(harness.controller.unreadAlertCount).toBe(1);
+    expect(harness.controller.statusBarModel().kind).not.toBe("ALERT");
+    writeState(harness.children[1], {
+      watchlist_count: 1,
+      feed_status: "LIVE",
+      symbols: [
+        wireSymbol({
+          active_signals: [
+            {
+              id: "live",
+              family: "price_volume",
+              direction: "up",
+              priority: "critical",
+              title: "t",
+              summary: "s",
+            },
+          ],
+        }),
+      ],
+    });
+    expect(harness.controller.unreadAlertCount).toBe(1);
+  });
+
+  it("resets unread without clearing transient ALERT or Core state", async () => {
+    let now = 1_000;
+    const harness = createHarness({
+      now: () => now,
+      alertHoldMs: 15_000,
+      setTimeoutFn: (() => 1 as unknown as ReturnType<typeof setTimeout>) as typeof setTimeout,
+      clearTimeoutFn: () => undefined,
+    });
+    await harness.controller.start();
+    writeState(harness.children[0], {
+      watchlist_count: 1,
+      feed_status: "LIVE",
+      symbols: [wireSymbol({ scheduler_level: "HOT" })],
+    });
+    writeAlert(harness.children[0], [alertCandidate(), alertCandidate({ id: "a2" })]);
+    expect(harness.controller.statusBarModel().kind).toBe("ALERT");
+    expect(harness.controller.statusBarModel().text).toBe("MS ALERT · 2");
+    harness.controller.resetAlertBadge();
+    expect(harness.controller.unreadAlertCount).toBe(0);
+    expect(harness.controller.statusBarModel().kind).toBe("ALERT");
+    expect(harness.controller.statusBarModel().text).toBe("MS ALERT");
+    expect(harness.controller.hoverModel().symbols[0]?.level).toBe("HOT");
+    now = 1_000 + 15_000;
+    expect(harness.controller.statusBarModel().kind).toBe("HOT");
+  });
+
+  it("hot-applies alertToast without restarting Core", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    const before = harness.spawned.length;
+    harness.settings.alertToast = "critical";
+    await harness.controller.onConfigurationChanged(["alertToast"]);
+    expect(harness.spawned).toHaveLength(before);
+    expect(harness.controller.restartNeeded).toBe(false);
   });
 });

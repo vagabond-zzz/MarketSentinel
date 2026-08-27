@@ -181,4 +181,34 @@ describe("mapHover", () => {
     expect(view.enableDetails).toBe(false);
     expect(view.headline).toBe("Market Sentinel · LIVE · symbols=3 · HOT=1 · WARM=1");
   });
+
+  it("surfaces unread separately from active_signals", () => {
+    const withSignals = mapHover({
+      actual: "RUNNING",
+      unreadAlertCount: 0,
+      market: market({
+        symbols: [symbol({ scheduler_level: "HOT", active_signals: [signal()] })],
+      }),
+    });
+    expect(withSignals.unreadAlertCount).toBe(0);
+    expect(withSignals.headline).not.toMatch(/unread=/);
+
+    const withUnread = mapHover({
+      actual: "RUNNING",
+      unreadAlertCount: 2,
+      enableHoverDetails: false,
+      market: market({
+        watchlist_count: 3,
+        symbols: [
+          symbol({ scheduler_level: "HOT" }),
+          symbol({ symbol: "b", scheduler_level: "WARM" }),
+          symbol({ symbol: "c", scheduler_level: "COLD" }),
+        ],
+      }),
+    });
+    expect(withUnread.unreadAlertCount).toBe(2);
+    expect(withUnread.headline).toBe(
+      "Market Sentinel · LIVE · symbols=3 · HOT=1 · WARM=1 · unread=2",
+    );
+  });
 });

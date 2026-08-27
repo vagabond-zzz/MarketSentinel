@@ -27,6 +27,7 @@ export interface RawSettings {
   provider?: unknown;
   replayPath?: string;
   enableHoverDetails?: unknown;
+  alertToast?: unknown;
 }
 
 export interface HostLogger {
@@ -35,7 +36,7 @@ export interface HostLogger {
 }
 
 export const HOT_SETTING_KEYS = ["watchlist"] as const;
-export const HOST_UI_SETTING_KEYS = ["enableHoverDetails"] as const;
+export const HOST_UI_SETTING_KEYS = ["enableHoverDetails", "alertToast"] as const;
 export const RESTART_SETTING_KEYS = ["coreRoot", "uvPath", "provider", "replayPath"] as const;
 
 export type SettingKey =
@@ -48,4 +49,5 @@ export const HOST_COMMANDS = {
   resume: "marketSentinel.resume",
   restartCore: "marketSentinel.restartCore",
   showOutput: "marketSentinel.showOutput",
+  resetAlertBadge: "marketSentinel.resetAlertBadge",
 } as const;

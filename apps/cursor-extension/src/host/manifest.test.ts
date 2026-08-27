@@ -15,26 +15,30 @@ describe("extension manifest", () => {
     expect(pkg.activationEvents).not.toContain("*");
   });
 
-  it("contributes the four host commands without a StatusBar contribution", () => {
+  it("contributes host commands without a StatusBar contribution or * activation", () => {
     const ids = pkg.contributes.commands.map((item) => item.command);
     expect(ids).toEqual([
       "marketSentinel.pause",
       "marketSentinel.resume",
       "marketSentinel.restartCore",
       "marketSentinel.showOutput",
+      "marketSentinel.resetAlertBadge",
     ]);
     expect(JSON.stringify(pkg.contributes)).not.toContain("statusBar");
-    expect(ids).not.toContain("marketSentinel.resetAlertBadge");
+    expect(pkg.activationEvents).toEqual(["onStartupFinished"]);
   });
 
-  it("defaults enableHoverDetails to true as a host-only setting", () => {
+  it("defaults enableHoverDetails to true and alertToast to off as host-only settings", () => {
     const properties = (
       pkg.contributes.configuration as {
-        properties: Record<string, { type: string; default: unknown }>;
+        properties: Record<string, { type: string; default: unknown; enum?: string[] }>;
       }
     ).properties;
     expect(properties["marketSentinel.enableHoverDetails"]).toEqual(
       expect.objectContaining({ type: "boolean", default: true }),
+    );
+    expect(properties["marketSentinel.alertToast"]).toEqual(
+      expect.objectContaining({ type: "string", default: "off", enum: ["off", "critical"] }),
     );
   });
 

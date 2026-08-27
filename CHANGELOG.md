@@ -2,7 +2,7 @@
 
 ## v0.3 — in progress (`feat/v0.3-cursor-host`)
 
-Python JSONL daemon, Protocol v1, vscode-free IPC, Cursor lifecycle/commands (M4), a minimal StatusBar (M5), and StatusBar hover details (M6). Toast/unread badge are M7.
+Python JSONL daemon, Protocol v1, vscode-free IPC, Cursor lifecycle/commands (M4), a minimal StatusBar (M5), StatusBar hover details (M6), and Host unread badge / optional critical toast (M7). Packaging is M8.
 
 ### M0 — Node / pnpm workspace
 
@@ -31,6 +31,10 @@ StatusBar maps host lifecycle + Protocol v1 `state`/`alert` to `DISCONNECTED | P
 ### M6 — Hover Details
 
 StatusBar hover is read-only persistent-state inspection. `HoverModel` maps host lifecycle + `WireMarketState` (no vscode). Markdown is rendered separately; `MarkdownString.isTrusted` stays false and there are no command links. `marketSentinel.enableHoverDetails` (default true) is a Host-only hot setting and does not restart Core. `active_signals` can appear in Hover but never become StatusBar `ALERT`.
+
+### M7 — Host Alert Handling
+
+Unread badge and optional critical toast come only from unsolicited Protocol `alert` messages (`unread += candidates.length`). `state.active_signals` never increment unread or toast. Transient 15s ALERT hold is independent of unread. `marketSentinel.resetAlertBadge` clears Host-local unread only. `marketSentinel.alertToast` (`off` | `critical`, default `off`) is Host-only. Unread is not persisted across extension reload. Core crash/restart keeps unread. Host does not write `notified_timestamp`.
 
 ## v0.2.0 — 2026-08-26
 

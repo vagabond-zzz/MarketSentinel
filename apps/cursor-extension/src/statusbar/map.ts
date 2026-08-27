@@ -1,3 +1,4 @@
+import { applyUnreadBadge } from "../alerts/state";
 import type { ActualState, DesiredState } from "../host/types";
 import type { SchedulerLevel, WireMarketState } from "../protocol/types";
 
@@ -29,6 +30,7 @@ export interface StatusBarInput {
   alertHoldMs?: number;
   lastError?: string;
   restartNeeded?: boolean;
+  unreadAlertCount?: number;
 }
 
 export const DEFAULT_ALERT_HOLD_MS = 15_000;
@@ -76,7 +78,7 @@ function tooltip(kind: StatusBarKind, input: StatusBarInput): string {
 function model(kind: StatusBarKind, tone: StatusBarTone, input: StatusBarInput): StatusBarModel {
   return {
     kind,
-    text: `MS ${kind}`,
+    text: applyUnreadBadge(`MS ${kind}`, input.unreadAlertCount ?? 0),
     tooltip: tooltip(kind, input),
     tone,
   };

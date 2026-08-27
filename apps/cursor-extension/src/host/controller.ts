@@ -1,3 +1,4 @@
+import { formatAlertDiagnostic } from "../alerts/state";
 import { ProtocolError } from "../ipc/errors";
 import {
   ProcessManager,
@@ -6,7 +7,7 @@ import {
   type SpawnFn,
 } from "../ipc/process";
 import { mapHover, type HoverModel } from "../hover/model";
-import type { WatchlistItem, WireMarketState } from "../protocol/types";
+import type { AlertMessage, WatchlistItem, WireMarketState } from "../protocol/types";
 import {
   DEFAULT_ALERT_HOLD_MS,
   mapStatusBar,
@@ -28,6 +29,11 @@ export const DEFAULT_MAX_RETRIES = 3;
 
 const RESTART_HINT = "Market Sentinel core configuration changed; restart core to apply.";
 
+export interface HostUiSnapshot {
+  statusBar: StatusBarModel;
+  hover: HoverModel;
+}
+
 export interface HostControllerOptions {
   readSettings: () => RawSettings;
   workspaceFolders: () => string[];
@@ -43,7 +49,8 @@ export interface HostControllerOptions {
   alertHoldMs?: number;
   setTimeoutFn?: typeof setTimeout;
   clearTimeoutFn?: typeof clearTimeout;
-  onStatusBar?: (model: StatusBarModel) => void;
+  onUiSnapshot?: (snapshot: HostUiSnapshot) => void;
+  onAlertEdge?: (message: AlertMessage) => void;
 }
 
 function defaultDelay(ms: number): Promise<void> {
@@ -73,6 +80,7 @@ export class HostController {
   private managerGeneration = 0;
   private lastMarket: WireMarketState | undefined;
   private lastAlertAt: number | undefined;
+  private unreadAlertCountInternal = 0;
   private alertHoldTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(options: HostControllerOptions) {
@@ -107,6 +115,10 @@ export class HostController {
     return this.lastAcked.map((item) => ({ ...item }));
   }
 
+  get unreadAlertCount(): number {
+    return this.unreadAlertCountInternal;
+  }
+
   statusBarModel(): StatusBarModel {
     return mapStatusBar({
       actual: this.actualInternal,
@@ -117,6 +129,7 @@ export class HostController {
       alertHoldMs: this.options.alertHoldMs ?? DEFAULT_ALERT_HOLD_MS,
       lastError: this.lastErrorInternal,
       restartNeeded: this.restartNeededInternal,
+      unreadAlertCount: this.unreadAlertCountInternal,
     });
   }
 
@@ -125,11 +138,17 @@ export class HostController {
       actual: this.actualInternal,
       market: this.lastMarket,
       enableHoverDetails: parseEnableHoverDetails(this.options.readSettings().enableHoverDetails),
+      unreadAlertCount: this.unreadAlertCountInternal,
     });
   }
 
-  uiSnapshot(): { statusBar: StatusBarModel; hover: HoverModel } {
+  uiSnapshot(): HostUiSnapshot {
     return { statusBar: this.statusBarModel(), hover: this.hoverModel() };
+  }
+
+  resetAlertBadge(): void {
+    this.unreadAlertCountInternal = 0;
+    this.emitUi();
   }
 
   async start(): Promise<void> {
@@ -318,11 +337,11 @@ export class HostController {
         this.lastMarket = message.state;
         this.emitUi();
       },
-      onAlert: () => {
+      onAlert: (message) => {
         if (generation !== this.managerGeneration) {
           return;
         }
-        this.noteAlert();
+        this.noteAlert(message);
       },
     });
     this.manager = manager;
@@ -401,7 +420,11 @@ export class HostController {
     }
   }
 
-  private noteAlert(): void {
+  private noteAlert(message: AlertMessage): void {
+    this.unreadAlertCountInternal += message.candidates.length;
+    for (const candidate of message.candidates) {
+      this.options.logger.host(formatAlertDiagnostic(candidate));
+    }
     this.lastAlertAt = (this.options.now ?? Date.now)();
     this.clearAlertHold();
     const hold = this.options.alertHoldMs ?? DEFAULT_ALERT_HOLD_MS;
@@ -410,6 +433,7 @@ export class HostController {
       this.alertHoldTimer = undefined;
       this.emitUi();
     }, hold);
+    this.options.onAlertEdge?.(message);
     this.emitUi();
   }
 
@@ -427,7 +451,7 @@ export class HostController {
   }
 
   private emitUi(): void {
-    this.options.onStatusBar?.(this.statusBarModel());
+    this.options.onUiSnapshot?.(this.uiSnapshot());
   }
 
   private errorMessage(error: unknown): string {

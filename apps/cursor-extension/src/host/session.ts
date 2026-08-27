@@ -30,6 +30,9 @@ export function bindCommands(
     [HOST_COMMANDS.showOutput]: async () => {
       output.show();
     },
+    [HOST_COMMANDS.resetAlertBadge]: wrap("resetAlertBadge", async () => {
+      controller.resetAlertBadge();
+    }),
   };
 }
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { activate, deactivate } from "./extension";
+import { activate, deactivate, presentHostAlertToast } from "./extension";
 import { HOST_COMMANDS } from "./host/types";
 import { MarkdownString, resetVscodeMock, vscodeState } from "../vitest/vscode-mock";
 
@@ -25,6 +25,7 @@ describe("extension adapter", () => {
     expect(vscodeState.commands.has(HOST_COMMANDS.resume)).toBe(true);
     expect(vscodeState.commands.has(HOST_COMMANDS.restartCore)).toBe(true);
     expect(vscodeState.commands.has(HOST_COMMANDS.showOutput)).toBe(true);
+    expect(vscodeState.commands.has(HOST_COMMANDS.resetAlertBadge)).toBe(true);
     expect(vscodeState.outputLines.some((line) => line.startsWith("[host]"))).toBe(true);
     expect(vscodeState.statusBar.shown).toBe(true);
     expect(vscodeState.statusBar.text).toContain("DISCONNECTED");
@@ -51,5 +52,49 @@ describe("extension adapter", () => {
     await vi.waitFor(() => {
       expect(tooltipMarkdown().value).toBe("Market Sentinel · Core disconnected");
     });
+  });
+
+  it("toasts at most one critical alert edge and never for important or off", () => {
+    const critical = {
+      protocol_version: 1 as const,
+      type: "alert" as const,
+      candidates: [
+        {
+          id: "c1",
+          symbol: "00700.HK",
+          family: "tape",
+          direction: "up" as const,
+          priority: "critical" as const,
+          title: "first",
+          summary: "s",
+        },
+        {
+          id: "c2",
+          symbol: "00700.HK",
+          family: "tape",
+          direction: "up" as const,
+          priority: "critical" as const,
+          title: "second",
+          summary: "s",
+        },
+      ],
+      market_timestamp: 1,
+    };
+    presentHostAlertToast(critical, "off");
+    expect(vscodeState.toasts).toEqual([]);
+    const important = critical.candidates[0];
+    if (important === undefined) {
+      throw new Error("expected a candidate");
+    }
+    presentHostAlertToast(
+      {
+        ...critical,
+        candidates: [{ ...important, priority: "important", title: "nope" }],
+      },
+      "critical",
+    );
+    expect(vscodeState.toasts).toEqual([]);
+    presentHostAlertToast(critical, "critical");
+    expect(vscodeState.toasts).toEqual(["Market Sentinel: first (+1 more)"]);
   });
 });

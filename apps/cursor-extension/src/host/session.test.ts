@@ -24,5 +24,8 @@ describe("bindCommands", () => {
     expect(shown).toEqual(["show"]);
     expect(commands[HOST_COMMANDS.resume]).toBeTypeOf("function");
     expect(commands[HOST_COMMANDS.restartCore]).toBeTypeOf("function");
+    expect(commands[HOST_COMMANDS.resetAlertBadge]).toBeTypeOf("function");
+    await commands[HOST_COMMANDS.resetAlertBadge]?.();
+    expect(controller.unreadAlertCount).toBe(0);
   });
 });

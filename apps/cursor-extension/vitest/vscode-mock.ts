@@ -17,6 +17,7 @@ export const vscodeState = {
   commands: new Map<string, () => Promise<void> | void>(),
   outputLines: [] as string[],
   outputShown: false,
+  toasts: [] as string[],
   configListeners: [] as Array<(event: { affectsConfiguration: (key: string) => boolean }) => void>,
   statusBar: {
     text: "",
@@ -33,6 +34,7 @@ export function resetVscodeMock(): void {
   vscodeState.commands.clear();
   vscodeState.outputLines = [];
   vscodeState.outputShown = false;
+  vscodeState.toasts = [];
   vscodeState.configListeners = [];
   vscodeState.statusBar = {
     text: "",
@@ -65,6 +67,10 @@ export const window = {
         return undefined;
       },
     };
+  },
+  showInformationMessage(message: string) {
+    vscodeState.toasts.push(message);
+    return Promise.resolve(undefined);
   },
   createStatusBarItem(_alignment?: number, _priority?: number) {
     return {

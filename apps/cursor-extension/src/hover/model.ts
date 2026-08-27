@@ -43,6 +43,7 @@ export interface HoverModel {
   headline: string;
   lifecycleMessage?: string;
   outputHint?: string;
+  unreadAlertCount: number;
   feed?: FeedStatus;
   symbolCount?: number;
   hotCount?: number;
@@ -54,6 +55,7 @@ export interface HoverInput {
   actual: ActualState;
   market?: WireMarketState;
   enableHoverDetails?: boolean;
+  unreadAlertCount?: number;
 }
 
 function countLevels(symbols: readonly WireSymbolState[]): { hot: number; warm: number } {
@@ -155,9 +157,14 @@ function shortHeadline(parts: {
   symbolCount?: number;
   hot?: number;
   warm?: number;
+  unread?: number;
 }): string {
+  const unread =
+    parts.unread !== undefined && parts.unread > 0 ? `unread=${parts.unread}` : undefined;
   if (parts.lifecycle !== undefined) {
-    return `Market Sentinel · ${parts.lifecycle}`;
+    return ["Market Sentinel", parts.lifecycle, unread]
+      .filter((part): part is string => part !== undefined)
+      .join(" · ");
   }
   return [
     "Market Sentinel",
@@ -165,50 +172,66 @@ function shortHeadline(parts: {
     parts.symbolCount !== undefined ? `symbols=${parts.symbolCount}` : undefined,
     parts.hot !== undefined ? `HOT=${parts.hot}` : undefined,
     parts.warm !== undefined ? `WARM=${parts.warm}` : undefined,
+    unread,
   ]
     .filter((part): part is string => part !== undefined)
     .join(" · ");
 }
 
+function withUnread(model: Omit<HoverModel, "unreadAlertCount">, unread: number): HoverModel {
+  return { ...model, unreadAlertCount: unread };
+}
+
 export function mapHover(input: HoverInput): HoverModel {
   const enableDetails = input.enableHoverDetails !== false;
+  const unread = input.unreadAlertCount ?? 0;
   const lifecycle = lifecycleFor(input.actual, input.market);
   if (lifecycle !== undefined) {
-    return {
-      title: "Market Sentinel",
-      enableDetails,
-      headline: shortHeadline({ lifecycle: lifecycle.message }),
-      lifecycleMessage: lifecycle.message,
-      outputHint: lifecycle.hint,
-      symbols: [],
-    };
+    return withUnread(
+      {
+        title: "Market Sentinel",
+        enableDetails,
+        headline: shortHeadline({ lifecycle: lifecycle.message, unread }),
+        lifecycleMessage: lifecycle.message,
+        outputHint: lifecycle.hint,
+        symbols: [],
+      },
+      unread,
+    );
   }
 
   const market = input.market;
   if (market === undefined) {
-    return {
-      title: "Market Sentinel",
-      enableDetails,
-      headline: shortHeadline({ lifecycle: "Core starting" }),
-      lifecycleMessage: "Core starting",
-      symbols: [],
-    };
+    return withUnread(
+      {
+        title: "Market Sentinel",
+        enableDetails,
+        headline: shortHeadline({ lifecycle: "Core starting", unread }),
+        lifecycleMessage: "Core starting",
+        symbols: [],
+      },
+      unread,
+    );
   }
 
   const { hot, warm } = countLevels(market.symbols);
-  return {
-    title: "Market Sentinel",
-    enableDetails,
-    headline: shortHeadline({
+  return withUnread(
+    {
+      title: "Market Sentinel",
+      enableDetails,
+      headline: shortHeadline({
+        feed: market.feed_status,
+        symbolCount: market.watchlist_count,
+        hot,
+        warm,
+        unread,
+      }),
       feed: market.feed_status,
       symbolCount: market.watchlist_count,
-      hot,
-      warm,
-    }),
-    feed: market.feed_status,
-    symbolCount: market.watchlist_count,
-    hotCount: hot,
-    warmCount: warm,
-    symbols: sortSymbols(market.symbols).map((symbol) => mapSymbol(symbol, market.feed_status)),
-  };
+      hotCount: hot,
+      warmCount: warm,
+      symbols: sortSymbols(market.symbols).map((symbol) => mapSymbol(symbol, market.feed_status)),
+    },
+    unread,
+  );
 }

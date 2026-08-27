@@ -1,10 +1,12 @@
 import * as vscode from "vscode";
 
+import { parseAlertToast, planCriticalToast } from "./alerts/state";
 import { HostController } from "./host/controller";
 import { bindCommands } from "./host/session";
 import { HOST_COMMANDS, type RawSettings } from "./host/types";
 import { renderHoverMarkdown } from "./hover/render";
 import type { HoverModel } from "./hover/model";
+import type { AlertMessage } from "./protocol/types";
 import type { StatusBarModel } from "./statusbar/map";
 
 let controller: HostController | undefined;
@@ -18,6 +20,7 @@ function readSettings(): RawSettings {
     provider: cfg.get("provider"),
     replayPath: cfg.get<string>("replayPath"),
     enableHoverDetails: cfg.get<boolean>("enableHoverDetails"),
+    alertToast: cfg.get<string>("alertToast"),
   };
 }
 
@@ -49,6 +52,13 @@ function applyStatusBar(
   item.show();
 }
 
+export function presentHostAlertToast(message: AlertMessage, alertToast: unknown): void {
+  const plan = planCriticalToast(parseAlertToast(alertToast), message.candidates);
+  if (plan.show && plan.message !== undefined) {
+    void vscode.window.showInformationMessage(plan.message);
+  }
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const output = vscode.window.createOutputChannel("Market Sentinel");
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
@@ -65,7 +75,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     workspaceFolders: () =>
       vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [],
     logger,
-    onStatusBar: (model) => applyStatusBar(statusBar, model, host.hoverModel()),
+    onUiSnapshot: (snapshot) => applyStatusBar(statusBar, snapshot.statusBar, snapshot.hover),
+    onAlertEdge: (message) => presentHostAlertToast(message, readSettings().alertToast),
   });
   controller = host;
   applyStatusBar(statusBar, host.statusBarModel(), host.hoverModel());
@@ -83,6 +94,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         "provider",
         "replayPath",
         "enableHoverDetails",
+        "alertToast",
       ].filter((key) => event.affectsConfiguration(`marketSentinel.${key}`));
       if (keys.length > 0) {
         void host.onConfigurationChanged(keys);

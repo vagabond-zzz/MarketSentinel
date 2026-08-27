@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.3.0",
   "displayName": "Market Sentinel",
-  "description": "Cursor host for Market Sentinel (v0.3; alerts/toast not implemented yet)",
+  "description": "Cursor host for Market Sentinel (v0.3)",
   "main": "./out/extension.js",
   "engines": {
     "vscode": "^1.90.0",
@@ -38,6 +38,10 @@
       {
         "command": "marketSentinel.showOutput",
         "title": "Market Sentinel: Show Output"
+      },
+      {
+        "command": "marketSentinel.resetAlertBadge",
+        "title": "Market Sentinel: Reset Alert Badge"
       }
     ],
     "configuration": {
@@ -86,6 +90,12 @@
           "type": "boolean",
           "default": true,
           "description": "Show full market details in the StatusBar hover. Host-only; changing it does not restart the Python Core."
+        },
+        "marketSentinel.alertToast": {
+          "type": "string",
+          "enum": ["off", "critical"],
+          "default": "off",
+          "description": "Optional notification for unsolicited critical alert edges. Host-only; changing it does not restart the Python Core. Default off."
         }
       }
     }
