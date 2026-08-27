@@ -106,7 +106,7 @@ class MarketEngine:
                     snapshot.market_timestamp,
                     latest.market_timestamp,
                 )
-            self.health.observe(symbol, snapshot)
+            self.health.observe(symbol, error=RuntimeError("out-of-order quote"))
             return
         if latest is not None and snapshot.market_timestamp == latest.market_timestamp:
             self.diagnostics.duplicate_timestamp_count += 1

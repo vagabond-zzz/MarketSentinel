@@ -154,6 +154,8 @@ describe("ProcessManager", () => {
       "longbridge",
       "daemon",
     ]);
+    expect(spawned[0]?.args).not.toContain("--extra");
+    expect(spawned[0]?.args.join(" ")).not.toMatch(/extra live/);
     expect(spawned[0]?.args.join(" ")).not.toMatch(/LONGBRIDGE_/);
     expect(JSON.stringify(spawned[0]?.options.env ?? {})).not.toMatch(/LONGBRIDGE_/);
   });

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -51,6 +52,25 @@ def test_maps_official_quote_fields_without_unit_conversion() -> None:
     assert row.field_confidence["price"] == "DOCUMENTED"
     assert row.field_confidence["volume_raw"] == "DOCUMENTED"
     assert row.field_confidence["market_timestamp_parsed"] == "DOCUMENTED"
+
+
+def test_maps_timezone_aware_datetime_timestamp() -> None:
+    cst = datetime(2024, 1, 15, 9, 30, 0, tzinfo=timezone(timedelta(hours=8)))
+    quote = SimpleNamespace(
+        symbol="600519.SH",
+        last_done="1292.300",
+        open="1304.000",
+        high="1305.000",
+        low="1288.000",
+        prev_close="1302.800",
+        volume=2476700,
+        turnover="3203715661.000",
+        timestamp=cst,
+        trade_status=0,
+    )
+    rows = map_quotes([quote], requested=["600519.SH"], received_timestamp=cst.timestamp() + 5.0)
+    assert rows[0].market_timestamp_parsed == cst.timestamp()
+    assert rows[0].received_minus_market_s == pytest.approx(5.0)
 
 
 def test_invalid_last_done_fails_closed() -> None:

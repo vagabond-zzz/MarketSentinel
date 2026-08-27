@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import os
-from collections.abc import Callable, Iterable, Sequence
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from datetime import datetime
+from typing import Any, Protocol
 
 from market_sentinel.clock import Clock
 from market_sentinel.domain.models import MarketSnapshot
 from market_sentinel.errors import (
     ProviderAuthError,
     ProviderError,
+    ProviderNoDataError,
     ProviderRateLimitError,
     ProviderUnavailableError,
     SnapshotValidationError,
@@ -27,7 +31,18 @@ CREDENTIAL_KEYS = (
 )
 ASHARE_SUFFIXES = (".SH", ".SZ")
 DEFAULT_TIMEOUT_S = 8.0
-QuoteFn = Callable[[list[str]], Iterable[Any]]
+MISSING_SDK_MESSAGE = "longbridge SDK is not installed; run uv sync --extra live"
+RATE_LIMIT_CODES = frozenset({301606, 429001, 429002})
+AUTH_CODES = frozenset({401003, 403201, 403203, 403205, 301604})
+NO_DATA_CODES = frozenset({301603})
+SERVER_CODES = frozenset({301602, 500000})
+_CODE_RE = re.compile(r"\b(30160[0-9]|301604|301606|401003|40320[135]|42900[12]|500000)\b")
+
+
+class QuoteClient(Protocol):
+    """Async Longbridge quote transport. One in-flight quote() per provider."""
+
+    async def quote(self, symbols: list[str]) -> Sequence[Any]: ...
 
 
 @dataclass
@@ -40,6 +55,7 @@ class ProviderDiagnostics:
     last_market_timestamp: float | None = None
     last_received_timestamp: float | None = None
     dropped_symbol_count: int = 0
+    context_create_count: int = 0
     notes: list[str] = field(default_factory=list)
 
 
@@ -70,6 +86,78 @@ def _attr(quote: Any, name: str) -> Any:
     return getattr(quote, name, None)
 
 
+def vendor_timestamp_to_unix(value: object) -> float | None:
+    """Convert a Longbridge quote timestamp to Unix seconds.
+
+    Timezone-aware datetime uses ``datetime.timestamp()``. Numeric values are
+    allowed for test seams. Naive datetime is fail-closed (None).
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return None
+        return value.timestamp()
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number) or number < 0:
+        return None
+    return number
+
+
+def extract_vendor_error_code(exc: BaseException) -> int | None:
+    for attr in ("code", "error_code"):
+        raw = getattr(exc, attr, None)
+        if callable(raw):
+            try:
+                raw = raw()
+            except TypeError:
+                continue
+        if isinstance(raw, int) and raw > 0:
+            return raw
+        if isinstance(raw, str) and raw.isdigit():
+            return int(raw)
+    match = _CODE_RE.search(redact_secrets(str(exc)))
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
+def classify_transport_error(exc: BaseException) -> ProviderError:
+    text = redact_secrets(str(exc))
+    code = extract_vendor_error_code(exc)
+    message = text if code is None or str(code) in text else f"{code} {text}"
+    if code in RATE_LIMIT_CODES:
+        return ProviderRateLimitError(message)
+    if code in AUTH_CODES:
+        return ProviderAuthError(message)
+    if code in NO_DATA_CODES:
+        return ProviderNoDataError(message)
+    if code in SERVER_CODES:
+        return ProviderUnavailableError(message)
+    lowered = text.lower()
+    if "429001" in text or "429002" in text or "rate limit" in lowered:
+        return ProviderRateLimitError(message)
+    if "no quote" in lowered:
+        return ProviderNoDataError(message)
+    if any(
+        token in lowered
+        for token in (
+            "token expired",
+            "signature invalid",
+            "apikey illegal",
+            "ip is not allowed",
+            "no access",
+        )
+    ):
+        return ProviderAuthError(message)
+    if isinstance(exc, (ConnectionError, OSError, TimeoutError)):
+        return ProviderUnavailableError(message)
+    return ProviderUnavailableError(message)
+
+
 def extract_vendor_fields(quote: Any) -> dict[str, Any]:
     """Pull documented Longbridge quote attributes. No unit conversion."""
     symbol = str(_attr(quote, "symbol") or "")
@@ -87,29 +175,13 @@ def extract_vendor_fields(quote: Any) -> dict[str, Any]:
     }
 
 
-def _classify_transport_error(exc: BaseException) -> ProviderError:
-    text = redact_secrets(str(exc))
-    lowered = text.lower()
-    if "301606" in text or "rate limit" in lowered:
-        return ProviderRateLimitError(text)
-    if (
-        "301603" in text
-        or "unauthorized" in lowered
-        or "auth" in lowered
-        or "permission" in lowered
-    ):
-        return ProviderAuthError(text)
-    return ProviderUnavailableError(text)
-
-
-def vendor_quote_to_raw(
-    quote: Any,
-    *,
-    include_turnover: bool,
-) -> dict[str, Any] | None:
+def vendor_quote_to_raw(quote: Any) -> dict[str, Any] | None:
     fields = extract_vendor_fields(quote)
     symbol = str(fields["symbol"])
     if not is_ashare(symbol):
+        return None
+    timestamp = vendor_timestamp_to_unix(fields["market_timestamp"])
+    if timestamp is None:
         return None
     try:
         high = float(fields["high"])
@@ -118,7 +190,7 @@ def vendor_quote_to_raw(
         return None
     if high <= 0 or low <= 0 or high < low:
         return None
-    raw: dict[str, Any] = {
+    return {
         "symbol": symbol,
         "price": fields["price"],
         "open": fields["open"],
@@ -126,64 +198,89 @@ def vendor_quote_to_raw(
         "low": fields["low"],
         "prev_close": fields["prev_close"],
         "volume": fields["volume"],
-        "market_timestamp": fields["market_timestamp"],
+        "market_timestamp": timestamp,
         "turnover": None,
     }
-    if include_turnover:
-        raw["turnover"] = fields["turnover"]
-    return raw
+
+
+class _SdkQuoteClient:
+    def __init__(self, context: Any) -> None:
+        self.context = context
+
+    async def quote(self, symbols: list[str]) -> Sequence[Any]:
+        return await self.context.quote(symbols)
 
 
 class LongbridgeQuoteProvider:
-    """Official Longbridge quote-pull adapter. Not a Tencent fallback."""
+    """Official Longbridge quote-pull adapter. Not a Tencent fallback.
+
+    Production owns one process-lifetime ``AsyncQuoteContext`` (lazy). There is
+    no documented close(); child-process exit is final cleanup.
+    """
 
     def __init__(
         self,
         clock: Clock,
         *,
-        quote_fn: QuoteFn | None = None,
+        quote_client: QuoteClient | None = None,
+        sdk_factory: Any | None = None,
         timeout_s: float = DEFAULT_TIMEOUT_S,
-        include_turnover: bool = False,
     ) -> None:
         self._clock = clock
-        self._quote_fn = quote_fn
+        self._quote_client = quote_client
+        self._sdk_factory = sdk_factory
         self._timeout_s = timeout_s
-        self._include_turnover = include_turnover
+        self._sdk_client: QuoteClient | None = None
+        self._flight = asyncio.Lock()
         self.diagnostics = ProviderDiagnostics()
-        if quote_fn is None and not credentials_present():
-            missing = ", ".join(missing_credential_names())
-            raise ProviderAuthError(
-                f"missing {missing}; set environment variables (values are never logged)"
-            )
+        if quote_client is None and sdk_factory is None:
+            if not credentials_present():
+                missing = ", ".join(missing_credential_names())
+                raise ProviderAuthError(
+                    f"missing {missing}; set environment variables (values are never logged)"
+                )
+            _require_installed_sdk()
 
     async def fetch_quotes(self, symbols: list[str]) -> list[MarketSnapshot]:
         requested = [symbol for symbol in symbols if is_ashare(symbol)]
         if not requested:
             return []
         started = self._clock.monotonic_time()
-        try:
-            payload = await asyncio.wait_for(
-                asyncio.to_thread(self._pull, requested),
-                timeout=self._timeout_s,
-            )
-        except TimeoutError as exc:
-            self.diagnostics.timeout_count += 1
-            self.diagnostics.request_failure += 1
-            self.diagnostics.last_request_latency_s = self._clock.monotonic_time() - started
-            logger.warning("longbridge quote timeout")
-            raise TimeoutError("longbridge quote timeout") from exc
-        except ProviderRateLimitError:
-            self.diagnostics.rate_limit_count += 1
-            self.diagnostics.request_failure += 1
-            self.diagnostics.last_request_latency_s = self._clock.monotonic_time() - started
-            raise
-        except ProviderError:
-            self.diagnostics.request_failure += 1
-            self.diagnostics.last_request_latency_s = self._clock.monotonic_time() - started
-            raise
+        async with self._flight:
+            try:
+                client = self._quote_client or await self._ensure_sdk_client()
+                payload = await asyncio.wait_for(client.quote(requested), timeout=self._timeout_s)
+            except TimeoutError as exc:
+                self._invalidate_sdk("timeout")
+                self.diagnostics.timeout_count += 1
+                self.diagnostics.request_failure += 1
+                self.diagnostics.last_request_latency_s = self._clock.monotonic_time() - started
+                logger.warning("longbridge quote timeout")
+                raise TimeoutError("longbridge quote timeout") from exc
+            except ProviderRateLimitError:
+                self.diagnostics.rate_limit_count += 1
+                self.diagnostics.request_failure += 1
+                self.diagnostics.last_request_latency_s = self._clock.monotonic_time() - started
+                raise
+            except ProviderError:
+                self.diagnostics.request_failure += 1
+                self.diagnostics.last_request_latency_s = self._clock.monotonic_time() - started
+                raise
+            except Exception as exc:
+                classified = classify_transport_error(exc)
+                if self._is_fatal_connection(exc, classified):
+                    self._invalidate_sdk("connection")
+                self.diagnostics.request_failure += 1
+                if isinstance(classified, ProviderRateLimitError):
+                    self.diagnostics.rate_limit_count += 1
+                    logger.warning("longbridge rate limited")
+                else:
+                    logger.warning("longbridge transport error")
+                self.diagnostics.last_request_latency_s = self._clock.monotonic_time() - started
+                raise classified from exc
         snapshots: list[MarketSnapshot] = []
         for quote in payload:
-            raw = vendor_quote_to_raw(quote, include_turnover=self._include_turnover)
+            raw = vendor_quote_to_raw(quote)
             if raw is None:
                 self.diagnostics.dropped_symbol_count += 1
                 continue
@@ -200,31 +297,56 @@ class LongbridgeQuoteProvider:
         self.diagnostics.last_request_latency_s = self._clock.monotonic_time() - started
         return snapshots
 
-    def _pull(self, symbols: list[str]) -> Sequence[Any]:
-        getter = self._quote_fn or self._sdk_quote
+    async def _ensure_sdk_client(self) -> QuoteClient:
+        if self._sdk_client is not None:
+            return self._sdk_client
         try:
-            return tuple(getter(symbols))
+            created = (self._sdk_factory or _create_async_quote_context)()
+            if inspect_awaitable(created):
+                created = await created
+            quote = getattr(created, "quote", None)
+            if quote is not None and asyncio.iscoroutinefunction(quote):
+                client: QuoteClient = created  # type: ignore[assignment]
+            else:
+                client = _SdkQuoteClient(created)
         except ProviderError:
             raise
-        except TimeoutError:
-            raise
-        except Exception as exc:
-            classified = _classify_transport_error(exc)
-            if isinstance(classified, ProviderRateLimitError):
-                logger.warning("longbridge rate limited")
-            else:
-                logger.warning("longbridge transport error")
-            raise classified from exc
-
-    def _sdk_quote(self, symbols: list[str]) -> Sequence[Any]:
-        try:
-            from longbridge.openapi import Config, QuoteContext
         except ImportError as exc:
-            raise ProviderUnavailableError(
-                "longbridge SDK is not installed; run uv sync --extra live"
-            ) from exc
-        try:
-            context = QuoteContext(Config.from_apikey_env())
-            return tuple(context.quote(symbols))
+            raise ProviderUnavailableError(MISSING_SDK_MESSAGE) from exc
         except Exception as exc:
-            raise _classify_transport_error(exc) from exc
+            raise classify_transport_error(exc) from exc
+        self._sdk_client = client
+        self.diagnostics.context_create_count += 1
+        logger.info("longbridge AsyncQuoteContext created (process lifetime)")
+        return client
+
+    def _invalidate_sdk(self, reason: str) -> None:
+        if self._quote_client is not None:
+            return
+        if self._sdk_client is not None:
+            logger.warning("discarding longbridge quote context (%s)", reason)
+        self._sdk_client = None
+
+    @staticmethod
+    def _is_fatal_connection(exc: BaseException, classified: ProviderError) -> bool:
+        del classified
+        return isinstance(exc, (ConnectionError, OSError))
+
+
+def inspect_awaitable(value: object) -> bool:
+    return asyncio.iscoroutine(value) or asyncio.isfuture(value)
+
+
+def _require_installed_sdk() -> None:
+    try:
+        import longbridge.openapi as _openapi
+    except ImportError as exc:
+        raise ProviderUnavailableError(MISSING_SDK_MESSAGE) from exc
+    del _openapi
+
+
+def _create_async_quote_context() -> Any:
+    _require_installed_sdk()
+    from longbridge.openapi import AsyncQuoteContext, Config
+
+    return AsyncQuoteContext.create(Config.from_apikey_env())

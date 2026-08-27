@@ -143,3 +143,85 @@ async def test_second_tick_waits_for_interval(tmp_path: Path) -> None:
     clock.advance_monotonic(10.0)
     await engine.tick()
     assert provider.last_requested == ["00700.HK"]
+
+
+async def test_older_quote_does_not_refresh_feed_success(tmp_path: Path) -> None:
+    clock, provider, engine = _engine(tmp_path)
+    engine.watchlist.add("600519.SH")
+    fresh_ts = clock.wall_time() - 0.2
+    provider.set_quote("600519.SH", price=100.0, market_timestamp=fresh_ts, volume=10.0)
+    await engine.tick()
+    assert engine.health.status("600519.SH") is FeedStatus.LIVE
+    result = None
+    for _ in range(3):
+        clock.advance(10.0)
+        provider.set_quote("600519.SH", price=90.0, market_timestamp=fresh_ts - 10.0, volume=11.0)
+        result = await engine.tick()
+        row = result.for_symbol("600519.SH")
+        assert row is not None
+        assert row.accepted_events == ()
+        assert row.alert_candidates == ()
+        latest = engine.buffers.latest("600519.SH")
+        assert latest is not None
+        assert latest.price == 100.0
+        assert latest.market_timestamp == fresh_ts
+        state = engine.states.get("600519.SH")
+        assert state is not None
+        assert state.latest is not None
+        assert state.latest.price == 100.0
+    assert result is not None
+    assert engine.diagnostics.out_of_order_count == 3
+    assert engine.health.status("600519.SH") is FeedStatus.DISCONNECTED
+
+
+async def test_duplicate_timestamp_does_not_repeat_alert_edge(tmp_path: Path) -> None:
+    clock, provider, engine = _engine(tmp_path)
+    engine.watchlist.add("00700.HK")
+    baseline = clock.wall_time()
+    provider.set_quote(
+        "00700.HK",
+        price=100.0,
+        open=100.0,
+        high=100.0,
+        low=100.0,
+        prev_close=100.0,
+        volume=1000.0,
+        market_timestamp=baseline,
+    )
+    await engine.tick()
+    clock.advance(60.0)
+    move_ts = clock.wall_time()
+    provider.set_quote(
+        "00700.HK",
+        price=100.8,
+        open=100.0,
+        high=100.8,
+        low=100.0,
+        prev_close=100.0,
+        volume=1100.0,
+        market_timestamp=move_ts,
+    )
+    first = await engine.tick()
+    row1 = first.for_symbol("00700.HK")
+    assert row1 is not None
+    assert row1.alert_candidates
+    clock.advance(10.0)
+    provider.set_quote(
+        "00700.HK",
+        price=100.8,
+        open=100.0,
+        high=100.8,
+        low=100.0,
+        prev_close=100.0,
+        volume=1100.0,
+        market_timestamp=move_ts,
+    )
+    second = await engine.tick()
+    row2 = second.for_symbol("00700.HK")
+    assert row2 is not None
+    assert engine.diagnostics.duplicate_timestamp_count == 1
+    assert row2.alert_candidates == ()
+    latest = engine.buffers.latest("00700.HK")
+    assert latest is not None
+    assert latest.market_timestamp == move_ts
+    assert latest.price == 100.8

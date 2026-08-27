@@ -32,3 +32,7 @@ class ProviderRateLimitError(ProviderError):
 
 class ProviderUnavailableError(ProviderError):
     """SDK missing, server error, or other unavailable condition."""
+
+
+class ProviderNoDataError(ProviderError):
+    """Vendor returned no quotes for the request (e.g. 301603). Not an auth failure."""

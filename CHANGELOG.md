@@ -1,19 +1,17 @@
 # Changelog
 
-## Unreleased — v0.4 Release Candidate (live session smoke pending)
+## Unreleased — v0.4 audit-blocker fixes (live session gate pending)
 
-Longbridge A-share Quote Pull is the production live Provider. Package versions stay **0.3.0** and Protocol stays **1** until the external Release Audit. Do not tag `v0.4.0` yet.
+External v0.4 Release Audit rejected the previous RC. Package versions stay **0.3.0** and Protocol stays **1** until every gate passes. Do not tag `v0.4.0` yet.
 
-- `LongbridgeQuoteProvider` (`--provider longbridge` / `marketSentinel.provider`)
-- SH/SZ only; volume passed through (unit UNKNOWN); **turnover = None**
-- Vendor `timestamp` as `market_timestamp`; `received_timestamp` from Clock
-- Fail closed on bad fields, timeout, auth, rate limit; no stale snapshot replay
-- Engine suppresses older quotes; duplicate timestamps replace
-- Optional extra: `uv sync --extra live` (`longbridge==4.5.0`)
-- Credentials: `LONGBRIDGE_*` environment variables only
-- Tencent remains an experimental probe, not a supported Provider
-- Fake / Replay regression unchanged
-- Live in-session smoke **PENDING** (credentials + A-share hours)
+- `SecurityQuote.timestamp` timezone-aware datetime → Unix at the Longbridge Provider boundary (naive datetime fail-closed)
+- Process-lifetime lazy `AsyncQuoteContext`; native `await quote()`; `asyncio.Lock` single-flight; `wait_for` timeout; no production `to_thread` quote path
+- Error codes: 301603 → `ProviderNoDataError` (not Auth); 301604/401003/40320x → Auth; 301606/42900x → rate limit
+- Older quotes no longer refresh FeedHealth success; duplicate timestamps do not re-fire alert edges
+- Turnover cannot be enabled in v0.4 (`vendor_quote_to_raw` always `None`)
+- Host Option A: `uv sync --extra live` is manual; Cursor spawn never passes `--extra live`
+- Live tests skip only when credentials are absent; provider errors fail when credentials exist
+- Session smoke tool: `python -m tools.live_probe session` (1/2/10 symbol batches; excluded from default CI)
 
 ## v0.3.0 — 2026-08-27
 

@@ -91,6 +91,7 @@ export class ProcessManager {
   }
 
   daemonArgs(): { command: string; args: string[] } {
+    // Option A: Host never passes `--extra live`. SDK install is a manual `uv sync --extra live`.
     const command = this.options.uvPath ?? "uv";
     const args = [
       "run",

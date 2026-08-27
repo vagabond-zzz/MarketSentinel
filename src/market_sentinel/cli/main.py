@@ -8,7 +8,7 @@ from pathlib import Path
 
 from market_sentinel.cli.display import format_dashboard, format_updated
 from market_sentinel.clock import SystemClock
-from market_sentinel.errors import ProviderAuthError
+from market_sentinel.errors import ProviderError
 from market_sentinel.health.feed_health import FeedHealthTracker
 from market_sentinel.ipc.daemon import MarketDaemon
 from market_sentinel.market_data.buffers import SymbolBuffers
@@ -107,7 +107,7 @@ async def _handle_daemon(args: argparse.Namespace) -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    except ProviderAuthError as exc:
+    except ProviderError as exc:
         print(str(exc), file=sys.stderr)
         return 2
     engine = MarketEngine(
@@ -131,7 +131,7 @@ async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    except ProviderAuthError as exc:
+    except ProviderError as exc:
         print(str(exc), file=sys.stderr)
         return 2
     engine = MarketEngine(

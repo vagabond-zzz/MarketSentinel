@@ -1,11 +1,11 @@
 # Roadmap v0.4 — Live Market Data & Feed Reliability
 
-> Status: **Release Candidate on `feat/v0.4-live-market-data`, live session smoke PENDING.**
+> Status: **Audit-blocker fixes on `feat/v0.4-live-market-data`; live session smoke PENDING.**
 >
 > Token target: **0**
 >
 > See `docs/12_v0.4_Longbridge_Provider_Setup.md` and `docs/13_v0.4_Release_Candidate.md`.
-> Do not tag `v0.4.0` until the external Release Audit.
+> Do not tag `v0.4.0` until the credentialed A-share live gates pass.
 
 ---
 

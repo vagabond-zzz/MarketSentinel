@@ -68,7 +68,12 @@ def map_quotes(
         quote = by_symbol.get(symbol)
         if quote is None:
             continue
-        timestamp = require_finite_number(_attr(quote, "timestamp"), "timestamp")
+        from market_sentinel.providers.longbridge import vendor_timestamp_to_unix
+
+        parsed = vendor_timestamp_to_unix(_attr(quote, "timestamp"))
+        if parsed is None:
+            raise ProbeParseError("timestamp")
+        timestamp = parsed
         row = Observation(
             provider="longbridge",
             symbol=symbol,

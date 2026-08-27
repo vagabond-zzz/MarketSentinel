@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from market_sentinel.clock import Clock
 from market_sentinel.providers.base import MarketProvider
 from market_sentinel.providers.fake import FakeProvider
-from market_sentinel.providers.longbridge import LongbridgeQuoteProvider
+from market_sentinel.providers.longbridge import LongbridgeQuoteProvider, QuoteClient
 from market_sentinel.providers.replay import ReplayProvider
 
 HTTP_STUB_MESSAGE = "HttpQuoteProvider is not implemented; use fake, replay, or longbridge."
@@ -17,7 +16,7 @@ def create_provider(
     clock: Clock,
     *,
     replay_path: Path | None = None,
-    quote_fn: Any | None = None,
+    quote_client: QuoteClient | None = None,
 ) -> MarketProvider:
     if name == "fake":
         return FakeProvider(clock)
@@ -28,5 +27,5 @@ def create_provider(
     if name == "http":
         raise ValueError(HTTP_STUB_MESSAGE)
     if name == "longbridge":
-        return LongbridgeQuoteProvider(clock, quote_fn=quote_fn)
+        return LongbridgeQuoteProvider(clock, quote_client=quote_client)
     raise ValueError(f"unknown provider: {name}")

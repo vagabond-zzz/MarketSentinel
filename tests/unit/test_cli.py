@@ -86,6 +86,29 @@ def test_longbridge_provider_requires_credentials(
     assert "LONGBRIDGE_ACCESS_TOKEN" in err
 
 
+def test_longbridge_missing_sdk_is_actionable(
+    tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from market_sentinel.errors import ProviderUnavailableError
+    from market_sentinel.providers.longbridge import MISSING_SDK_MESSAGE
+
+    monkeypatch.setenv("LONGBRIDGE_APP_KEY", "k")
+    monkeypatch.setenv("LONGBRIDGE_APP_SECRET", "s")
+    monkeypatch.setenv("LONGBRIDGE_ACCESS_TOKEN", "t")
+
+    def missing() -> None:
+        raise ProviderUnavailableError(MISSING_SDK_MESSAGE)
+
+    monkeypatch.setattr(
+        "market_sentinel.providers.longbridge._require_installed_sdk",
+        missing,
+    )
+    path = tmp_path / "watchlist.json"
+    assert main(["--watchlist", str(path), "--provider", "longbridge", "run", "--once"]) == 2
+    err = capsys.readouterr().err
+    assert "uv sync --extra live" in err
+
+
 def test_run_once_verbose_includes_scheduler_transition(tmp_path: Path, capsys) -> None:
     path = tmp_path / "watchlist.json"
     assert main(["--watchlist", str(path), "watchlist", "add", "00700.HK"]) == 0
