@@ -1,8 +1,8 @@
 # Changelog
 
-## v0.3 — in progress (`feat/v0.3-cursor-host`)
+## v0.3 — Release Candidate (`feat/v0.3-cursor-host`)
 
-Python JSONL daemon, Protocol v1, vscode-free IPC, Cursor lifecycle/commands (M4), a minimal StatusBar (M5), StatusBar hover details (M6), and Host unread badge / optional critical toast (M7). Packaging is M8.
+Python JSONL daemon, Protocol v1, vscode-free IPC, Cursor lifecycle/commands, StatusBar, Hover, unread badge / optional critical toast, and a local VSIX packaging path (M0–M8). Not tagged; Python package version remains 0.2.0.
 
 ### M0 — Node / pnpm workspace
 
@@ -35,6 +35,10 @@ StatusBar hover is read-only persistent-state inspection. `HoverModel` maps host
 ### M7 — Host Alert Handling
 
 Unread badge and optional critical toast come only from unsolicited Protocol `alert` messages (`unread += candidates.length`). `state.active_signals` never increment unread or toast. Transient 15s ALERT hold is independent of unread. `marketSentinel.resetAlertBadge` clears Host-local unread only. `marketSentinel.alertToast` (`off` | `critical`, default `off`) is Host-only. Unread is not persisted across extension reload. Core crash/restart keeps unread. Host does not write `notified_timestamp`.
+
+### M8 — Host Integration / VSIX (Release Candidate)
+
+Local developer VSIX via `@vscode/vsce` (`pnpm package:vsix`). Identity `market-sentinel-local.market-sentinel` is a local publisher id, not Marketplace. `extensionKind: ["ui"]`. Python Core is not bundled. Extension Host smoke uses `@vscode/test-electron`. Host-level IPC covers hello → set_watchlist → start → pause → resume → get_state → shutdown. Restart invariant: unread survives Core crash; `active_signals` still do not increment unread; a new `alert` edge increments unread. No tag, no Marketplace publish, Python version stays 0.2.0.
 
 ## v0.2.0 — 2026-08-26
 

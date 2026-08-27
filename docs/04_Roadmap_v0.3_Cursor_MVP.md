@@ -159,7 +159,18 @@ StatusBar → Hover → Detail
 | M5 Minimal StatusBar | done |
 | M6 Hover | done |
 | M7 Alert handling | done |
-| M8 Host integration tests / packaging | not started |
+| M8 Host integration tests / packaging | done (Release Candidate; not tagged) |
 
 v0.3 Host watchlist source of truth is `marketSentinel.watchlist` (settings). The daemon holds a non-persistent runtime Watchlist updated via `set_watchlist` and does not write `data/watchlist.json`.
+
+M8 Release Candidate identity (local VSIX, not Marketplace):
+
+```text
+publisher: market-sentinel-local
+name: market-sentinel
+id: market-sentinel-local.market-sentinel
+extensionKind: ["ui"]
+```
+
+`market-sentinel-local` is a developer/local publisher identifier. Changing it later changes the extension identifier. Python Core is not bundled; install still needs `coreRoot` + `uvPath`. Do not tag `v0.3.0` or enter v0.4 until a separate release audit.
 

@@ -2,11 +2,78 @@
 
 Low-latency market monitoring core for developer hosts (Cursor, DeepSeek Harness, ZCode).
 
-Current version: **v0.2.0 — Market Event Engine**. v0.3 Cursor Host is in progress on `feat/v0.3-cursor-host` (Python JSONL daemon + desktop Cursor extension lifecycle, StatusBar, Hover, and Host unread/toast). High-frequency market updates never call an LLM (`Token = 0`). There is no live HTTP provider, no `notified_timestamp`, and no LLM / News / MCP.
+Current Core package: **v0.2.0**. Cursor Host **v0.3 Release Candidate** is on `feat/v0.3-cursor-host`. Wire compatibility is **Protocol v1** (`protocol_version`), not the Python package version. High-frequency market updates never call an LLM (`Token = 0`). There is no live HTTP provider, no `notified_timestamp`, and no LLM / News / MCP.
 
 ## Positioning
 
-Market Sentinel watches a small watchlist, turns quotes into Features / Events / Signals, and keeps alerts rare. It is a Core plus diagnostics CLI, not a trading product and not a final IDE UI.
+Market Sentinel watches a small watchlist, turns quotes into Features / Events / Signals, and keeps alerts rare. It is a Core plus diagnostics CLI plus a desktop Cursor host, not a trading product.
+
+## v0.3 Cursor Host (Release Candidate)
+
+Desktop Cursor / VS Code extension that spawns the Python daemon over stdin/stdout JSONL (Protocol v1).
+
+Included:
+
+- Cursor / VS Code **Desktop** extension
+- Python daemon via **uv**
+- JSONL Protocol v1
+- StatusBar (`DISCONNECTED` / `STARTING` / `PAUSED` / `STALE` / `ALERT` / `HOT` / `WARM` / `NORMAL`)
+- Hover (persistent `WireMarketState`)
+- Pause / Resume / Restart Core / Show Output
+- Unread alert badge (unsolicited `alert` edges only)
+- Optional critical toast (`marketSentinel.alertToast`)
+- Reset Alert Badge
+
+Python Core is **not** bundled in the VSIX. Developer install still needs a Core checkout and `uv`.
+
+Extension identifier: `market-sentinel-local.market-sentinel`. Publisher `market-sentinel-local` is a **local VSIX id**, not a Marketplace publisher.
+
+### Developer install
+
+Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), Node.js 20+, pnpm, Cursor Desktop (or VS Code Desktop).
+
+```bash
+uv sync
+pnpm install
+pnpm build
+pnpm package:vsix
+```
+
+Then in Cursor: Extensions → **Install from VSIX…** → `apps/cursor-extension/market-sentinel-0.3.0.vsix`.
+
+Open a **trusted** workspace. Set `marketSentinel.coreRoot` when the window is not a single-folder Core checkout. Confirm `marketSentinel.uvPath` (default `uv`).
+
+### Settings
+
+| Setting | Role |
+|---|---|
+| `marketSentinel.coreRoot` | Python Core checkout (`pyproject.toml`). Required when no single workspace folder is open, and for multi-root windows. |
+| `marketSentinel.uvPath` | `uv` executable (`shell: false`). |
+| `marketSentinel.watchlist` | Host watchlist intent (Core still enforces 10-symbol limit). |
+| `marketSentinel.provider` | `fake` (default) or `replay`. |
+| `marketSentinel.replayPath` | Required when provider is `replay`. |
+| `marketSentinel.enableHoverDetails` | Full StatusBar hover (default `true`). Host-only. |
+| `marketSentinel.alertToast` | `off` (default) or `critical`. Host-only. |
+
+### Manual Cursor Desktop checklist
+
+1. Install the VSIX.
+2. Open a trusted workspace.
+3. Configure `marketSentinel.coreRoot` if needed.
+4. Confirm `uvPath`.
+5. Set `provider` to `fake` or `replay`.
+6. Configure `watchlist`.
+7. Reload the window.
+8. StatusBar item appears (`MS …`).
+9. Hover shows feed / symbols (or a lifecycle message).
+10. Pause / Resume.
+11. Restart Core.
+12. Show Output.
+13. Reset Alert Badge.
+14. Close Cursor.
+15. Confirm no leftover `market-sentinel daemon` / Python child.
+
+This checklist is manual. Automated tests cover Protocol IPC, HostController, StatusBar mapping, and an Extension Host smoke activate/deactivate path.
 
 ## Requirements
 
@@ -19,6 +86,7 @@ The default `python` on some machines is 3.11. Always use `uv run`.
 
 ```bash
 uv sync
+pnpm install
 ```
 
 ## Tests and checks
@@ -30,7 +98,16 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
-Default pytest is offline. Coverage fails under 85%. Do not depend on live market HTTP.
+```bash
+pnpm test
+pnpm lint
+pnpm typecheck
+pnpm build
+pnpm package:vsix
+pnpm test:extension-host
+```
+
+Default pytest is offline. Coverage fails under 85%. Do not depend on live market HTTP. `pnpm test:extension-host` downloads a VS Code Desktop binary via `@vscode/test-electron` (not Cursor).
 
 ## CLI
 
@@ -51,22 +128,13 @@ uv run market-sentinel --provider fake daemon
 
 Commands are JSON lines on stdin (`hello`, `start`, `pause`, `resume`, `set_watchlist`, `get_state`, `shutdown`). Logs go to stderr. `set_watchlist` is runtime-only and does not write `data/watchlist.json`.
 
-The Cursor package (`apps/cursor-extension`) includes a vscode-free JSONL IPC client and Python process manager. Spawn is argv-based (`shell: false`):
+Spawn is argv-based (`shell: false`):
 
 ```text
 uv run --directory <repo> market-sentinel --provider fake daemon
 ```
 
-Handshake order is `hello` → `set_watchlist` → `start`. Host commands: Pause / Resume / Restart Core / Show Output / Reset Alert Badge. StatusBar shows DISCONNECTED / PAUSED / STALE / ALERT / HOT / WARM / NORMAL, plus an unread badge from unsolicited `alert` messages. Hover inspects `WireMarketState` (disable with `marketSentinel.enableHoverDetails`). `marketSentinel.alertToast` defaults to `off`. Unread is session-local and is not persisted across Cursor/extension reload.
-
-The Cursor extension is **desktop-only** (Node `child_process`). It is not a Web extension.
-
-```bash
-pnpm test
-pnpm lint
-pnpm typecheck
-pnpm build
-```
+Handshake order is `hello` → `set_watchlist` → `start`.
 
 ## Architecture
 
@@ -81,6 +149,8 @@ Market Provider
   → WarmingPolicy / Adaptive Scheduler
   → Runtime (MarketState + EngineTickResult)
   → CLI diagnostics
+  → JSONL daemon
+  → Cursor Host (StatusBar / Hover / unread)
 ```
 
 ## v0.2 capabilities
@@ -115,7 +185,7 @@ Watchlist of **at most 10 symbols**.
 
 A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldown).
 
-## Current limitations
+## Known limitations
 
 - At most **10 symbols**.
 - `MarketSnapshot.volume` / `turnover` are **session cumulative**, not per-interval.
@@ -123,12 +193,12 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Session id is the **UTC+8 calendar day**. That matches current A/H MVP examples; there is no full exchange calendar.
 - `MarketBar` is an adaptive-polling **sampled/observed** 1-minute bar, not an exchange official K-line.
 - VWAP needs reliable cumulative **turnover and volume**.
-- No Cursor WebView yet (v0.3 M8). StatusBar is minimal text (`MS <kind>` plus optional unread badge); Hover inspects persistent `WireMarketState`.
-- Unread alert count is Host-local and resets on extension reload (not written to workspaceState).
-- Desktop Cursor/VS Code extension only. Web / browser Cursor environments are not supported. Remote SSH / Codespaces is not formally verified.
-- Developer install requires `uv` plus a Core checkout path (`marketSentinel.coreRoot`, or a single trusted workspace folder).
+- No live HTTP provider.
+- Python runtime is **not bundled** in the VSIX (developer install: `coreRoot` + `uvPath`).
+- Desktop Cursor / VS Code only (`extensionKind: ui`). Web / browser Cursor is unsupported. Remote SSH / Codespaces is not validated.
 - Untrusted workspaces are unsupported because the host starts a local Python Core.
-- No formal HTTP live provider.
+- Unread alert count is Host-local and resets on extension reload (not written to workspaceState).
+- No WebView, no alert history panel.
 - No `notified_timestamp` (alert candidate ≠ notified).
 - No LLM, News, MCP, auto-trading, or buy/sell advice.
 
