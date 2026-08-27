@@ -1,0 +1,5 @@
+packages:
+  - "apps/cursor-extension"
+
+allowBuilds:
+  esbuild: true

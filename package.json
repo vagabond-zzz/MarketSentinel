@@ -1,0 +1,13 @@
+{
+  "name": "market-sentinel",
+  "private": true,
+  "scripts": {
+    "test": "pnpm --filter @market-sentinel/cursor-extension test",
+    "lint": "pnpm --filter @market-sentinel/cursor-extension lint",
+    "typecheck": "pnpm --filter @market-sentinel/cursor-extension typecheck",
+    "build": "pnpm --filter @market-sentinel/cursor-extension build"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

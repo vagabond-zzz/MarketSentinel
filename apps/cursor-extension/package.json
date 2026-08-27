@@ -1,0 +1,25 @@
+{
+  "name": "@market-sentinel/cursor-extension",
+  "private": true,
+  "version": "0.3.0",
+  "description": "Cursor host for Market Sentinel (v0.3; UI not implemented yet)",
+  "main": "./out/extension.js",
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@types/node": "^22.18.0",
+    "eslint": "^9.34.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.42.0",
+    "vitest": "^3.2.4"
+  }
+}

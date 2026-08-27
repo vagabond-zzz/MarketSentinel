@@ -13,6 +13,7 @@ node_modules/
 dist/
 out/
 *.vsix
+*.tsbuildinfo
 
 # System
 .DS_Store
