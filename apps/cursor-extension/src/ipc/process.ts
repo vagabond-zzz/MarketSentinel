@@ -63,6 +63,7 @@ export class ProcessManager {
   private stopping = false;
   private live = false;
   private disconnectSent = false;
+  private lastPidInternal: number | undefined;
 
   constructor(options: ProcessManagerOptions) {
     this.options = options;
@@ -75,6 +76,10 @@ export class ProcessManager {
 
   get ipc(): IpcClient | undefined {
     return this.client;
+  }
+
+  get lastPid(): number | undefined {
+    return this.lastPidInternal;
   }
 
   get acknowledgedWatchlist(): WatchlistItem[] {
@@ -221,6 +226,7 @@ export class ProcessManager {
       windowsHide: true,
     });
     this.child = child;
+    this.lastPidInternal = child.pid;
     const { stdin, stdout, stderr } = child;
     if (stdin === null || stdout === null || stderr === null) {
       return this.failStart(new Error("child stdio pipes are missing"));

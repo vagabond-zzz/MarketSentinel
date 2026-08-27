@@ -1,11 +1,13 @@
 {
-  "name": "market-sentinel",
+  "name": "market-sentinel-workspace",
   "private": true,
   "scripts": {
-    "test": "pnpm --filter @market-sentinel/cursor-extension test",
-    "lint": "pnpm --filter @market-sentinel/cursor-extension lint",
-    "typecheck": "pnpm --filter @market-sentinel/cursor-extension typecheck",
-    "build": "pnpm --filter @market-sentinel/cursor-extension build"
+    "test": "pnpm --filter market-sentinel test",
+    "test:extension-host": "pnpm --filter market-sentinel test:extension-host",
+    "lint": "pnpm --filter market-sentinel lint",
+    "typecheck": "pnpm --filter market-sentinel typecheck",
+    "build": "pnpm --filter market-sentinel build",
+    "package:vsix": "pnpm --filter market-sentinel package:vsix"
   },
   "engines": {
     "node": ">=20"

@@ -3,11 +3,14 @@ import * as vscode from "vscode";
 import { parseAlertToast, planCriticalToast } from "./alerts/state";
 import { HostController } from "./host/controller";
 import { bindCommands } from "./host/session";
-import { HOST_COMMANDS, type RawSettings } from "./host/types";
-import { renderHoverMarkdown } from "./hover/render";
-import type { HoverModel } from "./hover/model";
+import type { RawSettings } from "./host/types";
 import type { AlertMessage } from "./protocol/types";
-import type { StatusBarModel } from "./statusbar/map";
+import { applyStatusBar } from "./statusbar/adapter";
+
+export interface ExtensionApi {
+  statusBar: vscode.StatusBarItem;
+  shutdown(): Promise<void>;
+}
 
 let controller: HostController | undefined;
 
@@ -32,26 +35,6 @@ function splitCoreLines(chunk: string, write: (line: string) => void): void {
   }
 }
 
-function applyStatusBar(
-  item: vscode.StatusBarItem,
-  model: StatusBarModel,
-  hover: HoverModel,
-): void {
-  item.text = model.text;
-  const tooltip = new vscode.MarkdownString(renderHoverMarkdown(hover));
-  tooltip.isTrusted = false;
-  item.tooltip = tooltip;
-  item.command = HOST_COMMANDS.showOutput;
-  if (model.tone === "error") {
-    item.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
-  } else if (model.tone === "warning") {
-    item.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
-  } else {
-    item.backgroundColor = undefined;
-  }
-  item.show();
-}
-
 export function presentHostAlertToast(message: AlertMessage, alertToast: unknown): void {
   const plan = planCriticalToast(parseAlertToast(alertToast), message.candidates);
   if (plan.show && plan.message !== undefined) {
@@ -59,7 +42,7 @@ export function presentHostAlertToast(message: AlertMessage, alertToast: unknown
   }
 }
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+export async function activate(context: vscode.ExtensionContext): Promise<ExtensionApi> {
   const output = vscode.window.createOutputChannel("Market Sentinel");
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
   const logger = {
@@ -107,6 +90,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
   });
   await host.start();
+  return {
+    statusBar,
+    shutdown: async () => {
+      await host.shutdown();
+    },
+  };
 }
 
 export async function deactivate(): Promise<void> {

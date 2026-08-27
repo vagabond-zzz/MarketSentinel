@@ -111,6 +111,10 @@ export class HostController {
     return this.coreVersionInternal;
   }
 
+  get lastPid(): number | undefined {
+    return this.manager?.lastPid;
+  }
+
   get lastAcknowledgedWatchlist(): WatchlistItem[] {
     return this.lastAcked.map((item) => ({ ...item }));
   }

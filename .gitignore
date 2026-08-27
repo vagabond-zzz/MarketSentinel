@@ -14,6 +14,7 @@ dist/
 out/
 *.vsix
 *.tsbuildinfo
+.vscode-test/
 
 # System
 .DS_Store

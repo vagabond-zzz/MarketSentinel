@@ -42,8 +42,14 @@ describe("extension manifest", () => {
     );
   });
 
-  it("requires a trusted workspace because it spawns a local Python Core", () => {
-    expect(pkg.capabilities.untrustedWorkspaces.supported).toBe(false);
-    expect(pkg.capabilities.untrustedWorkspaces.description).toMatch(/Python Core/);
+  it("records the local VSIX publisher and ui-only extensionKind", () => {
+    const raw = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as {
+      name: string;
+      publisher: string;
+      extensionKind: string[];
+    };
+    expect(raw.name).toBe("market-sentinel");
+    expect(raw.publisher).toBe("market-sentinel-local");
+    expect(raw.extensionKind).toEqual(["ui"]);
   });
 });

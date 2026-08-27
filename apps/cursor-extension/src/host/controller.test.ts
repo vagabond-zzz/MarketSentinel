@@ -869,6 +869,9 @@ describe("HostController", () => {
       ],
     });
     expect(harness.controller.unreadAlertCount).toBe(1);
+    writeAlert(harness.children[1], [alertCandidate({ id: "after-restart" })]);
+    expect(harness.controller.unreadAlertCount).toBe(2);
+    expect(harness.controller.statusBarModel().kind).toBe("ALERT");
   });
 
   it("resets unread without clearing transient ALERT or Core state", async () => {

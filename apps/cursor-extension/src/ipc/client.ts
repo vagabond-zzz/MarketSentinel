@@ -58,6 +58,10 @@ export class IpcClient {
     this.clearTimeoutFn = options.clearTimeoutFn ?? clearTimeout;
   }
 
+  get pendingCount(): number {
+    return this.pending.size;
+  }
+
   feed(chunk: string | Buffer): void {
     for (const line of this.decoder.push(chunk)) {
       this.dispatchLine(line);

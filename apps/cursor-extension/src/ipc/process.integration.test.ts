@@ -1,51 +1,13 @@
-import { spawnSync } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { ProcessManager } from "./process";
-
-function findRepoRoot(): string {
-  let dir = process.cwd();
-  for (;;) {
-    if (
-      fs.existsSync(path.join(dir, "pyproject.toml")) &&
-      fs.existsSync(path.join(dir, "src", "market_sentinel"))
-    ) {
-      return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) {
-      throw new Error("cannot find Market Sentinel repo root");
-    }
-    dir = parent;
-  }
-}
-
-function resolveUv(): string | undefined {
-  const probe = spawnSync("uv", ["--version"], { encoding: "utf8", shell: false });
-  if (probe.status === 0) {
-    return "uv";
-  }
-  if (process.platform === "win32") {
-    const located = spawnSync("where.exe", ["uv"], { encoding: "utf8", shell: false });
-    const line = located.stdout
-      .split(/\r?\n/)
-      .map((item) => item.trim())
-      .find((item) => item.toLowerCase().endsWith(".exe"));
-    if (line !== undefined && line.length > 0) {
-      return line;
-    }
-  }
-  return undefined;
-}
+import { findRepoRoot, processExists, resolveUv, stderrLooksLikeJsonl } from "../integration/env";
 
 const uvPath = resolveUv();
 
 describe("Python ↔ Node IPC", () => {
   it.skipIf(uvPath === undefined)(
-    "hello → set_watchlist → start → get_state → shutdown",
+    "hello → set_watchlist → start → state → pause → resume → get_state → shutdown",
     async () => {
       const stderr: string[] = [];
       const types: string[] = [];
@@ -68,18 +30,29 @@ describe("Python ↔ Node IPC", () => {
       });
       try {
         await manager.start([{ symbol: "00700.HK", enabled: true }]);
-        const snapshot = await manager.getState();
-        expect(snapshot.type).toBe("state");
-        expect(snapshot.protocol_version).toBe(1);
-        expect(snapshot.request_id).toBeDefined();
-        expect(snapshot.state.watchlist_count).toBe(1);
-        expect(snapshot.state.symbols[0]?.symbol).toBe("00700.HK");
-        expect(snapshot.state.symbols[0]?.scheduler_level).toMatch(/^(COLD|WARM|HOT)$/);
-        expect(snapshot.state.symbols[0]?.active_signals).toEqual([]);
+        expect(manager.phase).toBe("RUNNING");
+        const first = await manager.getState();
+        expect(first.type).toBe("state");
+        expect(first.protocol_version).toBe(1);
+        expect(first.request_id).toBeDefined();
+        expect(first.state.watchlist_count).toBe(1);
+        expect(first.state.symbols[0]?.symbol).toBe("00700.HK");
+        expect(first.state.symbols[0]?.scheduler_level).toMatch(/^(COLD|WARM|HOT)$/);
         await manager.pause();
         await manager.resume();
+        const second = await manager.getState();
+        expect(second.type).toBe("state");
+        expect(second.protocol_version).toBe(1);
+        const pid = manager.lastPid;
+        expect(pid).toBeDefined();
+        expect(manager.ipc?.pendingCount).toBe(0);
         await manager.shutdown();
         expect(manager.phase).toBe("STOPPED");
+        expect(manager.ipc).toBeUndefined();
+        expect(stderrLooksLikeJsonl(stderr)).toBe(false);
+        if (pid !== undefined) {
+          expect(processExists(pid)).toBe(false);
+        }
       } catch (error) {
         await manager.shutdown().catch(() => undefined);
         throw new Error(`${String(error)}\nstderr:\n${stderr.join("")}`);

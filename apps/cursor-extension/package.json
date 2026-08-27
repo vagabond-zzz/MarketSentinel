@@ -1,10 +1,14 @@
 {
-  "name": "@market-sentinel/cursor-extension",
+  "name": "market-sentinel",
   "private": true,
   "version": "0.3.0",
+  "publisher": "market-sentinel-local",
   "displayName": "Market Sentinel",
-  "description": "Cursor host for Market Sentinel (v0.3)",
+  "description": "Cursor host for Market Sentinel (v0.3 local VSIX)",
   "main": "./out/extension.js",
+  "extensionKind": [
+    "ui"
+  ],
   "engines": {
     "vscode": "^1.90.0",
     "node": ">=20"
@@ -101,16 +105,23 @@
     }
   },
   "scripts": {
+    "vscode:prepublish": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:extension-host": "tsc -p tsconfig.json && tsc -p tsconfig.integration.json && node ./out/test/runTest.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "package:vsix": "vsce package --no-dependencies --allow-missing-repository && node ./scripts/audit-vsix.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^22.18.0",
     "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^2.5.1",
+    "@vscode/vsce": "^3.6.0",
     "eslint": "^9.34.0",
+    "mocha": "^11.7.1",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.42.0",
     "vitest": "^3.2.4"
