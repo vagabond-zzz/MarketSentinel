@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — v0.5 RC Fix Pass (no version bump)
+
+External review blockers on `feat/v0.5-market-intelligence`. Package versions stay **0.3.0**. Protocol stays **1**.
+
+- Episode retirement invalidates queued work before `provider.complete`; in-flight results cannot resurrect annotations
+- Retired episode call-budget / generation maps are forgotten after pending work drains
+- Parser fail-closes Chinese and English trading-instruction phrasing
+- Intelligence config/auth/provider failure is fail-open: WARNING on stderr, Rule-only Core continues
+- CLI `run` / `--once` start, drain, and shut down the sidecar
+- Coordinator fallback logs redact configured secrets
+
 ## Unreleased — v0.5 Market Intelligence Router (no version bump)
 
 Optional low-frequency Intelligence sidecar on `feat/v0.5-market-intelligence`. Package versions stay **0.3.0**. Protocol stays **1** (additive `intelligence` on `WireSignal` only). Default `MARKET_SENTINEL_INTEL_ENABLED` is off, so ordinary ticks still make **zero** model calls.
