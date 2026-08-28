@@ -37,6 +37,36 @@ afterEach(() => {
 });
 
 describe("IpcClient", () => {
+  it("matches request_id for host_interaction ack", async () => {
+    const { client, written } = createClient();
+    const pending = client.request({
+      type: "host_interaction",
+      action: "alert_presented",
+      signal_id: "sig-1",
+      created_timestamp: 1.5,
+    });
+    const sent = JSON.parse(written[0] ?? "") as {
+      type: string;
+      action: string;
+      signal_id: string;
+      request_id: string;
+    };
+    expect(sent.type).toBe("host_interaction");
+    expect(sent.action).toBe("alert_presented");
+    expect(sent.signal_id).toBe("sig-1");
+    expect(sent).not.toHaveProperty("title");
+    expect(sent).not.toHaveProperty("workspace");
+    client.feed(
+      JSON.stringify({
+        protocol_version: 1,
+        type: "ack",
+        request_id: sent.request_id,
+      }) + "\n",
+    );
+    const ack = await pending;
+    expect(ack.type).toBe("ack");
+  });
+
   it("matches request_id for ready", async () => {
     const { client, written } = createClient();
     const pending = client.request({ type: "hello", host: "test" });

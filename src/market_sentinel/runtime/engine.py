@@ -19,6 +19,7 @@ from market_sentinel.providers.base import MarketProvider
 from market_sentinel.runtime.results import EngineTickResult, SymbolTickResult
 from market_sentinel.scheduler.scheduler import AdaptiveScheduler
 from market_sentinel.signals.pipeline import SignalPipeline
+from market_sentinel.telemetry.runtime import TelemetryRuntime
 from market_sentinel.watchlist.watchlist import Watchlist
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,7 @@ class MarketEngine:
         pipeline: SignalPipeline | None = None,
         warming: WarmingPolicy | None = None,
         intelligence: IntelligenceObserver | None = None,
+        telemetry: TelemetryRuntime | None = None,
     ) -> None:
         self.clock = clock
         self.watchlist = watchlist
@@ -72,7 +74,8 @@ class MarketEngine:
         self.states = states
         self.health = health
         self._feature_engine = feature_engine or FeatureEngine()
-        self.pipeline = pipeline or SignalPipeline(clock)
+        self.telemetry = telemetry or TelemetryRuntime(clock)
+        self.pipeline = pipeline or SignalPipeline(clock, telemetry=self.telemetry)
         self._warming = warming or WarmingPolicy()
         self.intelligence = intelligence
         self._fetched_symbols: set[str] = set()

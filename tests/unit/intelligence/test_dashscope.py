@@ -116,6 +116,8 @@ async def test_dashscope_parses_injected_transport_without_network() -> None:
     )
     row = await provider.complete({"symbol": "00700.HK", "priority": "important"}, timeout_s=2.0)
     assert row.confidence == pytest.approx(0.7)
+    assert row.token_in is None
+    assert row.token_out is None
 
 
 def test_dashscope_maps_rate_limit_timeout_and_redacts_key() -> None:
@@ -147,3 +149,30 @@ def test_dashscope_maps_rate_limit_timeout_and_redacts_key() -> None:
 
     with pytest.raises(IntelligenceAuthError, match="not set"):
         DashScopeIntelligenceProvider(api_key="  ", model="x", base_url="https://example.invalid")
+
+
+def test_dashscope_forwards_provider_usage_when_present() -> None:
+    content = (
+        '{"worth_highlight": true, "reason": "price and volume expanded", '
+        '"confidence": 0.7, "summary": "Expansion is strong."}'
+    )
+
+    def transport(
+        url: str, headers: dict[str, str], body: bytes, timeout_s: float
+    ) -> tuple[int, str]:
+        del url, headers, body, timeout_s
+        envelope = {
+            "choices": [{"message": {"content": content}}],
+            "usage": {"prompt_tokens": 9, "completion_tokens": 4},
+        }
+        return 200, json.dumps(envelope)
+
+    provider = DashScopeIntelligenceProvider(
+        api_key="sk-test-key",
+        model=DEFAULT_MODEL,
+        base_url="https://example.invalid/v1",
+        transport=transport,
+    )
+    row = provider.complete_sync({"symbol": "00700.HK"}, timeout_s=1.0)
+    assert row.token_in == 9
+    assert row.token_out == 4

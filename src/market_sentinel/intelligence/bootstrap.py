@@ -10,6 +10,7 @@ from market_sentinel.intelligence.errors import IntelligenceError
 from market_sentinel.intelligence.factory import create_intelligence_provider
 from market_sentinel.intelligence.model_settings import load_model_settings
 from market_sentinel.intelligence.redaction import redact_secrets
+from market_sentinel.telemetry.runtime import TelemetryRuntime
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ def optional_intelligence(
     clock: Clock,
     *,
     environ: Mapping[str, str] | None = None,
+    telemetry: TelemetryRuntime | None = None,
 ) -> IntelligenceCoordinator | None:
     env = os.environ if environ is None else environ
     flag = str(env.get("MARKET_SENTINEL_INTEL_ENABLED", "")).strip().lower()
@@ -36,6 +38,7 @@ def optional_intelligence(
             clock,
             timeout_s=settings.timeout_s,
             secrets=(secret,) if secret else (),
+            telemetry=telemetry,
         )
     except (IntelligenceError, ValueError) as exc:
         logger.warning(

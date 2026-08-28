@@ -37,6 +37,7 @@ export type HostCommandType =
   | "resume"
   | "set_watchlist"
   | "get_state"
+  | "host_interaction"
   | "shutdown";
 
 export type CoreMessageType =
@@ -130,6 +131,22 @@ export interface ShutdownCommand {
   request_id: string;
 }
 
+export type HostInteractionAction =
+  | "alert_presented"
+  | "alert_badge_reset"
+  | "signal_opened"
+  | "alert_dismissed"
+  | "signal_muted";
+
+export interface HostInteractionCommand {
+  protocol_version: 1;
+  type: "host_interaction";
+  request_id: string;
+  action: HostInteractionAction;
+  signal_id?: string;
+  created_timestamp: number;
+}
+
 export type HostCommand =
   | HelloCommand
   | StartCommand
@@ -137,6 +154,7 @@ export type HostCommand =
   | ResumeCommand
   | SetWatchlistCommand
   | GetStateCommand
+  | HostInteractionCommand
   | ShutdownCommand;
 
 export type HostCommandBody =
@@ -146,6 +164,12 @@ export type HostCommandBody =
   | { type: "resume" }
   | { type: "set_watchlist"; items: WatchlistItem[] }
   | { type: "get_state" }
+  | {
+      type: "host_interaction";
+      action: HostInteractionAction;
+      signal_id?: string;
+      created_timestamp: number;
+    }
   | { type: "shutdown" };
 
 export interface ReadyMessage {
@@ -208,5 +232,6 @@ export const EXPECTED_RESPONSE: Record<HostCommandType, RequestSuccessMessage["t
   resume: "ack",
   set_watchlist: "ack",
   get_state: "state",
+  host_interaction: "ack",
   shutdown: "shutdown_ack",
 };

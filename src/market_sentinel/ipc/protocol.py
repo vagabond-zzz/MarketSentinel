@@ -10,6 +10,7 @@ HOST_COMMANDS = frozenset(
         "resume",
         "set_watchlist",
         "get_state",
+        "host_interaction",
         "shutdown",
     }
 )

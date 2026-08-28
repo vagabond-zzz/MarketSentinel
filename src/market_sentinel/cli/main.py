@@ -21,6 +21,7 @@ from market_sentinel.providers.factory import create_provider
 from market_sentinel.runtime.engine import MarketEngine
 from market_sentinel.runtime.results import EngineTickResult
 from market_sentinel.scheduler.scheduler import AdaptiveScheduler
+from market_sentinel.telemetry.runtime import TelemetryRuntime
 from market_sentinel.watchlist.watchlist import Watchlist
 
 
@@ -128,7 +129,8 @@ async def _handle_daemon(args: argparse.Namespace) -> int:
     except ProviderError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    intelligence = optional_intelligence(clock)
+    telemetry = TelemetryRuntime(clock)
+    intelligence = optional_intelligence(clock, telemetry=telemetry)
     engine = MarketEngine(
         clock=clock,
         watchlist=Watchlist(persist=False),
@@ -138,6 +140,7 @@ async def _handle_daemon(args: argparse.Namespace) -> int:
         states=MarketStateStore(),
         health=FeedHealthTracker(clock),
         intelligence=intelligence,
+        telemetry=telemetry,
     )
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)
@@ -154,7 +157,8 @@ async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
     except ProviderError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    intelligence = optional_intelligence(clock)
+    telemetry = TelemetryRuntime(clock)
+    intelligence = optional_intelligence(clock, telemetry=telemetry)
     engine = MarketEngine(
         clock=clock,
         watchlist=watchlist,
@@ -164,23 +168,27 @@ async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
         states=MarketStateStore(),
         health=FeedHealthTracker(clock),
         intelligence=intelligence,
+        telemetry=telemetry,
     )
     async with _intelligence_lifecycle(intelligence):
-        if args.once:
-            result = await engine.tick()
-            if intelligence is not None:
-                await intelligence.idle()
-            _print_dashboard(engine, result, verbose=args.verbose)
-            return 0
         try:
-            while True:
+            if args.once:
                 result = await engine.tick()
+                if intelligence is not None:
+                    await intelligence.idle()
                 _print_dashboard(engine, result, verbose=args.verbose)
-                await asyncio.sleep(
-                    engine.scheduler.next_wait_s(engine.watchlist.enabled_symbols())
-                )
-        except KeyboardInterrupt:
-            return 0
+                return 0
+            try:
+                while True:
+                    result = await engine.tick()
+                    _print_dashboard(engine, result, verbose=args.verbose)
+                    await asyncio.sleep(
+                        engine.scheduler.next_wait_s(engine.watchlist.enabled_symbols())
+                    )
+            except KeyboardInterrupt:
+                return 0
+        finally:
+            engine.telemetry.close()
     return 0
 
 

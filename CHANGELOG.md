@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — v0.6 M1 Telemetry Wiring (no version bump)
+
+Wire frozen M0 observations on `feat/v0.6-feedback-observability`. Package versions stay **0.5.0**. Protocol stays **1** (additive `host_interaction`). No evaluation report, tuning, or JSONL storage yet.
+
+- Per-execution opaque `run_id`; fail-open collector (`NoOp` / `InMemory`)
+- Pipeline: generated/deduped/clustered, episode created/escalated, alert candidate/suppressed
+- Intelligence: routed/skipped/succeeded/fallback/latency-by-stage; tokens only from adapter usage
+- Host produces `alert_presented` (per candidate) and `alert_badge_reset` via Protocol v1 `host_interaction`
+
 ## Unreleased — v0.6 M0 Metrics Contract (no version bump)
 
 Optional telemetry contract on `feat/v0.6-feedback-observability`. Package versions stay **0.5.0**. Protocol stays **1**. No storage, Host UI, or online tuning. **Not finally frozen** after external review; this is the M0 fix pass.

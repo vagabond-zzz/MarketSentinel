@@ -152,6 +152,7 @@ export class HostController {
 
   resetAlertBadge(): void {
     this.unreadAlertCountInternal = 0;
+    this.reportHostInteraction({ action: "alert_badge_reset" });
     this.emitUi();
   }
 
@@ -428,6 +429,7 @@ export class HostController {
     this.unreadAlertCountInternal += message.candidates.length;
     for (const candidate of message.candidates) {
       this.options.logger.host(formatAlertDiagnostic(candidate));
+      this.reportHostInteraction({ action: "alert_presented", signal_id: candidate.id });
     }
     this.lastAlertAt = (this.options.now ?? Date.now)();
     this.clearAlertHold();
@@ -439,6 +441,35 @@ export class HostController {
     }, hold);
     this.options.onAlertEdge?.(message);
     this.emitUi();
+  }
+
+  private reportHostInteraction(input: {
+    action: "alert_presented" | "alert_badge_reset";
+    signal_id?: string;
+  }): void {
+    const ipc = this.manager?.ipc;
+    if (ipc === undefined) {
+      return;
+    }
+    const created_timestamp = (this.options.now ?? Date.now)() / 1000;
+    const body =
+      input.action === "alert_presented"
+        ? {
+            type: "host_interaction" as const,
+            action: input.action,
+            signal_id: input.signal_id,
+            created_timestamp,
+          }
+        : {
+            type: "host_interaction" as const,
+            action: input.action,
+            created_timestamp,
+          };
+    void ipc.request(body).catch((error: unknown) => {
+      this.options.logger.host(
+        `host_interaction ${input.action} failed: ${this.errorMessage(error)}`,
+      );
+    });
   }
 
   private clearAlertHold(): void {

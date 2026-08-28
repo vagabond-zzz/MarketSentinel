@@ -17,6 +17,26 @@ from market_sentinel.intelligence.errors import (
 )
 from market_sentinel.intelligence.parse import ModelCompletion, parse_model_output
 
+
+def _non_negative_int(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    if value < 0:
+        return None
+    return value
+
+
+def _usage_tokens(envelope: object) -> tuple[int | None, int | None]:
+    if not isinstance(envelope, dict):
+        return None, None
+    usage = envelope.get("usage")
+    if not isinstance(usage, dict):
+        return None, None
+    return _non_negative_int(usage.get("prompt_tokens")), _non_negative_int(
+        usage.get("completion_tokens")
+    )
+
+
 Transport = Callable[[str, dict[str, str], bytes, float], tuple[int, str]]
 
 SYSTEM_PROMPT = (
@@ -122,7 +142,17 @@ class DashScopeIntelligenceProvider:
         started = time.perf_counter()
         parsed = parse_model_output(content)
         self.last_parse_latency_s = time.perf_counter() - started
-        return parsed
+        token_in, token_out = _usage_tokens(envelope)
+        if token_in is None and token_out is None:
+            return parsed
+        return ModelCompletion(
+            worth_highlight=parsed.worth_highlight,
+            reason=parsed.reason,
+            confidence=parsed.confidence,
+            summary=parsed.summary,
+            token_in=token_in,
+            token_out=token_out,
+        )
 
     async def complete(self, payload: Mapping[str, Any], *, timeout_s: float) -> ModelCompletion:
         import asyncio

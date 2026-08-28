@@ -38,6 +38,8 @@ class ModelCompletion:
     reason: str
     confidence: float
     summary: str
+    token_in: int | None = None
+    token_out: int | None = None
 
 
 def contains_trading_advice(text: str) -> bool:

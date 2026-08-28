@@ -11,6 +11,7 @@ from market_sentinel.providers.fake import FakeProvider
 from market_sentinel.runtime.engine import MarketEngine
 from market_sentinel.scheduler.policy import SchedulerPolicy
 from market_sentinel.scheduler.scheduler import AdaptiveScheduler
+from market_sentinel.telemetry.runtime import TelemetryRuntime
 from market_sentinel.watchlist.watchlist import Watchlist
 
 
@@ -19,7 +20,9 @@ def command(message_type: str, request_id: str, **fields: Any) -> str:
     return json.dumps(payload) + "\n"
 
 
-def make_engine() -> tuple[FakeClock, FakeProvider, MarketEngine]:
+def make_engine(
+    telemetry: TelemetryRuntime | None = None,
+) -> tuple[FakeClock, FakeProvider, MarketEngine]:
     clock = FakeClock()
     provider = FakeProvider(clock)
     engine = MarketEngine(
@@ -39,6 +42,7 @@ def make_engine() -> tuple[FakeClock, FakeProvider, MarketEngine]:
         buffers=SymbolBuffers(),
         states=MarketStateStore(),
         health=FeedHealthTracker(clock),
+        telemetry=telemetry,
     )
     return clock, provider, engine
 

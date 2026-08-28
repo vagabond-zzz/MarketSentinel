@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from market_sentinel.clock import Clock
 from market_sentinel.domain.enums import FeedStatus, SignalPriority
+from market_sentinel.domain.signals import Signal
 from market_sentinel.intelligence.compress import compress_intelligence_input, to_model_payload
 from market_sentinel.intelligence.contract import (
     EpisodeCallBudget,
@@ -29,6 +30,8 @@ from market_sentinel.intelligence.redaction import redact_secrets
 from market_sentinel.intelligence.registry import AnnotationRegistry
 from market_sentinel.intelligence.router import RouterPolicy, need_intelligence
 from market_sentinel.runtime.results import EngineTickResult
+from market_sentinel.telemetry.contract import DecisionReason, LatencyStage, TelemetryName
+from market_sentinel.telemetry.runtime import TelemetryRuntime
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +41,23 @@ class IntelligenceWork:
     signal_id: str
     payload: IntelligenceInput
     generation: int
+    market_timestamp: float
+    symbol: str
+    family: str
+    direction: str
+    priority: str
 
 
 _FALLBACK_STATUS = IntelligenceStatus.FALLBACK
+
+_ROUTER_SKIP: dict[FallbackReason, DecisionReason] = {
+    FallbackReason.EXPIRED_EPISODE: DecisionReason.EXPIRED_EPISODE,
+    FallbackReason.SUPPRESSED_EDGE: DecisionReason.SUPPRESSED_EDGE,
+    FallbackReason.STALE_FEED: DecisionReason.STALE_FEED,
+    FallbackReason.INSUFFICIENT_FEATURES: DecisionReason.INSUFFICIENT_FEATURES,
+    FallbackReason.NOT_CANDIDATE: DecisionReason.NOT_CANDIDATE,
+    FallbackReason.EPISODE_BUDGET: DecisionReason.EPISODE_BUDGET,
+}
 
 
 def _reason_for(exc: BaseException) -> FallbackReason:
@@ -69,6 +86,7 @@ class IntelligenceCoordinator:
         budget: EpisodeCallBudget | None = None,
         policy: RouterPolicy | None = None,
         secrets: tuple[str, ...] = (),
+        telemetry: TelemetryRuntime | None = None,
     ) -> None:
         self._provider = provider
         self._clock = clock
@@ -78,6 +96,7 @@ class IntelligenceCoordinator:
         self._budget = budget or EpisodeCallBudget()
         self._policy = policy or RouterPolicy()
         self._secrets = secrets
+        self._telemetry = telemetry
         self.registry = AnnotationRegistry()
         self.diagnostics = IntelligenceDiagnostics()
         self._queue: asyncio.Queue[IntelligenceWork | None] | None = None
@@ -184,17 +203,73 @@ class IntelligenceCoordinator:
                     last_requested_priority=self._last_priority.get(signal.id),
                     expired=expired,
                 )
+                router_started = self._clock.monotonic_time()
                 decision = need_intelligence(payload, policy=self._policy, budget=self._budget)
                 self.diagnostics.router_decisions += 1
+                router_s = self._clock.monotonic_time() - router_started
                 if not decision.requested:
                     self.diagnostics.requests_suppressed += 1
+                    skip = _ROUTER_SKIP.get(decision.reason)
+                    if skip is not None:
+                        self._emit(
+                            TelemetryName.INTELLIGENCE_SKIPPED,
+                            signal,
+                            decision_reason=skip,
+                        )
+                        self._emit_latency(signal, router_s, LatencyStage.ROUTER)
                     continue
-                self._enqueue(payload)
+                if not self._enqueue(
+                    payload,
+                    market_timestamp=signal.market_timestamp,
+                    symbol=signal.symbol,
+                    family=signal.family,
+                    direction=signal.direction.value,
+                    priority=signal.priority.value,
+                ):
+                    continue
+                self._emit(TelemetryName.INTELLIGENCE_ROUTED, signal)
+                self._emit_latency(signal, router_s, LatencyStage.ROUTER)
         elapsed = self._clock.monotonic_time() - started
         self.diagnostics.router_decision_latency_s += elapsed
         self.diagnostics.router_latencies.append(elapsed)
         if self._queue is not None:
             self.diagnostics.queue_depth = self._queue.qsize()
+
+    def _emit(self, name: TelemetryName, signal: Signal, **fields: object) -> None:
+        if self._telemetry is None:
+            return
+        self._telemetry.emit(
+            name,
+            symbol=signal.symbol,
+            signal_id=signal.id,
+            family=signal.family,
+            direction=signal.direction.value,
+            priority=signal.priority.value,
+            market_timestamp=signal.market_timestamp,
+            **fields,
+        )
+
+    def _emit_latency(self, signal: Signal, latency_s: float, stage: LatencyStage) -> None:
+        self._emit(
+            TelemetryName.INTELLIGENCE_LATENCY,
+            signal,
+            latency_s=max(0.0, latency_s),
+            latency_stage=stage,
+        )
+
+    def _emit_work(self, work: IntelligenceWork, name: TelemetryName, **fields: object) -> None:
+        if self._telemetry is None:
+            return
+        self._telemetry.emit(
+            name,
+            symbol=work.symbol,
+            signal_id=work.signal_id,
+            family=work.family,
+            direction=work.direction,
+            priority=work.priority,
+            market_timestamp=work.market_timestamp,
+            **fields,
+        )
 
     def _retire_inactive(self, active_ids: set[str]) -> None:
         self._active_ids = set(active_ids)
@@ -248,20 +323,34 @@ class IntelligenceCoordinator:
         self._generation.pop(signal_id, None)
         self._pending.pop(signal_id, None)
 
-    def _enqueue(self, payload: IntelligenceInput) -> None:
+    def _enqueue(
+        self,
+        payload: IntelligenceInput,
+        *,
+        market_timestamp: float,
+        symbol: str,
+        family: str,
+        direction: str,
+        priority: str,
+    ) -> bool:
         if self._queue is None:
-            return
+            return False
         work = IntelligenceWork(
             signal_id=payload.signal_id,
             payload=payload,
             generation=self._generation.get(payload.signal_id, 0) + 1,
+            market_timestamp=market_timestamp,
+            symbol=symbol,
+            family=family,
+            direction=direction,
+            priority=priority,
         )
         try:
             self._queue.put_nowait(work)
         except asyncio.QueueFull:
             self.diagnostics.dropped_backpressure += 1
             logger.warning("intelligence queue full; dropping %s", payload.signal_id)
-            return
+            return False
         self._generation[payload.signal_id] = work.generation
         self._calls[payload.signal_id] = self._calls.get(payload.signal_id, 0) + 1
         self._last_priority[payload.signal_id] = payload.priority
@@ -278,6 +367,7 @@ class IntelligenceCoordinator:
                 model_calls=self._calls[payload.signal_id],
             )
         )
+        return True
 
     async def _worker(self) -> None:
         assert self._queue is not None
@@ -365,6 +455,32 @@ class IntelligenceCoordinator:
                     model_latency_s=elapsed,
                 ),
             )
+            self._emit_work(
+                work,
+                TelemetryName.INTELLIGENCE_SUCCEEDED,
+                intelligence_status=IntelligenceStatus.ENRICHED.value,
+            )
+            self._emit_work(
+                work,
+                TelemetryName.INTELLIGENCE_LATENCY,
+                latency_s=max(0.0, elapsed),
+                latency_stage=LatencyStage.MODEL,
+            )
+            self._emit_work(
+                work,
+                TelemetryName.INTELLIGENCE_LATENCY,
+                latency_s=max(0.0, parse_s),
+                latency_stage=LatencyStage.PARSE,
+            )
+            token_in = getattr(completion, "token_in", None)
+            token_out = getattr(completion, "token_out", None)
+            if token_in is not None or token_out is not None:
+                self._emit_work(
+                    work,
+                    TelemetryName.INTELLIGENCE_TOKEN_USAGE,
+                    token_in=token_in,
+                    token_out=token_out,
+                )
         except Exception as exc:
             elapsed = self._clock.monotonic_time() - started
             self.diagnostics.model_latency_s += elapsed
@@ -395,6 +511,18 @@ class IntelligenceCoordinator:
                         model_calls=self._calls.get(work.signal_id, 0),
                         model_latency_s=elapsed,
                     ),
+                )
+                self._emit_work(
+                    work,
+                    TelemetryName.INTELLIGENCE_FALLBACK,
+                    intelligence_status=_FALLBACK_STATUS.value,
+                    fallback_reason=reason.value,
+                )
+                self._emit_work(
+                    work,
+                    TelemetryName.INTELLIGENCE_LATENCY,
+                    latency_s=max(0.0, elapsed),
+                    latency_stage=LatencyStage.MODEL,
                 )
             else:
                 self.diagnostics.stale_discard += 1

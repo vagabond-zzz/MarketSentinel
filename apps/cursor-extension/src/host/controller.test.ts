@@ -938,4 +938,48 @@ describe("HostController", () => {
     expect(harness.spawned).toHaveLength(before);
     expect(harness.controller.restartNeeded).toBe(false);
   });
+
+  it("sends one alert_presented command per candidate independent of toast", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeAlert(harness.children[0], [
+      alertCandidate({ id: "c1" }),
+      alertCandidate({ id: "c2" }),
+      alertCandidate({ id: "c3" }),
+    ]);
+    await vi.waitFor(() => {
+      const presented = (
+        harness.commands as Array<{ type?: string; action?: string; signal_id?: string }>
+      ).filter((item) => item.type === "host_interaction" && item.action === "alert_presented");
+      expect(presented).toHaveLength(3);
+      expect(presented.map((item) => item.signal_id)).toEqual(["c1", "c2", "c3"]);
+    });
+    expect(harness.controller.unreadAlertCount).toBe(3);
+  });
+
+  it("sends one alert_badge_reset and never fabricates alert_dismissed", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate()]);
+    harness.controller.resetAlertBadge();
+    await vi.waitFor(() => {
+      const actions = (
+        harness.commands as Array<{ type?: string; action?: string }>
+      ).filter((item) => item.type === "host_interaction");
+      expect(actions.some((item) => item.action === "alert_badge_reset")).toBe(true);
+      expect(actions.some((item) => item.action === "alert_dismissed")).toBe(false);
+    });
+  });
+
+  it("does not record signal_opened from hover", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate()]);
+    harness.controller.hoverModel();
+    harness.controller.uiSnapshot();
+    const opened = (harness.commands as Array<{ type?: string; action?: string }>).filter(
+      (item) => item.type === "host_interaction" && item.action === "signal_opened",
+    );
+    expect(opened).toHaveLength(0);
+  });
 });

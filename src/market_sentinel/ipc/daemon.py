@@ -14,6 +14,7 @@ from market_sentinel.ipc.protocol import HOST_COMMANDS, DaemonPhase, ErrorCode
 from market_sentinel.ipc.writer import ProtocolWriter
 from market_sentinel.runtime.engine import MarketEngine
 from market_sentinel.runtime.results import EngineTickResult
+from market_sentinel.telemetry.host_interaction import parse_host_interaction
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,9 @@ class MarketDaemon:
                 pass
             if self._engine.intelligence is not None:
                 await self._engine.intelligence.shutdown()
+            closer = getattr(self._engine.telemetry, "close", None)
+            if callable(closer):
+                closer()
         return 0
 
     async def _stdin_loop(self) -> None:
@@ -146,6 +150,7 @@ class MarketDaemon:
             "resume": self._resume,
             "set_watchlist": self._set_watchlist,
             "get_state": self._get_state,
+            "host_interaction": self._host_interaction,
         }[message_type]
         handler(command, request_id)
 
@@ -285,6 +290,24 @@ class MarketDaemon:
                 state=map_engine_state(self._engine).to_wire(),
             )
         )
+
+    def _host_interaction(self, command: dict[str, Any], request_id: str) -> None:
+        if not self._require_ready(request_id):
+            return
+        parsed = parse_host_interaction(command)
+        if isinstance(parsed, str):
+            self._writer.send(
+                encode_error(ErrorCode.INVALID_PAYLOAD, parsed, request_id=request_id)
+            )
+            return
+        payload: dict[str, object] = {
+            "signal_id": parsed.signal_id,
+            "host_action": parsed.host_action,
+        }
+        if parsed.created_timestamp is not None:
+            payload["created_timestamp"] = parsed.created_timestamp
+        self._engine.telemetry.emit(parsed.name, **payload)
+        self._writer.send(encode_message("ack", request_id=request_id))
 
     def _shutdown_sync(self, request_id: str | None) -> None:
         self._phase = DaemonPhase.SHUTTING_DOWN

@@ -1,3 +1,9 @@
+from market_sentinel.telemetry.collector import (
+    FailOpenTelemetryCollector,
+    InMemoryTelemetryCollector,
+    NoOpTelemetryCollector,
+    TelemetryCollector,
+)
 from market_sentinel.telemetry.contract import (
     FEEDBACK_ALLOWLIST,
     HOST_INTERACTION_FACT_OWNER,
@@ -19,9 +25,18 @@ from market_sentinel.telemetry.contract import (
     kind_for,
     project_allowlist,
 )
+from market_sentinel.telemetry.host_interaction import (
+    HOST_INTERACTION_ACTIONS,
+    HOST_INTERACTION_TYPE,
+    HostInteractionFact,
+    parse_host_interaction,
+)
+from market_sentinel.telemetry.runtime import TelemetryRuntime, new_run_id
 
 __all__ = [
+    "HOST_INTERACTION_ACTIONS",
     "HOST_INTERACTION_FACT_OWNER",
+    "HOST_INTERACTION_TYPE",
     "TELEMETRY_COLLECTOR_OWNER",
     "TELEMETRY_ALLOWLIST",
     "TELEMETRY_DENYLIST",
@@ -29,15 +44,23 @@ __all__ = [
     "TUNING_ALLOWLIST",
     "ClusterMembershipTracker",
     "DecisionReason",
+    "FailOpenTelemetryCollector",
     "FeedbackLabel",
+    "HostInteractionFact",
+    "InMemoryTelemetryCollector",
     "LatencyStage",
+    "NoOpTelemetryCollector",
     "SuppressionReason",
+    "TelemetryCollector",
     "TelemetryEvent",
     "TelemetryKind",
     "TelemetryName",
+    "TelemetryRuntime",
     "TuningSnapshot",
     "TuningSource",
     "UserFeedback",
     "kind_for",
+    "new_run_id",
+    "parse_host_interaction",
     "project_allowlist",
 ]
