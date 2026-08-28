@@ -16,6 +16,7 @@ def test_intelligence_sidecar_can_enable_fake_without_network() -> None:
     )
     assert coord is not None
     assert isinstance(coord._provider, FakeIntelligenceProvider)
+    assert coord._timeout_s == 8.0
 
 
 def test_enabled_without_api_key_disables_sidecar_and_keeps_core(caplog) -> None:

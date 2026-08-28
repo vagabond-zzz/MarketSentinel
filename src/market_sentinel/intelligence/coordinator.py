@@ -23,6 +23,7 @@ from market_sentinel.intelligence.errors import (
     IntelligenceRateLimitError,
     IntelligenceTimeoutError,
 )
+from market_sentinel.intelligence.model_settings import DEFAULT_TIMEOUT_S
 from market_sentinel.intelligence.provider import IntelligenceProvider
 from market_sentinel.intelligence.redaction import redact_secrets
 from market_sentinel.intelligence.registry import AnnotationRegistry
@@ -62,7 +63,7 @@ class IntelligenceCoordinator:
         provider: IntelligenceProvider,
         clock: Clock,
         *,
-        timeout_s: float = 8.0,
+        timeout_s: float = DEFAULT_TIMEOUT_S,
         queue_size: int = 8,
         concurrency: int = 1,
         budget: EpisodeCallBudget | None = None,

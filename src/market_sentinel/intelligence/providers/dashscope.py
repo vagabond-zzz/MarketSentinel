@@ -100,6 +100,7 @@ class DashScopeIntelligenceProvider:
                 "response_format": {"type": "json_object"},
                 "max_tokens": self._max_output_tokens,
                 "temperature": 0.2,
+                "enable_thinking": False,
             }
         ).encode("utf-8")
         try:
