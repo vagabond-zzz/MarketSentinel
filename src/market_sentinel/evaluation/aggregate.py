@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from collections.abc import Sequence
 
@@ -27,7 +28,12 @@ from market_sentinel.market_data.session import (
     is_a_share_symbol,
     session_id,
 )
-from market_sentinel.telemetry.contract import FeedbackLabel, LatencyStage, TelemetryName
+from market_sentinel.telemetry.contract import (
+    FEEDBACK_ALLOWLIST,
+    FeedbackLabel,
+    LatencyStage,
+    TelemetryName,
+)
 
 _PRIORITIES = ("INFO", "NOTICE", "IMPORTANT", "CRITICAL")
 _CANDIDATE = TelemetryName.ALERT_CANDIDATE.value
@@ -51,11 +57,12 @@ def evaluate(
     names = [str(row["name"]) for row in records]
     intelligence, skip_unknown, fallback_unknown = _intelligence(records, names)
     suppression, suppression_unknown = _suppression(records)
-    semantic = skip_unknown + fallback_unknown + suppression_unknown
     market = _market_metrics(records)
     dates = _per_market_date(records)
     fb_loaded = feedback or LoadedTelemetry((), (), 0, 0, False, True)
     fb_records = [row for row in fb_loaded.records if run_id is None or row.get("run_id") == run_id]
+    fb_section, invalid_fb = _explicit_feedback(fb_records, records)
+    semantic = skip_unknown + fallback_unknown + suppression_unknown + invalid_fb
     return EvaluationReport(
         metadata=_metadata(records, run_id),
         data_quality=_data_quality(
@@ -68,7 +75,7 @@ def evaluate(
         per_symbol=_per_symbol(records),
         per_run=market["per_run"],
         per_market_date=dates,
-        explicit_feedback=_explicit_feedback(fb_records, records),
+        explicit_feedback=fb_section,
     )
 
 
@@ -428,22 +435,52 @@ def _host(names: Sequence[str]) -> dict[str, object]:
     }
 
 
-_FEEDBACK_LABELS = tuple(item.value for item in FeedbackLabel)
+_FEEDBACK_LABELS = frozenset(item.value for item in FeedbackLabel)
+_OPTIONAL_FEEDBACK_TEXT = ("symbol", "event_id", "telemetry_id")
+
+
+def _valid_feedback_row(row: dict[str, object]) -> bool:
+    if set(row) - FEEDBACK_ALLOWLIST:
+        return False
+    feedback_id = row.get("feedback_id")
+    if not isinstance(feedback_id, str) or feedback_id.strip() == "":
+        return False
+    run_id = row.get("run_id")
+    if not isinstance(run_id, str) or run_id.strip() == "":
+        return False
+    signal_id = row.get("signal_id")
+    if not isinstance(signal_id, str) or signal_id.strip() == "":
+        return False
+    label = row.get("label")
+    if not isinstance(label, str) or label not in _FEEDBACK_LABELS:
+        return False
+    created = row.get("created_timestamp")
+    if isinstance(created, bool) or not isinstance(created, int | float):
+        return False
+    if not math.isfinite(float(created)):
+        return False
+    for key in _OPTIONAL_FEEDBACK_TEXT:
+        if key not in row:
+            continue
+        value = row[key]
+        if value is None:
+            continue
+        if not isinstance(value, str) or value.strip() == "":
+            return False
+    return True
 
 
 def _explicit_feedback(
     feedback_rows: Sequence[dict[str, object]],
     telemetry_rows: Sequence[dict[str, object]],
-) -> dict[str, object]:
+) -> tuple[dict[str, object], int]:
     valid: list[dict[str, object]] = []
+    invalid = 0
     for row in feedback_rows:
-        label = row.get("label")
-        signal_id = row.get("signal_id")
-        if not isinstance(label, str) or label not in _FEEDBACK_LABELS:
-            continue
-        if not isinstance(signal_id, str) or signal_id.strip() == "":
-            continue
-        valid.append(row)
+        if _valid_feedback_row(row):
+            valid.append(row)
+        else:
+            invalid += 1
     counts = {key: sum(1 for row in valid if row.get("label") == key) for key in _FEEDBACK_LABELS}
     total = len(valid)
     useful_rate = (
@@ -451,28 +488,34 @@ def _explicit_feedback(
         if total == 0
         else available_value(counts["useful"] / total)
     )
-    presented_ids = {
-        str(row["signal_id"])
+    presented_keys = {
+        (str(row["run_id"]), str(row["signal_id"]))
         for row in telemetry_rows
         if row.get("name") == TelemetryName.ALERT_PRESENTED.value
+        and isinstance(row.get("run_id"), str)
+        and str(row["run_id"]).strip() != ""
         and isinstance(row.get("signal_id"), str)
         and str(row["signal_id"]).strip() != ""
     }
-    feedback_ids = {str(row["signal_id"]) for row in valid}
+    feedback_keys = {(str(row["run_id"]), str(row["signal_id"])) for row in valid}
     coverage = (
         unavailable(UNAVAILABLE_DENOMINATOR_ZERO)
-        if not presented_ids
-        else available_value(len(feedback_ids.intersection(presented_ids)) / len(presented_ids))
+        if not presented_keys
+        else available_value(len(feedback_keys.intersection(presented_keys)) / len(presented_keys))
     )
-    return {
-        "feedback_count": total,
-        "useful_count": counts["useful"],
-        "not_useful_count": counts["not_useful"],
-        "too_noisy_count": counts["too_noisy"],
-        "too_late_count": counts["too_late"],
-        "useful_rate": useful_rate,
-        "feedback_coverage": coverage,
-    }
+    return (
+        {
+            "feedback_count": total,
+            "useful_count": counts["useful"],
+            "not_useful_count": counts["not_useful"],
+            "too_noisy_count": counts["too_noisy"],
+            "too_late_count": counts["too_late"],
+            "useful_rate": useful_rate,
+            "feedback_coverage": coverage,
+            "invalid_feedback_record_count": invalid,
+        },
+        invalid,
+    )
 
 
 def _suppression(records: Sequence[dict[str, object]]) -> tuple[dict[str, int], int]:

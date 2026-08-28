@@ -228,6 +228,7 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Telemetry JSONL write/flush/rotate is synchronous on the producer thread. M3 measures Replay overhead vs NoOp as evidence (`absolute_extra_s`, `relative_overhead_fraction` = extra/baseline, `total_runtime_ratio` = telemetry/baseline); it does not switch to an async queue.
 - Evaluation `alerts_per_market_hour` is A-share only (`.SH` / `.SZ`). Non-A-share scope is unavailable rather than silently using A-share windows. The denominator is telemetry-observed market-time span per `run_id`, not process wall time or feed uptime. Weekends are excluded; official exchange holidays are not yet calendar-aware. Host open/dismiss/mute rates are unavailable until those producers exist.
 - Explicit `useful_rate` is the useful share of **submitted** feedback only (self-selection). No feedback is not “not useful”. Feedback never retunes thresholds, cooldown, or RouterPolicy.
+- `feedback_coverage` is unique `alert_presented` `(run_id, signal_id)` with at least one valid explicit feedback, not coverage of every signal the QuickPick could show. Host drops stale targets when Core restarts; Core does not maintain a signal-id registry.
 
 ## v0.1 status
 

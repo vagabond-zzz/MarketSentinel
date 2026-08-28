@@ -65,6 +65,8 @@ def render_text(report: EvaluationReport) -> str:
         f"- useful_rate: {_fmt_optional(record['explicit_feedback']['useful_rate'])}"
         " (explicit-feedback sample only)",
         f"- feedback_coverage: {_fmt_optional(record['explicit_feedback']['feedback_coverage'])}",
+        f"- invalid_feedback_record_count:"
+        f" {record['explicit_feedback']['invalid_feedback_record_count']}",
         "",
         "## Intelligence",
         f"- routed: {intel['routed']} skipped: {intel['skipped']}"

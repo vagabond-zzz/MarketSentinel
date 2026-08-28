@@ -1022,4 +1022,81 @@ describe("HostController", () => {
     );
     expect(feedback).toHaveLength(0);
   });
+
+  it("clears feedback targets on restartCore and does not send stale user_feedback", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate({ id: "sig-A" })]);
+    expect(harness.controller.signalFeedbackTargets().map((item) => item.id)).toContain("sig-A");
+    await harness.controller.restartCore();
+    expect(harness.controller.signalFeedbackTargets().map((item) => item.id)).not.toContain(
+      "sig-A",
+    );
+    await harness.controller.submitSignalFeedback("sig-A", "useful");
+    const sent = (harness.commands as Array<{ type?: string; signal_id?: string }>).filter(
+      (item) => item.type === "user_feedback",
+    );
+    expect(sent).toHaveLength(0);
+    expect(harness.lines.some((line) => line.includes("stale"))).toBe(true);
+  });
+
+  it("clears presented feedback targets on unexpected disconnect", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate({ id: "sig-A" })]);
+    expect(harness.controller.signalFeedbackTargets().map((item) => item.id)).toContain("sig-A");
+    harness.children[0]?.emit("exit", 1, null);
+    await vi.waitFor(() => {
+      expect(harness.controller.actualState).toBe("RUNNING");
+      expect(harness.managers.length).toBe(2);
+    });
+    expect(harness.controller.signalFeedbackTargets().map((item) => item.id)).not.toContain(
+      "sig-A",
+    );
+  });
+
+  it("clears feedback targets on shutdown", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate({ id: "sig-A" })]);
+    await harness.controller.shutdown();
+    expect(harness.controller.signalFeedbackTargets()).toEqual([]);
+  });
+
+  it("keeps same-run presented targets after the signal is no longer active", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate({ id: "sig-A" })]);
+    writeState(harness.children[0], {
+      watchlist_count: 1,
+      feed_status: "LIVE",
+      symbols: [wireSymbol({ active_signals: [] })],
+    });
+    expect(harness.controller.signalFeedbackTargets().map((item) => item.id)).toContain("sig-A");
+    await harness.controller.submitSignalFeedback("sig-A", "too_noisy");
+    await vi.waitFor(() => {
+      const sent = (harness.commands as Array<{ type?: string; signal_id?: string }>).filter(
+        (item) => item.type === "user_feedback" && item.signal_id === "sig-A",
+      );
+      expect(sent).toHaveLength(1);
+    });
+  });
+
+  it("does not clear feedback targets on pause and resume of the same Core", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate({ id: "sig-A" })]);
+    await harness.controller.pause();
+    expect(harness.controller.signalFeedbackTargets().map((item) => item.id)).toContain("sig-A");
+    await harness.controller.resume();
+    expect(harness.controller.signalFeedbackTargets().map((item) => item.id)).toContain("sig-A");
+    expect(harness.spawned).toHaveLength(1);
+    await harness.controller.submitSignalFeedback("sig-A", "useful");
+    await vi.waitFor(() => {
+      const sent = (harness.commands as Array<{ type?: string }>).filter(
+        (item) => item.type === "user_feedback",
+      );
+      expect(sent).toHaveLength(1);
+    });
+  });
 });

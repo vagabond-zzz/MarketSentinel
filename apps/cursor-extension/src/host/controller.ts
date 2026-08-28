@@ -183,6 +183,10 @@ export class HostController {
       this.options.logger.host("submitSignalFeedback skipped: core not connected");
       return;
     }
+    if (!this.signalFeedbackTargets().some((item) => item.id === signalId)) {
+      this.options.logger.host("submitSignalFeedback skipped: stale signal_id");
+      return;
+    }
     const created_timestamp = (this.options.now ?? Date.now)() / 1000;
     try {
       await ipc.request({
@@ -405,6 +409,7 @@ export class HostController {
 
   private async handleUnexpectedDisconnect(): Promise<void> {
     this.manager = undefined;
+    this.clearExecutionFeedbackTargets();
     this.lastMarket = undefined;
     this.lastAlertAt = undefined;
     this.clearAlertHold();
@@ -445,6 +450,8 @@ export class HostController {
 
   private async disposeManager(): Promise<void> {
     this.managerGeneration += 1;
+    this.clearExecutionFeedbackTargets();
+    this.lastMarket = undefined;
     const manager = this.manager;
     this.manager = undefined;
     if (manager !== undefined) {
@@ -455,6 +462,7 @@ export class HostController {
   private failDisconnected(error: unknown): void {
     const message = this.errorMessage(error);
     this.lastErrorInternal = message;
+    this.clearExecutionFeedbackTargets();
     this.lastMarket = undefined;
     this.lastAlertAt = undefined;
     this.clearAlertHold();
@@ -482,6 +490,10 @@ export class HostController {
     }, hold);
     this.options.onAlertEdge?.(message);
     this.emitUi();
+  }
+
+  private clearExecutionFeedbackTargets(): void {
+    this.presentedFeedbackTargets = [];
   }
 
   private rememberFeedbackTarget(id: string, label: string): void {

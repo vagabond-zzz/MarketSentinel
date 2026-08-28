@@ -83,6 +83,7 @@ EVALUATION_ALLOWLIST: frozenset[str] = frozenset(
         "too_late_count",
         "useful_rate",
         "feedback_coverage",
+        "invalid_feedback_record_count",
         "available",
         "value",
         "unavailable_reason",

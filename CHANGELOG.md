@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — v0.6 M4 review fixes (no version bump)
+
+Bind explicit feedback to Core execution identity after M4 external review. Package **0.5.0**. Protocol **1**. No M5.
+
+- Host clears feedback targets on restart / disconnect / shutdown / new Core generation; pause/resume of the same process keeps them
+- `submitSignalFeedback` refuses stale QuickPick selections (no `user_feedback` IPC)
+- `feedback_coverage` uses unique `(run_id, signal_id)` keys, not `signal_id` alone
+- Evaluation semantically validates feedback JSONL rows; invalid rows increment `invalid_feedback_record_count` / `semantic_warning_count` and never enter `useful_rate`
+
 ## Unreleased — v0.6 M4 Optional Explicit Feedback (no version bump)
 
 Optional, explicit, low-cardinality signal feedback on `feat/v0.6-feedback-observability`. Package **0.5.0**. Protocol **1** (additive `user_feedback`). No M5 tuning, no online mutation, no free text.

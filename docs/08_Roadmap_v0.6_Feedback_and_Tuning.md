@@ -1,6 +1,6 @@
 # Roadmap v0.6 — Feedback, Observability & Tuning
 
-> Status: **M0 frozen. M1/M2 PASS. M3 PASS.** **M4 optional explicit feedback implemented** on `feat/v0.6-feedback-observability`. Package versions remain **0.5.0**. Protocol **1**. **Do not start M5.**
+> Status: **M0 frozen. M1/M2 PASS. M3 PASS.** **M4 optional explicit feedback** + review-fix pass on `feat/v0.6-feedback-observability`. Package versions remain **0.5.0**. Protocol **1**. **Do not start M5.**
 >
 > Token target: **低**
 >
