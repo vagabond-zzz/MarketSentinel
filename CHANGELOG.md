@@ -2,9 +2,16 @@
 
 ## Unreleased — v0.6 M0 Metrics Contract (no version bump)
 
-Optional telemetry contract on `feat/v0.6-feedback-observability`. Package versions stay **0.5.0**. Protocol stays **1**. No storage, Host UI, or online tuning.
+Optional telemetry contract on `feat/v0.6-feedback-observability`. Package versions stay **0.5.0**. Protocol stays **1**. No storage, Host UI, or online tuning. **Not finally frozen** after external review; this is the M0 fix pass.
 
 - `TelemetryEvent` / `UserFeedback` / `TuningSnapshot` types and allowlist/denylist
+- `run_id` (one Core/Replay execution) and `market_timestamp` (not mixed with wall-clock `created_timestamp`); no telemetry `session_id`
+- Host interaction facts owned by Host; collector/future local storage owned by Core
+- `alert_presented` = one Host presentation/unread incorporation per candidate (not toast)
+- `alert_suppressed` + `SuppressionReason` (`cooldown`, `same_tick_duplicate`)
+- Intelligence `decision_reason` vs `fallback_reason`; `latency_stage` (`router`/`model`/`parse`)
+- `event_clustered` at most once per `event_id` per run (`ClusterMembershipTracker`)
+- `TuningSnapshot` has no `notes`; minimum correlation/non-negative validation
 - Measurement does not mutate Event/Signal; feedback is not a market fact
 
 ## 0.5.0 — 2026-08-28 (not tagged yet)

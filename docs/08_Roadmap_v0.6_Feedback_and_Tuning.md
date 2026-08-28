@@ -1,10 +1,10 @@
 # Roadmap v0.6 — Feedback, Observability & Tuning
 
-> Status: **M0 Metrics Contract on `feat/v0.6-feedback-observability`.** Waiting for external review. Not tagged. Package versions remain **0.5.0**. Protocol **1**.
+> Status: **M0 Metrics Contract fix pass on `feat/v0.6-feedback-observability`.** Direction passed external review; contract is **not finally frozen**. Package versions remain **0.5.0**. Protocol **1**.
 >
 > Token target: **低**
 >
-> See `docs/16_v0.6_Metrics_Contract.md`.
+> See `docs/16_v0.6_Metrics_Contract.md`. Do not start M1 until the contract is accepted.
 
 ---
 
@@ -241,7 +241,10 @@ new config
 
 ### M0 — Metrics contract
 
-- [x] 定义什么记录、什么不记录（`docs/16_v0.6_Metrics_Contract.md`；Core types only）。
+- [x] 定义什么记录、什么不记录（`docs/16_v0.6_Metrics_Contract.md`；Core types + offline tests only）。
+- [ ] 外审后最终冻结（当前为 M0 fix pass，**暂不视为最终冻结**）。
+
+M0 已纳入：`run_id`、`market_timestamp`、Host→Core collector 所有权、`alert_presented` 每 candidate、`alert_suppressed`、`decision_reason` / `latency_stage`、`event_clustered` once-per-run、无 `notes` 的 `TuningSnapshot`、最低 validation。不做 storage / UI / Protocol command / run-id emitter。
 
 ### M1 — Host interaction telemetry
 
