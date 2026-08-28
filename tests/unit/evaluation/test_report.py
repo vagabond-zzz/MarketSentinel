@@ -19,13 +19,16 @@ from market_sentinel.evaluation.report import (
     sanitize_report,
 )
 from market_sentinel.telemetry.contract import (
+    FEEDBACK_ALLOWLIST,
     TELEMETRY_DENYLIST,
     DecisionReason,
+    FeedbackLabel,
     LatencyStage,
     SuppressionReason,
     TelemetryEvent,
     TelemetryKind,
     TelemetryName,
+    UserFeedback,
 )
 from market_sentinel.telemetry.jsonl import DEFAULT_BACKUP_COUNT, JsonlTelemetrySink
 
@@ -946,3 +949,85 @@ def test_unknown_breakdown_values_do_not_leak_into_report() -> None:
     walk(report)
     assert keys <= EVALUATION_ALLOWLIST
     assert leaked not in keys
+
+
+def _feedback_record(
+    label: FeedbackLabel, *, signal_id: str, feedback_id: str, run_id: str = "run-1"
+) -> dict[str, object]:
+    return UserFeedback(
+        feedback_id=feedback_id,
+        created_timestamp=1.0,
+        run_id=run_id,
+        label=label,
+        signal_id=signal_id,
+    ).to_record()
+
+
+def test_no_explicit_feedback_is_not_not_useful() -> None:
+    records = [
+        _event(TelemetryName.ALERT_PRESENTED, signal_id="s1", telemetry_id="p1"),
+        _event(TelemetryName.ALERT_BADGE_RESET, telemetry_id="r1", host_action="reset_unread"),
+    ]
+    report = evaluate(_loaded(records)).to_record()
+    feedback = report["explicit_feedback"]
+    assert feedback["feedback_count"] == 0
+    assert feedback["useful_count"] == 0
+    assert feedback["not_useful_count"] == 0
+    assert feedback["too_noisy_count"] == 0
+    assert feedback["too_late_count"] == 0
+    assert feedback["useful_rate"]["available"] is False
+    assert feedback["useful_rate"]["value"] is None
+    assert feedback["useful_rate"]["unavailable_reason"] == "no_explicit_feedback"
+    assert report["host_interaction"]["alert_badge_reset"] == 1
+    assert report["host_interaction"]["dismiss_rate"]["available"] is False
+
+
+def test_explicit_feedback_useful_rate_and_coverage() -> None:
+    presented = [
+        _event(TelemetryName.ALERT_PRESENTED, signal_id="s1", telemetry_id="p1"),
+        _event(TelemetryName.ALERT_PRESENTED, signal_id="s2", telemetry_id="p2"),
+        _event(TelemetryName.ALERT_PRESENTED, signal_id="s3", telemetry_id="p3"),
+        _event(TelemetryName.ALERT_PRESENTED, signal_id="s4", telemetry_id="p4"),
+    ]
+    feedback_rows = [
+        _feedback_record(FeedbackLabel.USEFUL, signal_id="s1", feedback_id="f1"),
+        _feedback_record(FeedbackLabel.USEFUL, signal_id="s2", feedback_id="f2"),
+        _feedback_record(FeedbackLabel.NOT_USEFUL, signal_id="s3", feedback_id="f3"),
+        _feedback_record(FeedbackLabel.TOO_NOISY, signal_id="s1", feedback_id="f4"),
+    ]
+    report = evaluate(_loaded(presented), feedback=_loaded(feedback_rows)).to_record()
+    section = report["explicit_feedback"]
+    assert section["feedback_count"] == 4
+    assert section["useful_count"] == 2
+    assert section["not_useful_count"] == 1
+    assert section["too_noisy_count"] == 1
+    assert section["too_late_count"] == 0
+    assert section["useful_rate"]["available"] is True
+    assert section["useful_rate"]["value"] == 0.5
+    assert section["feedback_coverage"]["available"] is True
+    assert section["feedback_coverage"]["value"] == 0.75
+
+
+def test_feedback_coverage_unavailable_without_presented_denominator() -> None:
+    feedback_rows = [
+        _feedback_record(FeedbackLabel.USEFUL, signal_id="s1", feedback_id="f1"),
+    ]
+    report = evaluate(_loaded([]), feedback=_loaded(feedback_rows)).to_record()
+    coverage = report["explicit_feedback"]["feedback_coverage"]
+    assert coverage["available"] is False
+    assert coverage["value"] is None
+
+
+def test_cli_telemetry_report_reads_feedback_jsonl(tmp_path: Path, capsys) -> None:
+    tel = JsonlTelemetrySink(tmp_path / "telemetry.jsonl")
+    tel.write(_event(TelemetryName.ALERT_PRESENTED, signal_id="s1", telemetry_id="p1"))
+    tel.close()
+    fb = JsonlTelemetrySink(tmp_path / "feedback.jsonl", allowlist=FEEDBACK_ALLOWLIST)
+    fb.write(_feedback_record(FeedbackLabel.USEFUL, signal_id="s1", feedback_id="f1"))
+    fb.write(_feedback_record(FeedbackLabel.NOT_USEFUL, signal_id="s1", feedback_id="f2"))
+    fb.close()
+    assert main(["telemetry", "report", "--data-dir", str(tmp_path), "--format", "json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["explicit_feedback"]["feedback_count"] == 2
+    assert payload["explicit_feedback"]["useful_rate"]["value"] == 0.5
+    assert "therefore" not in json.dumps(payload)

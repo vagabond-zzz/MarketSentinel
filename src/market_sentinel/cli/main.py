@@ -26,7 +26,11 @@ from market_sentinel.runtime.engine import MarketEngine
 from market_sentinel.runtime.results import EngineTickResult
 from market_sentinel.scheduler.scheduler import AdaptiveScheduler
 from market_sentinel.telemetry.factory import jsonl_telemetry_runtime
-from market_sentinel.telemetry.paths import resolve_data_dir, telemetry_jsonl_path
+from market_sentinel.telemetry.paths import (
+    feedback_jsonl_path,
+    resolve_data_dir,
+    telemetry_jsonl_path,
+)
 from market_sentinel.watchlist.watchlist import Watchlist
 
 
@@ -210,7 +214,8 @@ def _handle_telemetry(args: argparse.Namespace) -> int:
         return 2
     data_dir = resolve_data_dir(args.data_dir)
     loaded = TelemetryReader().load(telemetry_jsonl_path(data_dir))
-    report = evaluate(loaded, run_id=args.run_id)
+    feedback = TelemetryReader().load(feedback_jsonl_path(data_dir))
+    report = evaluate(loaded, run_id=args.run_id, feedback=feedback)
     record = report.to_record()
     if args.format == "text":
         print(render_text(report), end="")

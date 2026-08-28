@@ -56,6 +56,16 @@ def render_text(report: EvaluationReport) -> str:
         f"- dismiss_rate: {_fmt_optional(host['dismiss_rate'])}",
         f"- mute_rate: {_fmt_optional(host['mute_rate'])}",
         "",
+        "## Explicit feedback",
+        f"- feedback_count: {record['explicit_feedback']['feedback_count']}",
+        f"- useful_count: {record['explicit_feedback']['useful_count']}",
+        f"- not_useful_count: {record['explicit_feedback']['not_useful_count']}",
+        f"- too_noisy_count: {record['explicit_feedback']['too_noisy_count']}",
+        f"- too_late_count: {record['explicit_feedback']['too_late_count']}",
+        f"- useful_rate: {_fmt_optional(record['explicit_feedback']['useful_rate'])}"
+        " (explicit-feedback sample only)",
+        f"- feedback_coverage: {_fmt_optional(record['explicit_feedback']['feedback_coverage'])}",
+        "",
         "## Intelligence",
         f"- routed: {intel['routed']} skipped: {intel['skipped']}"
         f" succeeded: {intel['succeeded']} fallback: {intel['fallback']}",

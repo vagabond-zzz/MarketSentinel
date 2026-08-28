@@ -19,7 +19,7 @@ Included:
 - Cursor / VS Code **Desktop** Host
 - StatusBar (`DISCONNECTED` / `STARTING` / `PAUSED` / `IDLE` / `NORMAL` / `WARM` / `HOT` / `STALE` / `ALERT`)
 - Hover (persistent `WireMarketState`)
-- Pause / Resume / Restart Core / Show Output
+- Pause / Resume / Restart Core / Show Output / Signal Feedback (optional explicit labels)
 - Unread alert badge (unsolicited `alert` edges only)
 - Optional critical toast (`marketSentinel.alertToast`)
 - Local VSIX (`pnpm package:vsix`)
@@ -72,8 +72,9 @@ Open a **trusted** workspace. Set `marketSentinel.coreRoot` when the window is n
 12. Restart Core.
 13. Show Output.
 14. Reset Alert Badge.
-15. Close Cursor.
-16. Confirm no leftover `market-sentinel daemon` / Python child.
+15. Optional: Command Palette → Market Sentinel: Signal Feedback (有用 / 没用 / 太吵 / 太晚).
+16. Close Cursor.
+17. Confirm no leftover `market-sentinel daemon` / Python child.
 
 This checklist is manual. Automated tests cover Protocol IPC, HostController, StatusBar mapping, and an Extension Host smoke activate/deactivate path.
 
@@ -129,7 +130,7 @@ Host protocol (stdout is JSONL Protocol v1 only; telemetry files are separate):
 uv run market-sentinel --provider fake daemon
 ```
 
-Commands are JSON lines on stdin (`hello`, `start`, `pause`, `resume`, `set_watchlist`, `get_state`, `host_interaction`, `shutdown`). Logs go to stderr. `set_watchlist` is runtime-only and does not write `data/watchlist.json`.
+Commands are JSON lines on stdin (`hello`, `start`, `pause`, `resume`, `set_watchlist`, `get_state`, `host_interaction`, `user_feedback`, `shutdown`). Logs go to stderr. `set_watchlist` is runtime-only and does not write `data/watchlist.json`.
 
 Read-only evaluation of local telemetry JSONL (does not write telemetry, does not use Protocol stdout):
 
@@ -142,9 +143,11 @@ Default `--format` is JSON (`EvaluationReport.to_record()`). `--data-dir` overri
 
 Local telemetry JSONL (append-only, not Protocol stdout) lives under the Market Sentinel data directory:
 
-- Windows: `%LOCALAPPDATA%\MarketSentinel\telemetry.jsonl`
-- Unix: `$XDG_DATA_HOME/market-sentinel/telemetry.jsonl` or `~/.local/share/market-sentinel/telemetry.jsonl`
+- Windows: `%LOCALAPPDATA%\MarketSentinel\telemetry.jsonl` and `feedback.jsonl`
+- Unix: `$XDG_DATA_HOME/market-sentinel/` or `~/.local/share/market-sentinel/`
 - Override: `MARKET_SENTINEL_DATA_DIR`
+
+`feedback.jsonl` is created only after an explicit `user_feedback` command. Hover and badge reset do not write it.
 
 Spawn is argv-based (`shell: false`):
 
@@ -224,6 +227,7 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - `ClusterMembershipTracker` keeps clustered `event_id`s for the whole Core run (once-per-run exactness). M3 reports `cluster_tracker_seen_count`. Bounded lifecycle is a v0.6 RC question, not LRU.
 - Telemetry JSONL write/flush/rotate is synchronous on the producer thread. M3 measures Replay overhead vs NoOp as evidence (`absolute_extra_s`, `relative_overhead_fraction` = extra/baseline, `total_runtime_ratio` = telemetry/baseline); it does not switch to an async queue.
 - Evaluation `alerts_per_market_hour` is A-share only (`.SH` / `.SZ`). Non-A-share scope is unavailable rather than silently using A-share windows. The denominator is telemetry-observed market-time span per `run_id`, not process wall time or feed uptime. Weekends are excluded; official exchange holidays are not yet calendar-aware. Host open/dismiss/mute rates are unavailable until those producers exist.
+- Explicit `useful_rate` is the useful share of **submitted** feedback only (self-selection). No feedback is not “not useful”. Feedback never retunes thresholds, cooldown, or RouterPolicy.
 
 ## v0.1 status
 

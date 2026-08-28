@@ -1,6 +1,6 @@
 # Roadmap v0.6 — Feedback, Observability & Tuning
 
-> Status: **M0 frozen. M1/M2 PASS.** M3 evaluation implemented; **M3 review-fix pass** on `feat/v0.6-feedback-observability`. Package versions remain **0.5.0**. Protocol **1**. **Do not start M4.**
+> Status: **M0 frozen. M1/M2 PASS. M3 PASS.** **M4 optional explicit feedback implemented** on `feat/v0.6-feedback-observability`. Package versions remain **0.5.0**. Protocol **1**. **Do not start M5.**
 >
 > Token target: **低**
 >
@@ -267,12 +267,17 @@ M0 已纳入：`run_id`、`market_timestamp`、Host→Core collector 所有权�
 
 Read-only. Does not rewrite telemetry semantics, Event/Signal rules, thresholds, or RouterPolicy.
 
-**Do not start M4.**
-
 ### M4 — Explicit feedback
 
-- useful/not useful；
-- optional UX。
+- [x] frozen taxonomy `useful` / `not_useful` / `too_noisy` / `too_late` (no free text);
+- [x] Protocol v1 additive `user_feedback` on `signal_id` only; Host produces facts, Core stores;
+- [x] `feedback.jsonl` append-only, separate from `telemetry.jsonl`;
+- [x] optional Cursor command / QuickPick; hover / badge reset / toast are not feedback;
+- [x] M3 report reads feedback (`feedback_count`, label counts, explicit `useful_rate`, `feedback_coverage`).
+
+Feedback does not mutate Event/Signal, cooldown, RouterPolicy, Scheduler, or thresholds.
+
+**Do not start M5.**
 
 ### M5 — Tuning workflow
 
@@ -293,7 +298,7 @@ Read-only. Does not rewrite telemetry semantics, Event/Signal rules, thresholds,
 - [x] Event → Signal → Alert → Host interaction 可追踪；
 - [x] persistent state 与 telemetry 分离；
 - [x] local-first storage；
-- [ ] optional explicit feedback；
+- [x] optional explicit feedback；
 - [x] no automatic online rule mutation；
 - [ ] tuning 必须跑 Replay regression；
 - [x] Intelligence token/cost 可统计（actual `intelligence_token_usage` only; unavailable when none）；

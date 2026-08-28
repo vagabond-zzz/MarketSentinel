@@ -22,6 +22,7 @@ EVALUATION_ALLOWLIST: frozenset[str] = frozenset(
         "per_symbol",
         "per_run",
         "per_market_date",
+        "explicit_feedback",
         "run_ids",
         "symbols",
         "market_dates",
@@ -74,6 +75,14 @@ EVALUATION_ALLOWLIST: frozenset[str] = frozenset(
         "open_rate",
         "dismiss_rate",
         "mute_rate",
+        "explicit_feedback",
+        "feedback_count",
+        "useful_count",
+        "not_useful_count",
+        "too_noisy_count",
+        "too_late_count",
+        "useful_rate",
+        "feedback_coverage",
         "available",
         "value",
         "unavailable_reason",
@@ -129,6 +138,7 @@ UNAVAILABLE_PRODUCER = "producer_not_implemented"
 UNAVAILABLE_NO_USAGE = "no_provider_usage"
 UNAVAILABLE_MARKET_TIME = "insufficient_market_time_evidence"
 UNAVAILABLE_MARKET_SCOPE = "unsupported_market_scope"
+UNAVAILABLE_NO_FEEDBACK = "no_explicit_feedback"
 
 PRODUCER_SIGNAL_OPENED = "signal_opened"
 PRODUCER_ALERT_DISMISSED = "alert_dismissed"
@@ -205,6 +215,7 @@ class EvaluationReport:
     per_symbol: list[dict[str, Any]]
     per_run: list[dict[str, Any]]
     per_market_date: list[dict[str, Any]]
+    explicit_feedback: dict[str, Any]
 
     def to_record(self) -> dict[str, Any]:
         raw = {
@@ -217,5 +228,6 @@ class EvaluationReport:
             "per_symbol": self.per_symbol,
             "per_run": self.per_run,
             "per_market_date": self.per_market_date,
+            "explicit_feedback": self.explicit_feedback,
         }
         return sanitize_report(raw)

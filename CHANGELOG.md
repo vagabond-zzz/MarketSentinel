@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — v0.6 M4 Optional Explicit Feedback (no version bump)
+
+Optional, explicit, low-cardinality signal feedback on `feat/v0.6-feedback-observability`. Package **0.5.0**. Protocol **1** (additive `user_feedback`). No M5 tuning, no online mutation, no free text.
+
+- Taxonomy: `useful` / `not_useful` / `too_noisy` / `too_late` (UI wording is not storage)
+- Host Command Palette / QuickPick produces facts; Core validates, stamps `run_id`, appends `feedback.jsonl`
+- Same `run_id + signal_id` may appear more than once (append-only; no rewrite)
+- Hover / `alert_presented` / badge reset / dismiss are not feedback
+- Evaluation adds `explicit_feedback` counts, `useful_rate` (explicit sample only), and `feedback_coverage`; no feedback → `useful_rate` unavailable, not 0%
+- Feedback write failure returns a command error; market pipeline continues
+
 ## Unreleased — v0.6 M3 review fixes (no version bump)
 
 Correct evaluation time semantics after M3 external review. Package **0.5.0**. Protocol **1**. No M4.

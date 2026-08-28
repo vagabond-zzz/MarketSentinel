@@ -11,8 +11,10 @@ from market_sentinel.evaluation.report import (
     PRODUCER_ALERT_DISMISSED,
     PRODUCER_SIGNAL_MUTED,
     PRODUCER_SIGNAL_OPENED,
+    UNAVAILABLE_DENOMINATOR_ZERO,
     UNAVAILABLE_MARKET_SCOPE,
     UNAVAILABLE_MARKET_TIME,
+    UNAVAILABLE_NO_FEEDBACK,
     UNAVAILABLE_NO_USAGE,
     UNAVAILABLE_PRODUCER,
     EvaluationReport,
@@ -25,7 +27,7 @@ from market_sentinel.market_data.session import (
     is_a_share_symbol,
     session_id,
 )
-from market_sentinel.telemetry.contract import LatencyStage, TelemetryName
+from market_sentinel.telemetry.contract import FeedbackLabel, LatencyStage, TelemetryName
 
 _PRIORITIES = ("INFO", "NOTICE", "IMPORTANT", "CRITICAL")
 _CANDIDATE = TelemetryName.ALERT_CANDIDATE.value
@@ -39,6 +41,7 @@ def evaluate(
     *,
     run_id: str | None = None,
     cluster_tracker_seen_count: int | None = None,
+    feedback: LoadedTelemetry | None = None,
 ) -> EvaluationReport:
     records = [
         row
@@ -51,9 +54,13 @@ def evaluate(
     semantic = skip_unknown + fallback_unknown + suppression_unknown
     market = _market_metrics(records)
     dates = _per_market_date(records)
+    fb_loaded = feedback or LoadedTelemetry((), (), 0, 0, False, True)
+    fb_records = [row for row in fb_loaded.records if run_id is None or row.get("run_id") == run_id]
     return EvaluationReport(
         metadata=_metadata(records, run_id),
-        data_quality=_data_quality(loaded, records, run_id, market, semantic),
+        data_quality=_data_quality(
+            loaded, records, run_id, market, semantic, fb_loaded, len(fb_records)
+        ),
         pipeline=_pipeline(records, names, cluster_tracker_seen_count),
         alert_noise=_alert_noise(records, market, suppression, suppression_unknown),
         host_interaction=_host(names),
@@ -61,6 +68,7 @@ def evaluate(
         per_symbol=_per_symbol(records),
         per_run=market["per_run"],
         per_market_date=dates,
+        explicit_feedback=_explicit_feedback(fb_records, records),
     )
 
 
@@ -103,6 +111,8 @@ def _data_quality(
     run_id: str | None,
     market: dict[str, object],
     semantic: int,
+    feedback: LoadedTelemetry,
+    feedback_records_used: int,
 ) -> dict[str, object]:
     timestamps = [
         float(row["market_timestamp"])
@@ -122,13 +132,21 @@ def _data_quality(
             "observed_market_seconds": 0.0,
         }
     run_ids = sorted({str(row["run_id"]) for row in records if isinstance(row.get("run_id"), str)})
-    warning = (not loaded.healthy) or semantic > 0
+    warning = (not loaded.healthy) or (not feedback.healthy) or semantic > 0
+    records_read = (
+        loaded.records_read + feedback.records_read
+        if run_id is None
+        else len(records) + feedback_records_used
+    )
     return {
-        "input_files": list(loaded.input_files),
-        "records_read": loaded.records_read if run_id is None else len(records),
-        "malformed_complete_lines": loaded.malformed_complete_lines,
-        "skipped_trailing_partial": loaded.skipped_trailing_partial,
-        "healthy": loaded.healthy,
+        "input_files": list(loaded.input_files) + list(feedback.input_files),
+        "records_read": records_read,
+        "malformed_complete_lines": (
+            loaded.malformed_complete_lines + feedback.malformed_complete_lines
+        ),
+        "skipped_trailing_partial": loaded.skipped_trailing_partial
+        or feedback.skipped_trailing_partial,
+        "healthy": loaded.healthy and feedback.healthy,
         "data_quality_warning": warning,
         "semantic_warning_count": semantic,
         "runs_insufficient_market_time": list(market["runs_insufficient_market_time"]),
@@ -407,6 +425,53 @@ def _host(names: Sequence[str]) -> dict[str, object]:
         "open_rate": {**unimplemented, "producer": PRODUCER_SIGNAL_OPENED},
         "dismiss_rate": {**unimplemented, "producer": PRODUCER_ALERT_DISMISSED},
         "mute_rate": {**unimplemented, "producer": PRODUCER_SIGNAL_MUTED},
+    }
+
+
+_FEEDBACK_LABELS = tuple(item.value for item in FeedbackLabel)
+
+
+def _explicit_feedback(
+    feedback_rows: Sequence[dict[str, object]],
+    telemetry_rows: Sequence[dict[str, object]],
+) -> dict[str, object]:
+    valid: list[dict[str, object]] = []
+    for row in feedback_rows:
+        label = row.get("label")
+        signal_id = row.get("signal_id")
+        if not isinstance(label, str) or label not in _FEEDBACK_LABELS:
+            continue
+        if not isinstance(signal_id, str) or signal_id.strip() == "":
+            continue
+        valid.append(row)
+    counts = {key: sum(1 for row in valid if row.get("label") == key) for key in _FEEDBACK_LABELS}
+    total = len(valid)
+    useful_rate = (
+        unavailable(UNAVAILABLE_NO_FEEDBACK)
+        if total == 0
+        else available_value(counts["useful"] / total)
+    )
+    presented_ids = {
+        str(row["signal_id"])
+        for row in telemetry_rows
+        if row.get("name") == TelemetryName.ALERT_PRESENTED.value
+        and isinstance(row.get("signal_id"), str)
+        and str(row["signal_id"]).strip() != ""
+    }
+    feedback_ids = {str(row["signal_id"]) for row in valid}
+    coverage = (
+        unavailable(UNAVAILABLE_DENOMINATOR_ZERO)
+        if not presented_ids
+        else available_value(len(feedback_ids.intersection(presented_ids)) / len(presented_ids))
+    )
+    return {
+        "feedback_count": total,
+        "useful_count": counts["useful"],
+        "not_useful_count": counts["not_useful"],
+        "too_noisy_count": counts["too_noisy"],
+        "too_late_count": counts["too_late"],
+        "useful_rate": useful_rate,
+        "feedback_coverage": coverage,
     }
 
 

@@ -33,6 +33,7 @@ This extension is `extensionKind: ["ui"]` (local Desktop). Remote SSH / Codespac
 - Market Sentinel: Restart Core
 - Market Sentinel: Show Output
 - Market Sentinel: Reset Alert Badge
+- Market Sentinel: Signal Feedback
 
 ## Settings
 
