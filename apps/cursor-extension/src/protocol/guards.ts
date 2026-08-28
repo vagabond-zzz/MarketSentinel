@@ -4,9 +4,11 @@ import {
   type CoreMessageType,
   type EventDirection,
   type FeedStatus,
+  type IntelligenceStatus,
   type SchedulerLevel,
   type SignalPriority,
   type WireAlertCandidate,
+  type WireIntelligence,
   type WireMarketState,
   type WireSignal,
   type WireSymbolState,
@@ -25,6 +27,13 @@ const SCHEDULER_LEVELS: readonly SchedulerLevel[] = ["COLD", "WARM", "HOT"];
 const FEED_STATUSES: readonly FeedStatus[] = ["LIVE", "DELAYED", "STALE", "DISCONNECTED"];
 const DIRECTIONS: readonly EventDirection[] = ["up", "down", "none"];
 const PRIORITIES: readonly SignalPriority[] = ["info", "notice", "important", "critical"];
+const INTEL_STATUSES: readonly IntelligenceStatus[] = [
+  "not_requested",
+  "queued",
+  "running",
+  "enriched",
+  "fallback",
+];
 
 export interface GuardFailure {
   ok: false;
@@ -83,6 +92,47 @@ function fail(error: string, value: unknown): GuardFailure {
   return { ok: false, error, requestId: peekRequestId(value) };
 }
 
+function parseIntelligence(value: unknown, label: string): WireIntelligence | string {
+  if (!isRecord(value)) {
+    return `${label} must be an object`;
+  }
+  if (!includes(INTEL_STATUSES, value.status)) {
+    return `${label}.status is invalid`;
+  }
+  const intelligence: WireIntelligence = { status: value.status };
+  if (value.summary !== undefined) {
+    if (!isString(value.summary)) {
+      return `${label}.summary must be a string`;
+    }
+    intelligence.summary = value.summary;
+  }
+  if (value.reason !== undefined) {
+    if (!isString(value.reason)) {
+      return `${label}.reason must be a string`;
+    }
+    intelligence.reason = value.reason;
+  }
+  if (value.fallback_reason !== undefined) {
+    if (!isString(value.fallback_reason)) {
+      return `${label}.fallback_reason must be a string`;
+    }
+    intelligence.fallback_reason = value.fallback_reason;
+  }
+  if (value.confidence !== undefined) {
+    if (!isFiniteNumber(value.confidence)) {
+      return `${label}.confidence must be a number`;
+    }
+    intelligence.confidence = value.confidence;
+  }
+  if (value.worth_highlight !== undefined) {
+    if (typeof value.worth_highlight !== "boolean") {
+      return `${label}.worth_highlight must be a boolean`;
+    }
+    intelligence.worth_highlight = value.worth_highlight;
+  }
+  return intelligence;
+}
+
 function parseSignal(value: unknown, label: string): WireSignal | string {
   if (!isRecord(value)) {
     return `${label} must be an object`;
@@ -101,6 +151,14 @@ function parseSignal(value: unknown, label: string): WireSignal | string {
   if (!includes(PRIORITIES, value.priority)) {
     return `${label}.priority is invalid`;
   }
+  let intelligence: WireIntelligence | undefined;
+  if (value.intelligence !== undefined) {
+    const parsed = parseIntelligence(value.intelligence, `${label}.intelligence`);
+    if (typeof parsed === "string") {
+      return parsed;
+    }
+    intelligence = parsed;
+  }
   return {
     id: value.id,
     family: value.family,
@@ -108,6 +166,7 @@ function parseSignal(value: unknown, label: string): WireSignal | string {
     priority: value.priority,
     title: value.title,
     summary: value.summary,
+    intelligence,
   };
 }
 

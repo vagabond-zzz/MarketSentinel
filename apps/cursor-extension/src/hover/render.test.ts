@@ -181,4 +181,46 @@ describe("renderHoverMarkdown", () => {
     expect(text).toContain("Unread alerts: 2");
     expect(text.indexOf("Unread alerts: 2")).toBeLessThan(text.indexOf("Feed: LIVE"));
   });
+
+  it("shows enrichment under the rule summary and hides fallback noise", () => {
+    const enriched = renderHoverMarkdown(
+      mapHover({
+        actual: "RUNNING",
+        market: market({
+          symbols: [
+            symbol({
+              scheduler_level: "HOT",
+              active_signals: [
+                signal({
+                  intelligence: { status: "enriched", summary: "Volume led the move." },
+                }),
+              ],
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(enriched).toContain("量价同步扩张");
+    expect(enriched).toContain("Volume led the move.");
+    const fallback = renderHoverMarkdown(
+      mapHover({
+        actual: "RUNNING",
+        market: market({
+          symbols: [
+            symbol({
+              scheduler_level: "HOT",
+              active_signals: [
+                signal({
+                  intelligence: { status: "fallback", fallback_reason: "timeout" },
+                }),
+              ],
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(fallback).toContain("量价同步扩张");
+    expect(fallback).not.toContain("timeout");
+    expect(fallback).not.toContain("fallback");
+  });
 });

@@ -5,6 +5,30 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+class WireIntelligence:
+    status: str
+    summary: str | None = None
+    reason: str | None = None
+    confidence: float | None = None
+    fallback_reason: str | None = None
+    worth_highlight: bool | None = None
+
+    def to_wire(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"status": self.status}
+        if self.summary is not None:
+            payload["summary"] = self.summary
+        if self.reason is not None:
+            payload["reason"] = self.reason
+        if self.confidence is not None:
+            payload["confidence"] = self.confidence
+        if self.fallback_reason is not None:
+            payload["fallback_reason"] = self.fallback_reason
+        if self.worth_highlight is not None:
+            payload["worth_highlight"] = self.worth_highlight
+        return payload
+
+
+@dataclass(frozen=True)
 class WireSignal:
     id: str
     family: str
@@ -12,9 +36,10 @@ class WireSignal:
     priority: str
     title: str
     summary: str
+    intelligence: WireIntelligence | None = None
 
     def to_wire(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "id": self.id,
             "family": self.family,
             "direction": self.direction,
@@ -22,6 +47,9 @@ class WireSignal:
             "title": self.title,
             "summary": self.summary,
         }
+        if self.intelligence is not None:
+            payload["intelligence"] = self.intelligence.to_wire()
+        return payload
 
 
 @dataclass(frozen=True)

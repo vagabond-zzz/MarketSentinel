@@ -4,6 +4,31 @@ export type SchedulerLevel = "COLD" | "WARM" | "HOT";
 export type FeedStatus = "LIVE" | "DELAYED" | "STALE" | "DISCONNECTED";
 export type EventDirection = "up" | "down" | "none";
 export type SignalPriority = "info" | "notice" | "important" | "critical";
+export type IntelligenceStatus =
+  | "not_requested"
+  | "queued"
+  | "running"
+  | "enriched"
+  | "fallback";
+
+export interface WireIntelligence {
+  status: IntelligenceStatus;
+  summary?: string;
+  reason?: string;
+  confidence?: number;
+  fallback_reason?: string;
+  worth_highlight?: boolean;
+}
+
+export interface WireSignal {
+  id: string;
+  family: string;
+  direction: EventDirection;
+  priority: SignalPriority;
+  title: string;
+  summary: string;
+  intelligence?: WireIntelligence;
+}
 
 export type HostCommandType =
   | "hello"
@@ -25,15 +50,6 @@ export type CoreMessageType =
 export interface WatchlistItem {
   symbol: string;
   enabled: boolean;
-}
-
-export interface WireSignal {
-  id: string;
-  family: string;
-  direction: EventDirection;
-  priority: SignalPriority;
-  title: string;
-  summary: string;
 }
 
 export interface WireSymbolState {

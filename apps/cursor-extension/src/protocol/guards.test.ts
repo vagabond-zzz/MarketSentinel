@@ -161,4 +161,34 @@ describe("parseCoreMessage", () => {
     expect(parseCoreMessage([]).ok).toBe(false);
     expect(parseCoreMessage(null).ok).toBe(false);
   });
+
+  it("accepts v1 state without intelligence and optional enrichment", () => {
+    const parsed = parseCoreMessage({
+      protocol_version: 1,
+      type: "state",
+      request_id: "g1",
+      state: validState,
+    });
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok && parsed.message.type === "state") {
+      expect(parsed.message.state.symbols[0]?.active_signals[0]?.intelligence).toBeUndefined();
+    }
+    const enriched = structuredClone(validState);
+    enriched.symbols[0].active_signals[0].intelligence = {
+      status: "enriched",
+      summary: "note",
+      confidence: 0.8,
+    };
+    const withIntel = parseCoreMessage({
+      protocol_version: 1,
+      type: "state",
+      state: enriched,
+    });
+    expect(withIntel.ok).toBe(true);
+    if (withIntel.ok && withIntel.message.type === "state") {
+      expect(withIntel.message.state.symbols[0]?.active_signals[0]?.intelligence?.summary).toBe(
+        "note",
+      );
+    }
+  });
 });

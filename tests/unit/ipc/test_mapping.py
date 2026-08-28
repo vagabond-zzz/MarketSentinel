@@ -98,6 +98,7 @@ def test_map_symbol_state_copies_selected_fields_only() -> None:
     assert payload["active_signals"][0]["id"] == "sig-1"
     assert payload["active_signals"][0]["title"] == "headline"
     assert "event_ids" not in payload["active_signals"][0]
+    assert "intelligence" not in payload["active_signals"][0]
     assert "feed_latency" not in payload
 
 
@@ -119,3 +120,51 @@ def test_runtime_watchlist_is_used_by_mapper() -> None:
     assert wire["watchlist_count"] == 1
     assert wire["symbols"][0]["symbol"] == "00700.HK"
     assert wire["symbols"][0]["price"] is None
+
+
+def test_map_signal_adds_optional_intelligence_without_replacing_summary() -> None:
+    from market_sentinel.intelligence.contract import (
+        FallbackReason,
+        IntelligenceAnnotation,
+        IntelligenceResult,
+        IntelligenceStatus,
+    )
+    from market_sentinel.ipc.mapping import map_signal
+
+    signal = Signal(
+        id="sig-1",
+        event_ids=("e1",),
+        symbol="00700.HK",
+        family="tape",
+        direction=EventDirection.UP,
+        priority=SignalPriority.IMPORTANT,
+        title="headline",
+        summary="rule summary",
+        generated_by=GeneratedBy.RULE,
+        market_timestamp=1.0,
+        received_timestamp=1.0,
+        detected_timestamp=1.0,
+        signal_created_timestamp=1.0,
+    )
+    omitted = map_signal(signal).to_wire()
+    assert omitted["summary"] == "rule summary"
+    assert "intelligence" not in omitted
+    result = IntelligenceResult(
+        signal_id=signal.id,
+        status=IntelligenceStatus.ENRICHED,
+        requested=True,
+        annotation=IntelligenceAnnotation(
+            signal_id=signal.id,
+            worth_highlight=True,
+            reason="cluster",
+            confidence=0.8,
+            summary="enriched note",
+            created_timestamp=2.0,
+        ),
+        fallback_reason=FallbackReason.NONE,
+        model_calls=1,
+    )
+    payload = map_signal(signal, result).to_wire()
+    assert payload["summary"] == "rule summary"
+    assert payload["intelligence"]["status"] == "enriched"
+    assert payload["intelligence"]["summary"] == "enriched note"

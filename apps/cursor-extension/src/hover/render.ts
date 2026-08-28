@@ -17,6 +17,9 @@ function renderSymbol(symbol: HoverSymbolView): string {
     if (signal.body.length > 0) {
       lines.push(escapeMarkdown(signal.body));
     }
+    if (signal.enrichment !== undefined && signal.enrichment.length > 0) {
+      lines.push(escapeMarkdown(signal.enrichment));
+    }
   }
   if (symbol.moreSignals > 0) {
     lines.push(`+${symbol.moreSignals} more active signals`);

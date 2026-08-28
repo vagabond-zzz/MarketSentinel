@@ -21,6 +21,7 @@ export interface HoverSignalView {
   direction: string;
   family: string;
   body: string;
+  enrichment?: string;
 }
 
 export interface HoverSymbolView {
@@ -82,11 +83,18 @@ function sortSymbols(symbols: readonly WireSymbolState[]): WireSymbolState[] {
 }
 
 function mapSignal(signal: WireSignal): HoverSignalView {
+  const enrichment =
+    signal.intelligence?.status === "enriched" &&
+    signal.intelligence.summary !== undefined &&
+    signal.intelligence.summary.length > 0
+      ? signal.intelligence.summary
+      : undefined;
   return {
     priority: signal.priority.toUpperCase(),
     direction: signal.direction.toUpperCase(),
     family: signal.family,
     body: signal.summary.length > 0 ? signal.summary : signal.title,
+    enrichment,
   };
 }
 
