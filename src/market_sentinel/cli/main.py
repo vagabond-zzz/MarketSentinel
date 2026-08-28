@@ -4,6 +4,8 @@ import argparse
 import asyncio
 import logging
 import sys
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from market_sentinel.cli.display import format_dashboard, format_updated
@@ -11,7 +13,7 @@ from market_sentinel.clock import SystemClock
 from market_sentinel.errors import ProviderError
 from market_sentinel.health.feed_health import FeedHealthTracker
 from market_sentinel.intelligence.bootstrap import optional_intelligence
-from market_sentinel.intelligence.errors import IntelligenceAuthError
+from market_sentinel.intelligence.coordinator import IntelligenceCoordinator
 from market_sentinel.ipc.daemon import MarketDaemon
 from market_sentinel.market_data.buffers import SymbolBuffers
 from market_sentinel.market_data.state import MarketStateStore
@@ -102,6 +104,20 @@ def _handle_watchlist(watchlist: Watchlist, args: argparse.Namespace) -> int:
     return 0
 
 
+@asynccontextmanager
+async def _intelligence_lifecycle(
+    intelligence: IntelligenceCoordinator | None,
+) -> AsyncIterator[None]:
+    if intelligence is None:
+        yield
+        return
+    await intelligence.start()
+    try:
+        yield
+    finally:
+        await intelligence.shutdown()
+
+
 async def _handle_daemon(args: argparse.Namespace) -> int:
     clock = SystemClock()
     try:
@@ -112,11 +128,7 @@ async def _handle_daemon(args: argparse.Namespace) -> int:
     except ProviderError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    try:
-        intelligence = optional_intelligence(clock)
-    except IntelligenceAuthError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
+    intelligence = optional_intelligence(clock)
     engine = MarketEngine(
         clock=clock,
         watchlist=Watchlist(persist=False),
@@ -142,11 +154,7 @@ async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
     except ProviderError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    try:
-        intelligence = optional_intelligence(clock)
-    except IntelligenceAuthError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
+    intelligence = optional_intelligence(clock)
     engine = MarketEngine(
         clock=clock,
         watchlist=watchlist,
@@ -157,17 +165,22 @@ async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
         health=FeedHealthTracker(clock),
         intelligence=intelligence,
     )
-    if args.once:
-        result = await engine.tick()
-        _print_dashboard(engine, result, verbose=args.verbose)
-        return 0
-    try:
-        while True:
+    async with _intelligence_lifecycle(intelligence):
+        if args.once:
             result = await engine.tick()
+            if intelligence is not None:
+                await intelligence.idle()
             _print_dashboard(engine, result, verbose=args.verbose)
-            await asyncio.sleep(engine.scheduler.next_wait_s(engine.watchlist.enabled_symbols()))
-    except KeyboardInterrupt:
-        return 0
+            return 0
+        try:
+            while True:
+                result = await engine.tick()
+                _print_dashboard(engine, result, verbose=args.verbose)
+                await asyncio.sleep(
+                    engine.scheduler.next_wait_s(engine.watchlist.enabled_symbols())
+                )
+        except KeyboardInterrupt:
+            return 0
     return 0
 
 

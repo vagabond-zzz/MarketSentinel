@@ -24,6 +24,7 @@ from market_sentinel.intelligence.errors import (
     IntelligenceTimeoutError,
 )
 from market_sentinel.intelligence.provider import IntelligenceProvider
+from market_sentinel.intelligence.redaction import redact_secrets
 from market_sentinel.intelligence.registry import AnnotationRegistry
 from market_sentinel.intelligence.router import RouterPolicy, need_intelligence
 from market_sentinel.runtime.results import EngineTickResult
@@ -83,13 +84,23 @@ class IntelligenceCoordinator:
         self._calls: dict[str, int] = {}
         self._last_priority: dict[str, SignalPriority] = {}
         self._generation: dict[str, int] = {}
+        self._pending: dict[str, int] = {}
+        self._active_ids: set[str] = set()
+        self._in_flight_tasks: dict[str, asyncio.Task[object]] = {}
         self._in_flight = 0
+        self._closed = False
         self._idle = asyncio.Event()
         self._idle.set()
+
+    def tracked_episode_count(self) -> int:
+        return len(
+            set(self._calls) | set(self._generation) | set(self._last_priority) | set(self._pending)
+        )
 
     async def start(self) -> None:
         if self._queue is not None:
             return
+        self._closed = False
         self._queue = asyncio.Queue(maxsize=self._queue_size)
         self._workers = [
             asyncio.create_task(self._worker(), name=f"intel-worker-{index}")
@@ -100,6 +111,7 @@ class IntelligenceCoordinator:
         queue = self._queue
         if queue is None:
             return
+        self._closed = True
         for worker in self._workers:
             worker.cancel()
         for worker in self._workers:
@@ -109,6 +121,7 @@ class IntelligenceCoordinator:
                 pass
         self._workers = []
         self._queue = None
+        self._in_flight_tasks.clear()
 
     async def idle(self) -> None:
         queue = self._queue
@@ -126,16 +139,25 @@ class IntelligenceCoordinator:
         active_ids: set[str] | None = None,
     ) -> None:
         started = self._clock.monotonic_time()
-        live_ids: set[str] = set()
+        current_active: set[str] = set(active_ids) if active_ids is not None else set()
+        if active_ids is None:
+            for row in result.symbol_results:
+                current_active.update(signal.id for signal in row.signal_updates)
+        now = self._clock.wall_time()
+        for row in result.symbol_results:
+            for signal in row.signal_updates:
+                if signal.expires_at is not None and now >= signal.expires_at:
+                    current_active.discard(signal.id)
+        self._retire_inactive(current_active)
         for row in result.symbol_results:
             feed = feed_status_for(row.symbol)
             traces = {item.signal_id: item for item in row.traces}
             alerts = {item.id for item in row.alert_candidates}
             for signal in row.signal_updates:
-                live_ids.add(signal.id)
                 trace = traces.get(signal.id)
                 if trace is None:
                     continue
+                expired = signal.id not in current_active
                 payload = compress_intelligence_input(
                     signal=signal,
                     trace=trace,
@@ -143,7 +165,7 @@ class IntelligenceCoordinator:
                     alert_edge=signal.id in alerts,
                     episode_call_count=self._calls.get(signal.id, 0),
                     last_requested_priority=self._last_priority.get(signal.id),
-                    expired=False,
+                    expired=expired,
                 )
                 decision = need_intelligence(payload, policy=self._policy, budget=self._budget)
                 self.diagnostics.router_decisions += 1
@@ -151,12 +173,63 @@ class IntelligenceCoordinator:
                     self.diagnostics.requests_suppressed += 1
                     continue
                 self._enqueue(payload)
-        self.registry.prune(active_ids if active_ids is not None else live_ids)
         elapsed = self._clock.monotonic_time() - started
         self.diagnostics.router_decision_latency_s += elapsed
         self.diagnostics.router_latencies.append(elapsed)
         if self._queue is not None:
             self.diagnostics.queue_depth = self._queue.qsize()
+
+    def _retire_inactive(self, active_ids: set[str]) -> None:
+        self._active_ids = set(active_ids)
+        self.registry.prune(self._active_ids)
+        tracked = (
+            set(self._calls)
+            | set(self._generation)
+            | set(self._last_priority)
+            | set(self._pending)
+            | self.registry.ids()
+        )
+        for signal_id in tracked - self._active_ids:
+            self._invalidate(signal_id)
+
+    def _invalidate(self, signal_id: str) -> None:
+        self._generation[signal_id] = self._generation.get(signal_id, 0) + 1
+        self.registry.drop(signal_id)
+        self._cancel_in_flight(signal_id)
+        self._maybe_forget(signal_id)
+
+    def _cancel_in_flight(self, signal_id: str) -> None:
+        task = self._in_flight_tasks.get(signal_id)
+        if task is not None and not task.done():
+            task.cancel()
+
+    def _work_is_live(self, work: IntelligenceWork) -> bool:
+        if work.signal_id not in self._active_ids:
+            return False
+        return work.generation == self._generation.get(work.signal_id)
+
+    def _store(self, work: IntelligenceWork, result: IntelligenceResult) -> None:
+        if not self._work_is_live(work):
+            return
+        self.registry.put(result)
+
+    def _release_pending(self, signal_id: str) -> None:
+        remaining = self._pending.get(signal_id, 0) - 1
+        if remaining <= 0:
+            self._pending.pop(signal_id, None)
+        else:
+            self._pending[signal_id] = remaining
+        self._maybe_forget(signal_id)
+
+    def _maybe_forget(self, signal_id: str) -> None:
+        if signal_id in self._active_ids:
+            return
+        if self._pending.get(signal_id, 0) > 0:
+            return
+        self._calls.pop(signal_id, None)
+        self._last_priority.pop(signal_id, None)
+        self._generation.pop(signal_id, None)
+        self._pending.pop(signal_id, None)
 
     def _enqueue(self, payload: IntelligenceInput) -> None:
         if self._queue is None:
@@ -175,6 +248,7 @@ class IntelligenceCoordinator:
         self._generation[payload.signal_id] = work.generation
         self._calls[payload.signal_id] = self._calls.get(payload.signal_id, 0) + 1
         self._last_priority[payload.signal_id] = payload.priority
+        self._pending[payload.signal_id] = self._pending.get(payload.signal_id, 0) + 1
         self.diagnostics.requests_submitted += 1
         self._idle.clear()
         self.registry.put(
@@ -201,11 +275,33 @@ class IntelligenceCoordinator:
                 queue.task_done()
 
     async def _run(self, work: IntelligenceWork) -> None:
-        if work.generation != self._generation.get(work.signal_id, 0):
+        try:
+            await self._execute(work)
+        finally:
+            self._release_pending(work.signal_id)
+
+    async def _execute(self, work: IntelligenceWork) -> None:
+        if not self._work_is_live(work):
+            self.diagnostics.stale_discard += 1
+            return
+        call: asyncio.Task[object] = asyncio.create_task(
+            self._provider.complete(to_model_payload(work.payload), timeout_s=self._timeout_s)
+        )
+        self._in_flight_tasks[work.signal_id] = call
+        if not self._work_is_live(work):
+            self._cancel_in_flight(work.signal_id)
+            self._in_flight_tasks.pop(work.signal_id, None)
+            call.cancel()
+            try:
+                await call
+            except (asyncio.CancelledError, Exception):
+                pass
             self.diagnostics.stale_discard += 1
             return
         self._in_flight += 1
-        self.registry.put(
+        self.diagnostics.model_calls += 1
+        self._store(
+            work,
             IntelligenceResult(
                 signal_id=work.signal_id,
                 status=IntelligenceStatus.RUNNING,
@@ -213,18 +309,23 @@ class IntelligenceCoordinator:
                 annotation=None,
                 fallback_reason=FallbackReason.NONE,
                 model_calls=self._calls.get(work.signal_id, 0),
-            )
+            ),
         )
-        self.diagnostics.model_calls += 1
         started = self._clock.monotonic_time()
         try:
-            completion = await asyncio.wait_for(
-                self._provider.complete(to_model_payload(work.payload), timeout_s=self._timeout_s),
-                timeout=self._timeout_s,
-            )
+            try:
+                completion = await asyncio.wait_for(call, timeout=self._timeout_s)
+            except asyncio.CancelledError:
+                if self._closed:
+                    raise
+                self.diagnostics.stale_discard += 1
+                return
             elapsed = self._clock.monotonic_time() - started
             self.diagnostics.model_latency_s += elapsed
             self.diagnostics.model_latencies.append(elapsed)
+            if not self._work_is_live(work):
+                self.diagnostics.stale_discard += 1
+                return
             parse_s = float(getattr(self._provider, "last_parse_latency_s", 0.0) or 0.0)
             self.diagnostics.parse_latency_s += parse_s
             annotation = IntelligenceAnnotation(
@@ -235,7 +336,8 @@ class IntelligenceCoordinator:
                 summary=completion.summary,
                 created_timestamp=self._clock.wall_time(),
             )
-            self.registry.put(
+            self._store(
+                work,
                 IntelligenceResult(
                     signal_id=work.signal_id,
                     status=IntelligenceStatus.ENRICHED,
@@ -244,7 +346,7 @@ class IntelligenceCoordinator:
                     fallback_reason=FallbackReason.NONE,
                     model_calls=self._calls.get(work.signal_id, 0),
                     model_latency_s=elapsed,
-                )
+                ),
             )
         except Exception as exc:
             elapsed = self._clock.monotonic_time() - started
@@ -259,23 +361,28 @@ class IntelligenceCoordinator:
             elif reason is FallbackReason.RATE_LIMITED:
                 self.diagnostics.rate_limit_count += 1
             logger.warning(
-                "intelligence fallback signal=%s reason=%s",
+                "intelligence fallback signal=%s reason=%s detail=%s",
                 work.signal_id,
                 reason.value,
+                redact_secrets(str(exc), self._secrets),
             )
-            del exc
-            self.registry.put(
-                IntelligenceResult(
-                    signal_id=work.signal_id,
-                    status=_FALLBACK_STATUS,
-                    requested=True,
-                    annotation=None,
-                    fallback_reason=reason,
-                    model_calls=self._calls.get(work.signal_id, 0),
-                    model_latency_s=elapsed,
+            if self._work_is_live(work):
+                self._store(
+                    work,
+                    IntelligenceResult(
+                        signal_id=work.signal_id,
+                        status=_FALLBACK_STATUS,
+                        requested=True,
+                        annotation=None,
+                        fallback_reason=reason,
+                        model_calls=self._calls.get(work.signal_id, 0),
+                        model_latency_s=elapsed,
+                    ),
                 )
-            )
+            else:
+                self.diagnostics.stale_discard += 1
         finally:
+            self._in_flight_tasks.pop(work.signal_id, None)
             self._in_flight = max(0, self._in_flight - 1)
             if self._queue is not None and self._queue.empty() and self._in_flight == 0:
                 self._idle.set()

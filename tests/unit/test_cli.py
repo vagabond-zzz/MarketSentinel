@@ -109,6 +109,70 @@ def test_longbridge_missing_sdk_is_actionable(
     assert "uv sync --extra live" in err
 
 
+def test_run_once_survives_intelligence_missing_key(
+    tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MARKET_SENTINEL_INTEL_ENABLED", "1")
+    monkeypatch.setenv("MARKET_SENTINEL_INTEL_PROVIDER", "dashscope")
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    path = tmp_path / "watchlist.json"
+    assert main(["--watchlist", str(path), "watchlist", "add", "00700.HK"]) == 0
+    capsys.readouterr()
+    assert main(["--watchlist", str(path), "run", "--once"]) == 0
+    captured = capsys.readouterr()
+    assert "MARKET SENTINEL" in captured.out
+    assert "API key" not in captured.out
+    assert captured.out.strip().startswith("MARKET SENTINEL") or "Feed:" in captured.out
+
+
+def test_run_once_survives_unknown_intelligence_provider(
+    tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MARKET_SENTINEL_INTEL_ENABLED", "1")
+    monkeypatch.setenv("MARKET_SENTINEL_INTEL_PROVIDER", "not-a-vendor")
+    path = tmp_path / "watchlist.json"
+    assert main(["--watchlist", str(path), "watchlist", "add", "00700.HK"]) == 0
+    capsys.readouterr()
+    assert main(["--watchlist", str(path), "run", "--once"]) == 0
+    out = capsys.readouterr().out
+    assert "MARKET SENTINEL" in out
+
+
+def test_run_once_starts_and_shuts_down_fake_intelligence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from market_sentinel.intelligence.coordinator import IntelligenceCoordinator
+
+    events: list[str] = []
+    orig_start = IntelligenceCoordinator.start
+    orig_idle = IntelligenceCoordinator.idle
+    orig_shutdown = IntelligenceCoordinator.shutdown
+
+    async def start(self) -> None:
+        events.append("start")
+        await orig_start(self)
+
+    async def idle(self) -> None:
+        events.append("idle")
+        await orig_idle(self)
+
+    async def shutdown(self) -> None:
+        events.append("shutdown")
+        await orig_shutdown(self)
+
+    monkeypatch.setattr(IntelligenceCoordinator, "start", start)
+    monkeypatch.setattr(IntelligenceCoordinator, "idle", idle)
+    monkeypatch.setattr(IntelligenceCoordinator, "shutdown", shutdown)
+    monkeypatch.setenv("MARKET_SENTINEL_INTEL_ENABLED", "1")
+    monkeypatch.setenv("MARKET_SENTINEL_INTEL_PROVIDER", "fake")
+    path = tmp_path / "watchlist.json"
+    assert main(["--watchlist", str(path), "watchlist", "add", "00700.HK"]) == 0
+    assert main(["--watchlist", str(path), "run", "--once"]) == 0
+    assert events[:1] == ["start"]
+    assert "idle" in events
+    assert events[-1] == "shutdown"
+
+
 def test_run_once_verbose_includes_scheduler_transition(tmp_path: Path, capsys) -> None:
     path = tmp_path / "watchlist.json"
     assert main(["--watchlist", str(path), "watchlist", "add", "00700.HK"]) == 0

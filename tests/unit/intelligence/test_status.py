@@ -19,7 +19,10 @@ from market_sentinel.intelligence.contract import (
     IntelligenceStatus,
 )
 from market_sentinel.intelligence.coordinator import IntelligenceCoordinator
-from market_sentinel.intelligence.errors import IntelligenceRateLimitError
+from market_sentinel.intelligence.errors import (
+    IntelligenceRateLimitError,
+    IntelligenceTransportError,
+)
 from market_sentinel.intelligence.fake import FakeIntelligenceProvider
 from market_sentinel.intelligence.view import intelligence_view
 from market_sentinel.runtime.results import EngineTickResult, SymbolTickResult
@@ -145,4 +148,25 @@ async def test_rate_limit_fallback_is_visible_without_dropping_signal() -> None:
     assert coordinator.diagnostics.fallback_count == 1
     view = intelligence_view(stored, signal.id)
     assert view.status is IntelligenceStatus.FALLBACK
+    await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_redacts_secrets_in_fallback_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING)
+    model = FakeIntelligenceProvider(error=IntelligenceTransportError("failed sk-secret"))
+    clock = FakeClock()
+    coordinator = IntelligenceCoordinator(model, clock, secrets=("sk-secret",))
+    await coordinator.start()
+    signal = _signal()
+    coordinator.observe_tick(
+        _tick(signal),
+        feed_status_for=lambda _symbol: FeedStatus.LIVE,
+        active_ids={signal.id},
+    )
+    await coordinator.idle()
+    assert "sk-secret" not in caplog.text
+    assert "[redacted]" in caplog.text
     await coordinator.shutdown()
