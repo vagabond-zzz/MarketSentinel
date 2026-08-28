@@ -981,5 +981,45 @@ describe("HostController", () => {
       (item) => item.type === "host_interaction" && item.action === "signal_opened",
     );
     expect(opened).toHaveLength(0);
+    const feedback = (harness.commands as Array<{ type?: string }>).filter(
+      (item) => item.type === "user_feedback",
+    );
+    expect(feedback).toHaveLength(0);
+  });
+
+  it("sends user_feedback without title, workspace, or free text", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate({ id: "sig-9", title: "secret title" })]);
+    await harness.controller.submitSignalFeedback("sig-9", "useful");
+    await vi.waitFor(() => {
+      const sent = (
+        harness.commands as Array<{
+          type?: string;
+          signal_id?: string;
+          feedback_type?: string;
+          title?: string;
+          workspace?: string;
+        }>
+      ).filter((item) => item.type === "user_feedback");
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.signal_id).toBe("sig-9");
+      expect(sent[0]?.feedback_type).toBe("useful");
+      expect(sent[0]).not.toHaveProperty("title");
+      expect(sent[0]).not.toHaveProperty("summary");
+      expect(sent[0]).not.toHaveProperty("workspace");
+      expect(sent[0]).not.toHaveProperty("comment");
+    });
+  });
+
+  it("does not treat badge reset as not_useful feedback", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate()]);
+    harness.controller.resetAlertBadge();
+    const feedback = (harness.commands as Array<{ type?: string; feedback_type?: string }>).filter(
+      (item) => item.type === "user_feedback",
+    );
+    expect(feedback).toHaveLength(0);
   });
 });

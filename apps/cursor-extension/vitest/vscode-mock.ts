@@ -72,6 +72,9 @@ export const window = {
     vscodeState.toasts.push(message);
     return Promise.resolve(undefined);
   },
+  showQuickPick<T>(_items: T[]): Promise<T | undefined> {
+    return Promise.resolve(undefined);
+  },
   createStatusBarItem(_alignment?: number, _priority?: number) {
     return {
       text: "",

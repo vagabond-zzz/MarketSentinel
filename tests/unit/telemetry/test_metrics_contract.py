@@ -58,6 +58,7 @@ def test_run_id_required() -> None:
             created_timestamp=1.0,
             run_id="",
             label=FeedbackLabel.USEFUL,
+            signal_id="sig-1",
         )
 
 
@@ -341,6 +342,34 @@ def test_tuning_snapshot_has_no_apply_api() -> None:
         "source": "manual",
         "config_version": "cfg-1",
     }
+
+
+def test_feedback_labels_are_frozen_low_cardinality() -> None:
+    assert {item.value for item in FeedbackLabel} == {
+        "useful",
+        "not_useful",
+        "too_noisy",
+        "too_late",
+    }
+    for label in FeedbackLabel:
+        record = UserFeedback(
+            feedback_id="f1",
+            created_timestamp=1.0,
+            run_id="run-1",
+            label=label,
+            signal_id="sig-1",
+        ).to_record()
+        assert record["label"] == label.value
+        assert "comment" not in record
+        assert "notes" not in record
+    with pytest.raises(ValueError, match="FeedbackLabel"):
+        UserFeedback(
+            feedback_id="f1",
+            created_timestamp=1.0,
+            run_id="run-1",
+            label="free_text",  # type: ignore[arg-type]
+            signal_id="sig-1",
+        )
 
 
 def test_feedback_is_not_a_market_fact() -> None:

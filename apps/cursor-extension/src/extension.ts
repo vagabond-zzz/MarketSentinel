@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 
 import { parseAlertToast, planCriticalToast } from "./alerts/state";
 import { HostController } from "./host/controller";
-import { bindCommands } from "./host/session";
+import { bindCommands, type FeedbackPrompt } from "./host/session";
 import type { RawSettings } from "./host/types";
 import type { AlertMessage } from "./protocol/types";
 import { applyStatusBar } from "./statusbar/adapter";
@@ -42,6 +42,25 @@ export function presentHostAlertToast(message: AlertMessage, alertToast: unknown
   }
 }
 
+function vscodeFeedbackPrompt(): FeedbackPrompt {
+  return {
+    pickSignal: async (items) => {
+      const picked = await vscode.window.showQuickPick(
+        items.map((item) => ({ label: item.label, id: item.id })),
+        { placeHolder: "选择信号" },
+      );
+      return picked === undefined ? undefined : { id: picked.id, label: picked.label };
+    },
+    pickLabel: async (items) => {
+      const picked = await vscode.window.showQuickPick(
+        items.map((item) => ({ label: item.label, value: item.value })),
+        { placeHolder: "这条提醒对你有帮助吗？" },
+      );
+      return picked;
+    },
+  };
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<ExtensionApi> {
   const output = vscode.window.createOutputChannel("Market Sentinel");
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
@@ -63,7 +82,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
   });
   controller = host;
   applyStatusBar(statusBar, host.statusBarModel(), host.hoverModel());
-  const commands = bindCommands(host, { show: () => output.show() }, logger);
+  const commands = bindCommands(host, { show: () => output.show() }, logger, vscodeFeedbackPrompt());
   for (const [id, handler] of Object.entries(commands)) {
     context.subscriptions.push(vscode.commands.registerCommand(id, handler));
   }

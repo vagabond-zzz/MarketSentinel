@@ -7,7 +7,7 @@ import {
   type SpawnFn,
 } from "../ipc/process";
 import { mapHover, type HoverModel } from "../hover/model";
-import type { AlertMessage, WatchlistItem, WireMarketState } from "../protocol/types";
+import type { AlertMessage, FeedbackType, WatchlistItem, WireMarketState } from "../protocol/types";
 import {
   DEFAULT_ALERT_HOLD_MS,
   mapStatusBar,
@@ -26,6 +26,9 @@ import { HOST_UI_SETTING_KEYS, HOT_SETTING_KEYS, RESTART_SETTING_KEYS } from "./
 
 export const DEFAULT_BACKOFF_MS = [1_000, 3_000, 10_000] as const;
 export const DEFAULT_MAX_RETRIES = 3;
+
+const FEEDBACK_TYPES = new Set<FeedbackType>(["useful", "not_useful", "too_noisy", "too_late"]);
+const MAX_FEEDBACK_TARGETS = 20;
 
 const RESTART_HINT = "Market Sentinel core configuration changed; restart core to apply.";
 
@@ -79,6 +82,7 @@ export class HostController {
   private coreVersionInternal: string | undefined;
   private managerGeneration = 0;
   private lastMarket: WireMarketState | undefined;
+  private presentedFeedbackTargets: Array<{ id: string; label: string }> = [];
   private lastAlertAt: number | undefined;
   private unreadAlertCountInternal = 0;
   private alertHoldTimer: ReturnType<typeof setTimeout> | undefined;
@@ -154,6 +158,42 @@ export class HostController {
     this.unreadAlertCountInternal = 0;
     this.reportHostInteraction({ action: "alert_badge_reset" });
     this.emitUi();
+  }
+
+  signalFeedbackTargets(): Array<{ id: string; label: string }> {
+    const labels = new Map<string, string>();
+    for (const item of this.presentedFeedbackTargets) {
+      labels.set(item.id, item.label);
+    }
+    for (const symbol of this.lastMarket?.symbols ?? []) {
+      for (const signal of symbol.active_signals) {
+        labels.set(signal.id, `${symbol.symbol} ${signal.title}`);
+      }
+    }
+    return [...labels.entries()].map(([id, label]) => ({ id, label }));
+  }
+
+  async submitSignalFeedback(signalId: string, feedbackType: FeedbackType): Promise<void> {
+    if (signalId.trim() === "" || !FEEDBACK_TYPES.has(feedbackType)) {
+      this.options.logger.host("submitSignalFeedback ignored invalid payload");
+      return;
+    }
+    const ipc = this.manager?.ipc;
+    if (ipc === undefined) {
+      this.options.logger.host("submitSignalFeedback skipped: core not connected");
+      return;
+    }
+    const created_timestamp = (this.options.now ?? Date.now)() / 1000;
+    try {
+      await ipc.request({
+        type: "user_feedback",
+        signal_id: signalId,
+        feedback_type: feedbackType,
+        created_timestamp,
+      });
+    } catch (error) {
+      this.options.logger.host(`user_feedback failed: ${this.errorMessage(error)}`);
+    }
   }
 
   async start(): Promise<void> {
@@ -430,6 +470,7 @@ export class HostController {
     for (const candidate of message.candidates) {
       this.options.logger.host(formatAlertDiagnostic(candidate));
       this.reportHostInteraction({ action: "alert_presented", signal_id: candidate.id });
+      this.rememberFeedbackTarget(candidate.id, `${candidate.symbol} ${candidate.title}`);
     }
     this.lastAlertAt = (this.options.now ?? Date.now)();
     this.clearAlertHold();
@@ -441,6 +482,13 @@ export class HostController {
     }, hold);
     this.options.onAlertEdge?.(message);
     this.emitUi();
+  }
+
+  private rememberFeedbackTarget(id: string, label: string): void {
+    this.presentedFeedbackTargets = [
+      ...this.presentedFeedbackTargets.filter((item) => item.id !== id),
+      { id, label },
+    ].slice(-MAX_FEEDBACK_TARGETS);
   }
 
   private reportHostInteraction(input: {

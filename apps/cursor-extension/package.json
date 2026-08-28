@@ -46,6 +46,10 @@
       {
         "command": "marketSentinel.resetAlertBadge",
         "title": "Market Sentinel: Reset Alert Badge"
+      },
+      {
+        "command": "marketSentinel.submitSignalFeedback",
+        "title": "Market Sentinel: Signal Feedback"
       }
     ],
     "configuration": {

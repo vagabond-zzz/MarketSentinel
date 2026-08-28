@@ -11,6 +11,7 @@ HOST_COMMANDS = frozenset(
         "set_watchlist",
         "get_state",
         "host_interaction",
+        "user_feedback",
         "shutdown",
     }
 )

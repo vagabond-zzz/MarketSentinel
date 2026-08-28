@@ -38,6 +38,7 @@ export type HostCommandType =
   | "set_watchlist"
   | "get_state"
   | "host_interaction"
+  | "user_feedback"
   | "shutdown";
 
 export type CoreMessageType =
@@ -138,12 +139,23 @@ export type HostInteractionAction =
   | "alert_dismissed"
   | "signal_muted";
 
+export type FeedbackType = "useful" | "not_useful" | "too_noisy" | "too_late";
+
 export interface HostInteractionCommand {
   protocol_version: 1;
   type: "host_interaction";
   request_id: string;
   action: HostInteractionAction;
   signal_id?: string;
+  created_timestamp: number;
+}
+
+export interface UserFeedbackCommand {
+  protocol_version: 1;
+  type: "user_feedback";
+  request_id: string;
+  signal_id: string;
+  feedback_type: FeedbackType;
   created_timestamp: number;
 }
 
@@ -155,6 +167,7 @@ export type HostCommand =
   | SetWatchlistCommand
   | GetStateCommand
   | HostInteractionCommand
+  | UserFeedbackCommand
   | ShutdownCommand;
 
 export type HostCommandBody =
@@ -168,6 +181,12 @@ export type HostCommandBody =
       type: "host_interaction";
       action: HostInteractionAction;
       signal_id?: string;
+      created_timestamp: number;
+    }
+  | {
+      type: "user_feedback";
+      signal_id: string;
+      feedback_type: FeedbackType;
       created_timestamp: number;
     }
   | { type: "shutdown" };
@@ -233,5 +252,6 @@ export const EXPECTED_RESPONSE: Record<HostCommandType, RequestSuccessMessage["t
   set_watchlist: "ack",
   get_state: "state",
   host_interaction: "ack",
+  user_feedback: "ack",
   shutdown: "shutdown_ack",
 };

@@ -50,6 +50,7 @@ export const HOST_COMMANDS = {
   restartCore: "marketSentinel.restartCore",
   showOutput: "marketSentinel.showOutput",
   resetAlertBadge: "marketSentinel.resetAlertBadge",
+  submitSignalFeedback: "marketSentinel.submitSignalFeedback",
 } as const;
 
 export const EXTENSION_ID = "market-sentinel-local.market-sentinel";

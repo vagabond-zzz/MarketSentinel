@@ -29,5 +29,5 @@ def telemetry_jsonl_path(data_dir: Path) -> Path:
 
 
 def feedback_jsonl_path(data_dir: Path) -> Path:
-    """Reserved for M4. M2 does not write this file."""
+    """Explicit UserFeedback JSONL. Separate from telemetry.jsonl."""
     return data_dir / "feedback.jsonl"

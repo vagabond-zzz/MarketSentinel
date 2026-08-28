@@ -15,6 +15,7 @@ from market_sentinel.ipc.writer import ProtocolWriter
 from market_sentinel.runtime.engine import MarketEngine
 from market_sentinel.runtime.results import EngineTickResult
 from market_sentinel.telemetry.host_interaction import parse_host_interaction
+from market_sentinel.telemetry.user_feedback import parse_user_feedback
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,7 @@ class MarketDaemon:
             "set_watchlist": self._set_watchlist,
             "get_state": self._get_state,
             "host_interaction": self._host_interaction,
+            "user_feedback": self._user_feedback,
         }[message_type]
         handler(command, request_id)
 
@@ -307,6 +309,33 @@ class MarketDaemon:
         if parsed.created_timestamp is not None:
             payload["created_timestamp"] = parsed.created_timestamp
         self._engine.telemetry.emit(parsed.name, **payload)
+        self._writer.send(encode_message("ack", request_id=request_id))
+
+    def _user_feedback(self, command: dict[str, Any], request_id: str) -> None:
+        if not self._require_ready(request_id):
+            return
+        parsed = parse_user_feedback(command)
+        if isinstance(parsed, str):
+            self._writer.send(
+                encode_error(ErrorCode.INVALID_PAYLOAD, parsed, request_id=request_id)
+            )
+            return
+        try:
+            self._engine.telemetry.record_feedback(
+                signal_id=parsed.signal_id,
+                label=parsed.label,
+                created_timestamp=parsed.created_timestamp,
+            )
+        except Exception:
+            logger.exception("user_feedback storage failed; market pipeline continues")
+            self._writer.send(
+                encode_error(
+                    ErrorCode.INVALID_PAYLOAD,
+                    "feedback storage failed",
+                    request_id=request_id,
+                )
+            )
+            return
         self._writer.send(encode_message("ack", request_id=request_id))
 
     def _shutdown_sync(self, request_id: str | None) -> None:

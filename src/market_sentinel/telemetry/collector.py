@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Protocol
 
-from market_sentinel.telemetry.contract import TelemetryEvent
+from market_sentinel.telemetry.contract import TelemetryEvent, UserFeedback
 from market_sentinel.telemetry.sink import TelemetrySink
 
 logger = logging.getLogger(__name__)
@@ -58,6 +58,38 @@ class SinkTelemetryCollector:
 
     def record(self, event: TelemetryEvent) -> None:
         self._sink.write(event.to_record())
+
+    def close(self) -> None:
+        self._sink.close()
+
+
+class FeedbackCollector(Protocol):
+    """Append-only explicit-feedback sink. Not a telemetry stream."""
+
+    def record(self, feedback: UserFeedback) -> None: ...
+
+
+class NoOpFeedbackCollector:
+    def record(self, feedback: UserFeedback) -> None:
+        del feedback
+
+
+class InMemoryFeedbackCollector:
+    def __init__(self) -> None:
+        self.records: list[UserFeedback] = []
+
+    def record(self, feedback: UserFeedback) -> None:
+        self.records.append(feedback)
+
+
+class SinkFeedbackCollector:
+    """Maps UserFeedback → TelemetrySink using to_record() only."""
+
+    def __init__(self, sink: TelemetrySink) -> None:
+        self._sink = sink
+
+    def record(self, feedback: UserFeedback) -> None:
+        self._sink.write(feedback.to_record())
 
     def close(self) -> None:
         self._sink.close()

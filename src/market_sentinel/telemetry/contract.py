@@ -429,6 +429,9 @@ class UserFeedback:
         _require_text(self.feedback_id, "feedback_id")
         _require_text(self.run_id, "run_id")
         _require_finite(self.created_timestamp, "created_timestamp")
+        _require_enum(self.label, FeedbackLabel, "label")
+        if not isinstance(self.signal_id, str) or self.signal_id.strip() == "":
+            raise ValueError("signal_id must be non-empty")
 
     def to_record(self) -> dict[str, Any]:
         raw = {

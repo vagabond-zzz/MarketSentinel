@@ -40,6 +40,7 @@ class JsonlTelemetrySink:
         *,
         max_bytes: int = DEFAULT_MAX_BYTES,
         backup_count: int = DEFAULT_BACKUP_COUNT,
+        allowlist: frozenset[str] | None = None,
     ) -> None:
         if max_bytes < 1:
             raise ValueError("max_bytes must be >= 1")
@@ -48,13 +49,14 @@ class JsonlTelemetrySink:
         self._path = path
         self._max_bytes = max_bytes
         self._backup_count = backup_count
+        self._allowlist = TELEMETRY_ALLOWLIST if allowlist is None else allowlist
         self._handle: TextIO | None = None
         path.parent.mkdir(parents=True, exist_ok=True)
         _truncate_trailing_partial(path)
         self._open()
 
     def write(self, record: dict[str, object]) -> None:
-        payload = project_allowlist(dict(record), TELEMETRY_ALLOWLIST)
+        payload = project_allowlist(dict(record), self._allowlist)
         line = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
         handle = self._require()
         handle.write(line + "\n")

@@ -25,7 +25,58 @@ describe("bindCommands", () => {
     expect(commands[HOST_COMMANDS.resume]).toBeTypeOf("function");
     expect(commands[HOST_COMMANDS.restartCore]).toBeTypeOf("function");
     expect(commands[HOST_COMMANDS.resetAlertBadge]).toBeTypeOf("function");
+    expect(commands[HOST_COMMANDS.submitSignalFeedback]).toBeTypeOf("function");
     await commands[HOST_COMMANDS.resetAlertBadge]?.();
     expect(controller.unreadAlertCount).toBe(0);
+  });
+
+  it("only sends user_feedback after explicit QuickPick choices", async () => {
+    const logs: string[] = [];
+    const logger: HostLogger = {
+      host: (message) => logs.push(message),
+      core: () => undefined,
+    };
+    const sent: Array<{ signalId: string; feedbackType: string }> = [];
+    const controller = {
+      signalFeedbackTargets: () => [{ id: "sig-1", label: "00700.HK alert" }],
+      submitSignalFeedback: async (signalId: string, feedbackType: string) => {
+        sent.push({ signalId, feedbackType });
+      },
+    };
+    const commands = bindCommands(
+      controller as never,
+      { show: () => undefined },
+      logger,
+      {
+        pickSignal: async (items) => items[0],
+        pickLabel: async (items) => items.find((item) => item.value === "too_noisy"),
+      },
+    );
+    await commands[HOST_COMMANDS.submitSignalFeedback]?.();
+    expect(sent).toEqual([{ signalId: "sig-1", feedbackType: "too_noisy" }]);
+  });
+
+  it("does not send feedback when the user cancels QuickPick", async () => {
+    const sent: unknown[] = [];
+    const controller = {
+      signalFeedbackTargets: () => [{ id: "sig-1", label: "00700.HK alert" }],
+      submitSignalFeedback: async (signalId: string, feedbackType: string) => {
+        sent.push({ signalId, feedbackType });
+      },
+    };
+    const commands = bindCommands(
+      controller as never,
+      { show: () => undefined },
+      {
+        host: () => undefined,
+        core: () => undefined,
+      },
+      {
+        pickSignal: async () => undefined,
+        pickLabel: async () => ({ label: "有用", value: "useful" as const }),
+      },
+    );
+    await commands[HOST_COMMANDS.submitSignalFeedback]?.();
+    expect(sent).toEqual([]);
   });
 });

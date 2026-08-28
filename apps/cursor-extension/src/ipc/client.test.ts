@@ -67,6 +67,37 @@ describe("IpcClient", () => {
     expect(ack.type).toBe("ack");
   });
 
+  it("matches request_id for user_feedback ack", async () => {
+    const { client, written } = createClient();
+    const pending = client.request({
+      type: "user_feedback",
+      signal_id: "sig-1",
+      feedback_type: "not_useful",
+      created_timestamp: 2.5,
+    });
+    const sent = JSON.parse(written[0] ?? "") as {
+      type: string;
+      signal_id: string;
+      feedback_type: string;
+      protocol_version: number;
+    };
+    expect(sent.type).toBe("user_feedback");
+    expect(sent.signal_id).toBe("sig-1");
+    expect(sent.feedback_type).toBe("not_useful");
+    expect(sent.protocol_version).toBe(1);
+    expect(sent).not.toHaveProperty("title");
+    expect(sent).not.toHaveProperty("run_id");
+    expect(sent).not.toHaveProperty("comment");
+    client.feed(
+      JSON.stringify({
+        protocol_version: 1,
+        type: "ack",
+        request_id: (JSON.parse(written[0] ?? "") as { request_id: string }).request_id,
+      }) + "\n",
+    );
+    await expect(pending).resolves.toMatchObject({ type: "ack" });
+  });
+
   it("matches request_id for ready", async () => {
     const { client, written } = createClient();
     const pending = client.request({ type: "hello", host: "test" });

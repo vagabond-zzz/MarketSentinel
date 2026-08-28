@@ -23,6 +23,7 @@ describe("extension manifest", () => {
       "marketSentinel.restartCore",
       "marketSentinel.showOutput",
       "marketSentinel.resetAlertBadge",
+      "marketSentinel.submitSignalFeedback",
     ]);
     expect(JSON.stringify(pkg.contributes)).not.toContain("statusBar");
     expect(pkg.activationEvents).toEqual(["onStartupFinished"]);
