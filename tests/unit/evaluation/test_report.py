@@ -11,6 +11,8 @@ from market_sentinel.evaluation.aggregate import evaluate
 from market_sentinel.evaluation.reader import LoadedTelemetry, TelemetryReader
 from market_sentinel.evaluation.render import render_text
 from market_sentinel.evaluation.report import (
+    EVALUATION_ALLOWLIST,
+    UNAVAILABLE_MARKET_SCOPE,
     UNAVAILABLE_MARKET_TIME,
     UNAVAILABLE_NO_USAGE,
     UNAVAILABLE_PRODUCER,
@@ -28,10 +30,12 @@ from market_sentinel.telemetry.contract import (
 from market_sentinel.telemetry.jsonl import DEFAULT_BACKUP_COUNT, JsonlTelemetrySink
 
 CST = timezone(timedelta(hours=8))
+ASHARE = "600519.SH"
+HK = "00700.HK"
 
 
-def _ts(hour: int, minute: int = 0) -> float:
-    return datetime(2024, 1, 15, hour, minute, tzinfo=CST).timestamp()
+def _ts(hour: int, minute: int = 0, day: int = 15) -> float:
+    return datetime(2024, 1, day, hour, minute, tzinfo=CST).timestamp()
 
 
 def _event(name: TelemetryName, **fields: object) -> dict[str, object]:
@@ -209,8 +213,9 @@ def test_suppression_by_reason() -> None:
             suppression_reason=SuppressionReason.SAME_TICK_DUPLICATE,
         ),
     ]
-    reasons = evaluate(_loaded(records)).to_record()["alert_noise"]["suppression_by_reason"]
-    assert reasons == {"cooldown": 2, "same_tick_duplicate": 1}
+    noise = evaluate(_loaded(records)).to_record()["alert_noise"]
+    assert noise["suppression_by_reason"] == {"cooldown": 2, "same_tick_duplicate": 1}
+    assert noise["unrecognized_suppression_reason_count"] == 0
 
 
 def test_priority_distribution() -> None:
@@ -297,9 +302,12 @@ def test_intelligence_skip_and_fallback_breakdown() -> None:
     assert intel["skipped"] == 2
     assert intel["skip_by_decision_reason"]["stale_feed"] == 1
     assert intel["skip_by_decision_reason"]["not_candidate"] == 1
+    assert set(intel["skip_by_decision_reason"]) == {item.value for item in DecisionReason}
     assert intel["fallback"] == 1
     assert intel["fallback_by_fallback_reason"]["timeout"] == 1
     assert intel["routed"] == 1
+    assert intel["unrecognized_skip_reason_count"] == 0
+    assert intel["unrecognized_fallback_reason_count"] == 0
 
 
 def test_latency_statistics() -> None:
@@ -374,7 +382,7 @@ def test_market_hour_excludes_lunch() -> None:
         _event(
             TelemetryName.ALERT_CANDIDATE,
             signal_id="s1",
-            symbol="00700.HK",
+            symbol=ASHARE,
             telemetry_id="a",
             priority="NOTICE",
             market_timestamp=_ts(11, 0),
@@ -382,14 +390,16 @@ def test_market_hour_excludes_lunch() -> None:
         _event(
             TelemetryName.ALERT_CANDIDATE,
             signal_id="s2",
-            symbol="00700.HK",
+            symbol=ASHARE,
             telemetry_id="b",
             priority="NOTICE",
             market_timestamp=_ts(14, 0),
         ),
     ]
-    noise = evaluate(_loaded(records)).to_record()["alert_noise"]
+    report = evaluate(_loaded(records)).to_record()
+    noise = report["alert_noise"]
     assert noise["observed_market_seconds"] == 5400.0
+    assert report["data_quality"]["market_time_coverage"]["observed_market_seconds"] == 5400.0
     hour = noise["alerts_per_market_hour"]
     assert hour["available"] is True
     assert hour["value"] == 2 / 5400.0 * 3600.0
@@ -400,7 +410,7 @@ def test_insufficient_market_time_unavailable() -> None:
         _event(
             TelemetryName.ALERT_CANDIDATE,
             signal_id="s1",
-            symbol="00700.HK",
+            symbol=ASHARE,
             telemetry_id="a",
             priority="NOTICE",
             market_timestamp=_ts(10, 0),
@@ -417,7 +427,7 @@ def test_lunch_only_span_is_unavailable() -> None:
         _event(
             TelemetryName.ALERT_CANDIDATE,
             signal_id="s1",
-            symbol="00700.HK",
+            symbol=ASHARE,
             telemetry_id="a",
             priority="NOTICE",
             market_timestamp=_ts(12, 0),
@@ -425,7 +435,7 @@ def test_lunch_only_span_is_unavailable() -> None:
         _event(
             TelemetryName.ALERT_CANDIDATE,
             signal_id="s2",
-            symbol="00700.HK",
+            symbol=ASHARE,
             telemetry_id="b",
             priority="NOTICE",
             market_timestamp=_ts(12, 30),
@@ -442,7 +452,7 @@ def test_market_hour_ignores_created_timestamp() -> None:
         _event(
             TelemetryName.ALERT_CANDIDATE,
             signal_id="s1",
-            symbol="00700.HK",
+            symbol=ASHARE,
             telemetry_id="a",
             priority="NOTICE",
             created_timestamp=_ts(9, 30),
@@ -451,7 +461,7 @@ def test_market_hour_ignores_created_timestamp() -> None:
         _event(
             TelemetryName.ALERT_CANDIDATE,
             signal_id="s2",
-            symbol="00700.HK",
+            symbol=ASHARE,
             telemetry_id="b",
             priority="NOTICE",
             created_timestamp=_ts(15, 0),
@@ -570,6 +580,7 @@ def test_report_serialization_allowlist() -> None:
 
     walk(parsed)
     assert TELEMETRY_DENYLIST.isdisjoint(keys)
+    assert keys <= EVALUATION_ALLOWLIST
     for denied in TELEMETRY_DENYLIST:
         assert f'"{denied}"' not in raw
 
@@ -648,3 +659,290 @@ def test_missing_jsonl_is_empty_healthy(tmp_path: Path) -> None:
     assert quality["records_read"] == 0
     assert quality["healthy"] is True
     assert quality["input_files"] == []
+
+
+def _ashare_alert(
+    signal_id: str,
+    telemetry_id: str,
+    hour: int,
+    minute: int = 0,
+    **fields: object,
+) -> dict[str, object]:
+    day = int(fields.pop("day", 15))
+    payload: dict[str, object] = {
+        "signal_id": signal_id,
+        "symbol": ASHARE,
+        "telemetry_id": telemetry_id,
+        "priority": "NOTICE",
+        "market_timestamp": _ts(hour, minute, day=day),
+    }
+    payload.update(fields)
+    return _event(TelemetryName.ALERT_CANDIDATE, **payload)  # type: ignore[arg-type]
+
+
+def test_single_alert_uses_all_telemetry_exposure() -> None:
+    records = [
+        _event(
+            TelemetryName.EVENT_GENERATED,
+            event_id="e1",
+            symbol=ASHARE,
+            telemetry_id="e1",
+            market_timestamp=_ts(9, 30),
+        ),
+        _ashare_alert("s1", "a1", 10, 0),
+        _event(
+            TelemetryName.EVENT_GENERATED,
+            event_id="e2",
+            symbol=ASHARE,
+            telemetry_id="e2",
+            market_timestamp=_ts(10, 30),
+        ),
+    ]
+    report = evaluate(_loaded(records)).to_record()
+    assert report["alert_noise"]["observed_market_seconds"] == 3600.0
+    assert report["data_quality"]["market_time_coverage"]["observed_market_seconds"] == 3600.0
+    hour = report["alert_noise"]["alerts_per_market_hour"]
+    assert hour["available"] is True
+    assert hour["value"] == 1.0
+
+
+def test_multi_run_does_not_bridge_idle_hours() -> None:
+    records = [
+        _ashare_alert("s1", "r1a", 9, 30, run_id="r1"),
+        _ashare_alert("s2", "r1b", 10, 30, run_id="r1"),
+        _ashare_alert("s3", "r2a", 9, 30, run_id="r2", day=16),
+        _ashare_alert("s4", "r2b", 10, 30, run_id="r2", day=16),
+    ]
+    report = evaluate(_loaded(records)).to_record()
+    assert report["alert_noise"]["observed_market_seconds"] == 7200.0
+    hour = report["alert_noise"]["alerts_per_market_hour"]
+    assert hour["available"] is True
+    assert hour["value"] == 2.0
+    by_run = {row["run_id"]: row for row in report["per_run"]}
+    assert by_run["r1"]["alert_candidates"] == 2
+    assert by_run["r1"]["alerts_per_market_hour"]["value"] == 2.0
+    assert by_run["r2"]["alert_candidates"] == 2
+    assert by_run["r2"]["alerts_per_market_hour"]["value"] == 2.0
+    dates = {row["market_date"]: row for row in report["per_market_date"]}
+    assert set(dates) == {"2024-01-15", "2024-01-16"}
+    assert dates["2024-01-15"]["alert_candidates"] == 2
+    assert dates["2024-01-16"]["alert_candidates"] == 2
+    assert dates["2024-01-15"]["alerts_per_market_hour"]["value"] == 2.0
+
+
+def test_candidate_run_without_exposure_fail_closes_global() -> None:
+    records = [
+        _ashare_alert("s1", "r1a", 9, 30, run_id="r1"),
+        _ashare_alert("s2", "r1b", 10, 30, run_id="r1"),
+        _ashare_alert("s3", "r2a", 10, 0, run_id="r2"),
+    ]
+    report = evaluate(_loaded(records)).to_record()
+    hour = report["alert_noise"]["alerts_per_market_hour"]
+    assert hour["available"] is False
+    assert hour["unavailable_reason"] == UNAVAILABLE_MARKET_TIME
+    assert hour["value"] is None
+    assert report["alert_noise"]["observed_market_seconds"] == 0.0
+    by_run = {row["run_id"]: row for row in report["per_run"]}
+    assert by_run["r1"]["alerts_per_market_hour"]["available"] is True
+    assert by_run["r1"]["alerts_per_market_hour"]["value"] == 2.0
+    assert by_run["r2"]["alerts_per_market_hour"]["available"] is False
+    assert by_run["r2"]["alerts_per_market_hour"]["unavailable_reason"] == UNAVAILABLE_MARKET_TIME
+    assert report["data_quality"]["runs_insufficient_market_time"] == ["r2"]
+
+
+def test_hk_market_hour_is_unsupported_scope() -> None:
+    records = [
+        _event(
+            TelemetryName.ALERT_CANDIDATE,
+            signal_id="s1",
+            symbol=HK,
+            telemetry_id="a",
+            priority="NOTICE",
+            market_timestamp=_ts(11, 0),
+        ),
+        _event(
+            TelemetryName.ALERT_CANDIDATE,
+            signal_id="s2",
+            symbol=HK,
+            telemetry_id="b",
+            priority="NOTICE",
+            market_timestamp=_ts(14, 0),
+        ),
+    ]
+    report = evaluate(_loaded(records)).to_record()
+    hour = report["alert_noise"]["alerts_per_market_hour"]
+    assert hour["available"] is False
+    assert hour["unavailable_reason"] == UNAVAILABLE_MARKET_SCOPE
+    assert hour["value"] is None
+    assert report["alert_noise"]["observed_market_seconds"] == 0.0
+    assert report["data_quality"]["runs_unsupported_market_scope"] == ["run-1"]
+
+
+def test_ashare_market_hour_is_computable() -> None:
+    records = [
+        _event(
+            TelemetryName.EVENT_GENERATED,
+            event_id="e1",
+            symbol=ASHARE,
+            telemetry_id="e1",
+            market_timestamp=_ts(9, 30),
+        ),
+        _ashare_alert("s1", "a1", 10, 0),
+        _event(
+            TelemetryName.EVENT_GENERATED,
+            event_id="e2",
+            symbol="000001.SZ",
+            telemetry_id="e2",
+            market_timestamp=_ts(10, 30),
+        ),
+    ]
+    hour = evaluate(_loaded(records)).to_record()["alert_noise"]["alerts_per_market_hour"]
+    assert hour["available"] is True
+    assert hour["value"] == 1.0
+
+
+def test_mixed_ashare_and_hk_fail_closes_global() -> None:
+    records = [
+        _ashare_alert("s1", "r1a", 9, 30, run_id="r1"),
+        _ashare_alert("s2", "r1b", 10, 30, run_id="r1"),
+        _event(
+            TelemetryName.ALERT_CANDIDATE,
+            signal_id="s3",
+            symbol=HK,
+            run_id="r2",
+            telemetry_id="h1",
+            priority="NOTICE",
+            market_timestamp=_ts(9, 30),
+        ),
+        _event(
+            TelemetryName.ALERT_CANDIDATE,
+            signal_id="s4",
+            symbol=HK,
+            run_id="r2",
+            telemetry_id="h2",
+            priority="NOTICE",
+            market_timestamp=_ts(10, 30),
+        ),
+    ]
+    hour = evaluate(_loaded(records)).to_record()["alert_noise"]["alerts_per_market_hour"]
+    assert hour["available"] is False
+    assert hour["unavailable_reason"] == UNAVAILABLE_MARKET_SCOPE
+
+
+def test_saturday_is_not_cash_session_exposure() -> None:
+    records = [
+        _event(
+            TelemetryName.EVENT_GENERATED,
+            event_id="e1",
+            symbol=ASHARE,
+            telemetry_id="e1",
+            market_timestamp=_ts(9, 30, day=13),
+        ),
+        _ashare_alert("s1", "a1", 10, 0, day=13),
+        _event(
+            TelemetryName.EVENT_GENERATED,
+            event_id="e2",
+            symbol=ASHARE,
+            telemetry_id="e2",
+            market_timestamp=_ts(15, 0, day=13),
+        ),
+    ]
+    report = evaluate(_loaded(records)).to_record()
+    assert report["alert_noise"]["observed_market_seconds"] == 0.0
+    hour = report["alert_noise"]["alerts_per_market_hour"]
+    assert hour["available"] is False
+    assert hour["unavailable_reason"] == UNAVAILABLE_MARKET_TIME
+
+
+def test_per_run_and_per_market_date_are_separate() -> None:
+    records = [
+        _event(
+            TelemetryName.EVENT_GENERATED,
+            event_id="e1",
+            symbol=ASHARE,
+            run_id="r1",
+            telemetry_id="e1",
+            market_timestamp=_ts(9, 30, day=15),
+        ),
+        _ashare_alert("s1", "a1", 10, 30, run_id="r1", day=15),
+        _event(
+            TelemetryName.EVENT_GENERATED,
+            event_id="e2",
+            symbol=ASHARE,
+            run_id="r2",
+            telemetry_id="e2",
+            market_timestamp=_ts(9, 30, day=16),
+        ),
+        _ashare_alert("s2", "a2", 10, 30, run_id="r2", day=16),
+        _event(
+            TelemetryName.ALERT_BADGE_RESET,
+            telemetry_id="host",
+            host_action="reset_unread",
+            run_id="r1",
+        ),
+    ]
+    report = evaluate(_loaded(records)).to_record()
+    assert [row["run_id"] for row in report["per_run"]] == ["r1", "r2"]
+    dates = [row["market_date"] for row in report["per_market_date"]]
+    assert dates == ["2024-01-15", "2024-01-16"]
+    by_date = {row["market_date"]: row for row in report["per_market_date"]}
+    assert by_date["2024-01-15"]["events_generated"] == 1
+    assert by_date["2024-01-16"]["events_generated"] == 1
+    assert by_date["2024-01-15"]["alert_candidates"] == 1
+    assert "2024-01-01" not in by_date
+
+
+def test_unknown_breakdown_values_do_not_leak_into_report() -> None:
+    leaked = "arbitrary free text from future adapter"
+    records = [
+        {
+            "telemetry_id": "k1",
+            "name": "intelligence_skipped",
+            "kind": "intelligence",
+            "created_timestamp": 1.0,
+            "run_id": "run-1",
+            "signal_id": "s1",
+            "decision_reason": leaked,
+        },
+        _event(
+            TelemetryName.INTELLIGENCE_FALLBACK,
+            signal_id="s2",
+            telemetry_id="f1",
+            fallback_reason=leaked,
+        ),
+        {
+            "telemetry_id": "sup",
+            "name": "alert_suppressed",
+            "kind": "pipeline",
+            "created_timestamp": 1.0,
+            "run_id": "run-1",
+            "signal_id": "s3",
+            "symbol": ASHARE,
+            "suppression_reason": leaked,
+        },
+    ]
+    report = evaluate(_loaded(records)).to_record()
+    raw = json.dumps(report)
+    assert leaked not in raw
+    assert leaked not in report["intelligence"]["skip_by_decision_reason"]
+    assert leaked not in report["intelligence"]["fallback_by_fallback_reason"]
+    assert leaked not in report["alert_noise"]["suppression_by_reason"]
+    assert report["intelligence"]["unrecognized_skip_reason_count"] == 1
+    assert report["intelligence"]["unrecognized_fallback_reason_count"] == 1
+    assert report["alert_noise"]["unrecognized_suppression_reason_count"] == 1
+    assert report["data_quality"]["semantic_warning_count"] == 3
+    assert report["data_quality"]["data_quality_warning"] is True
+    keys: set[str] = set()
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            keys.update(node)
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(report)
+    assert keys <= EVALUATION_ALLOWLIST
+    assert leaked not in keys

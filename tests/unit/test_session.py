@@ -1,6 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
-from market_sentinel.market_data.session import cash_session_overlap_s, session_id
+from market_sentinel.market_data.session import (
+    cash_session_overlap_s,
+    is_a_share_symbol,
+    session_id,
+)
 
 CST = timezone(timedelta(hours=8))
 
@@ -46,3 +50,23 @@ def test_cash_session_spans_next_morning() -> None:
     end = datetime(2024, 1, 16, 10, 0, tzinfo=CST).timestamp()
     # 14:00–15:00 + 09:30–10:00 = 5400s
     assert cash_session_overlap_s(start, end) == 5400.0
+
+
+def test_cash_session_saturday_is_zero() -> None:
+    start = datetime(2024, 1, 13, 9, 30, tzinfo=CST).timestamp()
+    end = datetime(2024, 1, 13, 15, 0, tzinfo=CST).timestamp()
+    assert cash_session_overlap_s(start, end) == 0.0
+
+
+def test_cash_session_friday_to_monday_skips_weekend() -> None:
+    start = datetime(2024, 1, 12, 14, 0, tzinfo=CST).timestamp()
+    end = datetime(2024, 1, 15, 10, 0, tzinfo=CST).timestamp()
+    # Friday 14:00–15:00 + Monday 09:30–10:00 = 5400s
+    assert cash_session_overlap_s(start, end) == 5400.0
+
+
+def test_is_a_share_symbol_sh_sz_only() -> None:
+    assert is_a_share_symbol("600519.SH") is True
+    assert is_a_share_symbol("000001.SZ") is True
+    assert is_a_share_symbol("00700.HK") is False
+    assert is_a_share_symbol("AAPL") is False

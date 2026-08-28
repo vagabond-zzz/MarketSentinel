@@ -182,15 +182,23 @@ async def test_sync_jsonl_overhead_is_measured_not_gated(tmp_path: Path) -> None
     jsonl = jsonl_telemetry_runtime(FakeClock(), data_dir=jsonl_dir)
     telemetry_elapsed = await run_with(jsonl, tmp_path / "jsonl")
     jsonl.close()
-    relative = 0.0 if baseline <= 0 else (telemetry_elapsed - baseline) / baseline
+    extra = telemetry_elapsed - baseline
+    # fraction = extra/baseline (e.g. 1.73 means +173%, not 1.73× total runtime).
+    # total_runtime_ratio = telemetry/baseline (e.g. 2.73×).
+    fraction = 0.0 if baseline <= 0 else extra / baseline
+    total_ratio = 0.0 if baseline <= 0 else telemetry_elapsed / baseline
     evidence = {
         "baseline_elapsed": baseline,
         "telemetry_elapsed": telemetry_elapsed,
-        "relative_overhead": relative,
+        "absolute_extra_s": extra,
+        "relative_overhead_fraction": fraction,
+        "total_runtime_ratio": total_ratio,
         "tick_count": ticks,
     }
     assert evidence["tick_count"] == ticks > 0
     assert evidence["baseline_elapsed"] >= 0
     assert evidence["telemetry_elapsed"] >= 0
-    assert evidence["relative_overhead"] == relative
+    assert evidence["absolute_extra_s"] == extra
+    assert evidence["relative_overhead_fraction"] == fraction
+    assert evidence["total_runtime_ratio"] == total_ratio
     assert any((jsonl_dir / "telemetry.jsonl").read_text(encoding="utf-8").splitlines())

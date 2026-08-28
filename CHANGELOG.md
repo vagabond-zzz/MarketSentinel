@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — v0.6 M3 review fixes (no version bump)
+
+Correct evaluation time semantics after M3 external review. Package **0.5.0**. Protocol **1**. No M4.
+
+- `alerts_per_market_hour` uses per-run telemetry-observed market-time span (all `market_timestamp` observations), not candidate-only min/max
+- Multi-run exposure is summed per `run_id`; never min(r1)→max(rN)
+- A-share market-hour metric supports `.SH`/`.SZ` only; `.HK` is `unsupported_market_scope`
+- Weekends contribute 0 cash-session seconds; official holidays still not calendar-aware
+- `per_run` / `per_market_date` summaries; breakdowns use frozen keys only (unknown values → counts + `data_quality_warning`)
+
 ## Unreleased — v0.6 M3 Evaluation Report (no version bump)
 
 Read-only evaluation over M1/M2 telemetry on `feat/v0.6-feedback-observability`. Package **0.5.0**. Protocol **1**. No M4 feedback UX, no threshold changes, no storage redesign.

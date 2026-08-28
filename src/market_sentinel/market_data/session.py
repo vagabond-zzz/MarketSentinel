@@ -23,11 +23,17 @@ def is_same_session(left_ts: float, right_ts: float) -> bool:
     return session_id(left_ts) == session_id(right_ts)
 
 
+def is_a_share_symbol(symbol: str) -> bool:
+    """A-share market-hour metric supports SH/SZ only. HK/other is not this calendar."""
+    return symbol.endswith(".SH") or symbol.endswith(".SZ")
+
+
 def cash_session_overlap_s(start_ts: float, end_ts: float) -> float:
     """Elapsed A-share cash-session seconds between two market timestamps.
 
-    Windows are 09:30–11:30 and 13:00–15:00 UTC+8. Equal timestamps yield 0
-    (do not extrapolate from one point).
+    Windows are 09:30–11:30 and 13:00–15:00 UTC+8 on weekdays. Saturday and
+    Sunday contribute 0. Equal timestamps yield 0 (do not extrapolate from one
+    point). Official exchange holidays are not calendar-aware.
     """
     if not math.isfinite(start_ts) or not math.isfinite(end_ts):
         return 0.0
@@ -41,13 +47,14 @@ def cash_session_overlap_s(start_ts: float, end_ts: float) -> float:
     day = start.date()
     last = end.date()
     while day <= last:
-        for win_start, win_end in _CASH_WINDOWS:
-            window_start = datetime.combine(day, win_start, tzinfo=_SESSION_TZ)
-            window_end = datetime.combine(day, win_end, tzinfo=_SESSION_TZ)
-            left = max(start, window_start)
-            right = min(end, window_end)
-            if right > left:
-                total += (right - left).total_seconds()
+        if day.weekday() < 5:
+            for win_start, win_end in _CASH_WINDOWS:
+                window_start = datetime.combine(day, win_start, tzinfo=_SESSION_TZ)
+                window_end = datetime.combine(day, win_end, tzinfo=_SESSION_TZ)
+                left = max(start, window_start)
+                right = min(end, window_end)
+                if right > left:
+                    total += (right - left).total_seconds()
         day += timedelta(days=1)
     return total
 

@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from market_sentinel.telemetry.contract import TELEMETRY_DENYLIST, project_allowlist
+from market_sentinel.intelligence.contract import FallbackReason
+from market_sentinel.telemetry.contract import (
+    TELEMETRY_DENYLIST,
+    DecisionReason,
+    SuppressionReason,
+    project_allowlist,
+)
 
 EVALUATION_ALLOWLIST: frozenset[str] = frozenset(
     {
@@ -14,6 +20,8 @@ EVALUATION_ALLOWLIST: frozenset[str] = frozenset(
         "host_interaction",
         "intelligence",
         "per_symbol",
+        "per_run",
+        "per_market_date",
         "run_ids",
         "symbols",
         "market_dates",
@@ -24,6 +32,9 @@ EVALUATION_ALLOWLIST: frozenset[str] = frozenset(
         "skipped_trailing_partial",
         "healthy",
         "data_quality_warning",
+        "semantic_warning_count",
+        "runs_insufficient_market_time",
+        "runs_unsupported_market_scope",
         "market_time_coverage",
         "min_market_timestamp",
         "max_market_timestamp",
@@ -53,6 +64,9 @@ EVALUATION_ALLOWLIST: frozenset[str] = frozenset(
         "suppression_by_reason",
         "cooldown",
         "same_tick_duplicate",
+        "unrecognized_skip_reason_count",
+        "unrecognized_fallback_reason_count",
+        "unrecognized_suppression_reason_count",
         "alert_badge_reset",
         "signal_opened",
         "alert_dismissed",
@@ -86,6 +100,8 @@ EVALUATION_ALLOWLIST: frozenset[str] = frozenset(
         "token_total",
         "token_events_count",
         "symbol",
+        "run_id",
+        "market_date",
         "expired_episode",
         "suppressed_edge",
         "stale_feed",
@@ -104,18 +120,15 @@ EVALUATION_ALLOWLIST: frozenset[str] = frozenset(
     }
 )
 
-_BREAKDOWN_KEYS = frozenset(
-    {
-        "skip_by_decision_reason",
-        "fallback_by_fallback_reason",
-        "suppression_by_reason",
-    }
-)
+KNOWN_SKIP_REASONS: tuple[str, ...] = tuple(item.value for item in DecisionReason)
+KNOWN_FALLBACK_REASONS: tuple[str, ...] = tuple(item.value for item in FallbackReason)
+KNOWN_SUPPRESSION_REASONS: tuple[str, ...] = tuple(item.value for item in SuppressionReason)
 
 UNAVAILABLE_DENOMINATOR_ZERO = "denominator_is_zero"
 UNAVAILABLE_PRODUCER = "producer_not_implemented"
 UNAVAILABLE_NO_USAGE = "no_provider_usage"
 UNAVAILABLE_MARKET_TIME = "insufficient_market_time_evidence"
+UNAVAILABLE_MARKET_SCOPE = "unsupported_market_scope"
 
 PRODUCER_SIGNAL_OPENED = "signal_opened"
 PRODUCER_ALERT_DISMISSED = "alert_dismissed"
@@ -163,21 +176,19 @@ def _all_keys(payload: object) -> set[str]:
     return found
 
 
-def _project_tree(payload: object, *, allow_extra: bool = False) -> object:
+def _project_tree(payload: object) -> object:
     if isinstance(payload, dict):
         denied = TELEMETRY_DENYLIST.intersection(payload)
         if denied:
             raise ValueError(f"evaluation report contains denied keys: {sorted(denied)}")
         projected: dict[str, object] = {}
         for key, value in payload.items():
-            keep = allow_extra or key in EVALUATION_ALLOWLIST
-            if not keep:
+            if key not in EVALUATION_ALLOWLIST:
                 continue
-            child_extra = key in _BREAKDOWN_KEYS
-            projected[key] = _project_tree(value, allow_extra=child_extra)
+            projected[key] = _project_tree(value)
         return projected
     if isinstance(payload, list):
-        return [_project_tree(item, allow_extra=allow_extra) for item in payload]
+        return [_project_tree(item) for item in payload]
     return payload
 
 
@@ -192,6 +203,8 @@ class EvaluationReport:
     host_interaction: dict[str, Any]
     intelligence: dict[str, Any]
     per_symbol: list[dict[str, Any]]
+    per_run: list[dict[str, Any]]
+    per_market_date: list[dict[str, Any]]
 
     def to_record(self) -> dict[str, Any]:
         raw = {
@@ -202,5 +215,7 @@ class EvaluationReport:
             "host_interaction": self.host_interaction,
             "intelligence": self.intelligence,
             "per_symbol": self.per_symbol,
+            "per_run": self.per_run,
+            "per_market_date": self.per_market_date,
         }
         return sanitize_report(raw)

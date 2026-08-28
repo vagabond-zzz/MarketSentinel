@@ -211,6 +211,7 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Volume ratio needs about **20 in-session 1-minute baselines** before it is defined (`None` until then, never treated as 0).
 - Session id is the **UTC+8 calendar day**. That matches current A/H MVP examples; there is no full exchange calendar.
 - `MarketBar` is an adaptive-polling **sampled/observed** 1-minute bar, not an exchange official K-line.
+- `MarketBar` is an adaptive-polling **sampled/observed** 1-minute bar, not an exchange official K-line.
 - VWAP needs reliable cumulative **turnover and volume** (live Longbridge currently maps `turnover` to `None`).
 - Tencent in-session live gate passed 2026-08-28 (1 / 2 / 10 batches + freshness). Sina is a one-shot cross-check. Longbridge remains optional. Tencent/Sina are probes until Core `MarketProvider` wiring is an explicit follow-up.
 - Python runtime is **not bundled** in the VSIX (developer install: `coreRoot` + `uvPath`). Longbridge requires a **manual** `uv sync --extra live` (Host does not pass `--extra` on spawn).
@@ -221,8 +222,8 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - No `notified_timestamp` (alert candidate ≠ notified).
 - Intelligence is **off by default** (`MARKET_SENTINEL_INTEL_ENABLED=1` to enable). Host hover/click never calls a model. No News, MCP, auto-trading, or buy/sell advice. Default sidecar timeout is 8s. The DashScope adapter sends `enable_thinking: false`. Live model calls are **not** in default pytest.
 - `ClusterMembershipTracker` keeps clustered `event_id`s for the whole Core run (once-per-run exactness). M3 reports `cluster_tracker_seen_count`. Bounded lifecycle is a v0.6 RC question, not LRU.
-- Telemetry JSONL write/flush/rotate is synchronous on the producer thread. M3 measures Replay overhead vs NoOp as evidence; it does not switch to an async queue.
-- Evaluation `alerts_per_market_hour` uses A-share cash-session overlap (UTC+8 `09:30–11:30` / `13:00–15:00`), not process wall time. No holiday calendar. Host open/dismiss/mute rates are unavailable until those producers exist.
+- Telemetry JSONL write/flush/rotate is synchronous on the producer thread. M3 measures Replay overhead vs NoOp as evidence (`absolute_extra_s`, `relative_overhead_fraction` = extra/baseline, `total_runtime_ratio` = telemetry/baseline); it does not switch to an async queue.
+- Evaluation `alerts_per_market_hour` is A-share only (`.SH` / `.SZ`). Non-A-share scope is unavailable rather than silently using A-share windows. The denominator is telemetry-observed market-time span per `run_id`, not process wall time or feed uptime. Weekends are excluded; official exchange holidays are not yet calendar-aware. Host open/dismiss/mute rates are unavailable until those producers exist.
 
 ## v0.1 status
 

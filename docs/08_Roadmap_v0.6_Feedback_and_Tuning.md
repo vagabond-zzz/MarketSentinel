@@ -1,6 +1,6 @@
 # Roadmap v0.6 — Feedback, Observability & Tuning
 
-> Status: **M0 frozen. M1/M2 PASS.** M3 evaluation report implemented on `feat/v0.6-feedback-observability` for **external review**. Package versions remain **0.5.0**. Protocol **1**. **Do not start M4.**
+> Status: **M0 frozen. M1/M2 PASS.** M3 evaluation implemented; **M3 review-fix pass** on `feat/v0.6-feedback-observability`. Package versions remain **0.5.0**. Protocol **1**. **Do not start M4.**
 >
 > Token target: **低**
 >
@@ -259,9 +259,10 @@ M0 已纳入：`run_id`、`market_timestamp`、Host→Core collector 所有权�
 
 ### M3 — Evaluation report
 
-- [x] daily/session summary from JSONL (`run_id`, optional symbol / market date);
+- [x] daily/session summary from JSONL (`per_run`, `per_market_date`; market date from `market_timestamp` only);
 - [x] pipeline funnel + noise metrics (priority, suppression by reason, repeated episode, alerts per A-share market hour);
-- [x] intelligence cost (skip/fallback breakdown, latency stages, actual token events only);
+- [x] A-share market-hour metric is `.SH`/`.SZ` only; non-A-share is `unsupported_market_scope`, not A-share windows;
+- [x] intelligence cost (skip/fallback breakdown on frozen keys, latency stages, actual token events only);
 - [x] Host unimplemented facts (`signal_opened` / dismiss / mute) reported as **unavailable**, never fake 0%.
 
 Read-only. Does not rewrite telemetry semantics, Event/Signal rules, thresholds, or RouterPolicy.
