@@ -48,6 +48,8 @@ class MarketDaemon:
         return self._phase
 
     async def run(self) -> int:
+        if self._engine.intelligence is not None:
+            await self._engine.intelligence.start()
         ticker = asyncio.create_task(self._tick_loop(), name="market-daemon-tick")
         try:
             await self._stdin_loop()
@@ -59,6 +61,8 @@ class MarketDaemon:
                 await ticker
             except asyncio.CancelledError:
                 pass
+            if self._engine.intelligence is not None:
+                await self._engine.intelligence.shutdown()
         return 0
 
     async def _stdin_loop(self) -> None:

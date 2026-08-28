@@ -10,6 +10,7 @@ from market_sentinel.domain.models import MarketSnapshot
 from market_sentinel.domain.signals import SignalPipelineResult
 from market_sentinel.features.engine import FeatureEngine
 from market_sentinel.health.feed_health import FeedHealthTracker
+from market_sentinel.intelligence.coordinator import IntelligenceCoordinator
 from market_sentinel.market_data.buffers import SymbolBuffers
 from market_sentinel.market_data.state import MarketStateStore
 from market_sentinel.orchestration.warming import WarmingPolicy
@@ -44,6 +45,7 @@ class MarketEngine:
         feature_engine: FeatureEngine | None = None,
         pipeline: SignalPipeline | None = None,
         warming: WarmingPolicy | None = None,
+        intelligence: IntelligenceCoordinator | None = None,
     ) -> None:
         self.clock = clock
         self.watchlist = watchlist
@@ -55,6 +57,7 @@ class MarketEngine:
         self._feature_engine = feature_engine or FeatureEngine()
         self.pipeline = pipeline or SignalPipeline(clock)
         self._warming = warming or WarmingPolicy()
+        self.intelligence = intelligence
         self._fetched_symbols: set[str] = set()
         self.diagnostics = EngineDiagnostics()
 
@@ -71,7 +74,19 @@ class MarketEngine:
         for symbol in enabled:
             if symbol not in due_set:
                 self._project_health(symbol)
-        return EngineTickResult(symbol_results=tuple(results))
+        result = EngineTickResult(symbol_results=tuple(results))
+        if self.intelligence is not None:
+            active_ids: set[str] = set()
+            for item in self.watchlist.list():
+                state = self.states.get(item.symbol)
+                if state is not None:
+                    active_ids.update(signal.id for signal in state.active_signals)
+            self.intelligence.observe_tick(
+                result,
+                feed_status_for=self.health.status,
+                active_ids=active_ids,
+            )
+        return result
 
     async def _fetch_due(self, due: list[str]) -> None:
         try:
