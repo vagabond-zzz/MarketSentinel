@@ -194,3 +194,56 @@ async def test_expires_at_marks_episode_expired_before_enqueue() -> None:
     assert coordinator.diagnostics.requests_submitted == 0
     assert model.calls == []
     await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_shutdown_clears_queued_episode_state() -> None:
+    model = FakeIntelligenceProvider()
+    coordinator = IntelligenceCoordinator(model, FakeClock())
+    await coordinator.start()
+    signals = (_signal("s0"), _signal("s1"), _signal("s2"))
+    coordinator.observe_tick(
+        _tick(*signals),
+        feed_status_for=lambda _symbol: FeedStatus.LIVE,
+        active_ids={item.id for item in signals},
+    )
+    submitted = coordinator.diagnostics.requests_submitted
+    assert submitted == 3
+    assert coordinator.tracked_episode_count() == 3
+    assert coordinator.registry.ids() == {"s0", "s1", "s2"}
+    await coordinator.shutdown()
+    assert coordinator.tracked_episode_count() == 0
+    assert coordinator.registry.ids() == set()
+    assert coordinator.diagnostics.requests_submitted == submitted
+    assert model.calls == []
+
+
+@pytest.mark.asyncio
+async def test_coordinator_can_restart_cleanly_after_shutdown() -> None:
+    model = FakeIntelligenceProvider()
+    coordinator = IntelligenceCoordinator(model, FakeClock())
+    await coordinator.start()
+    first = _signal("s0")
+    coordinator.observe_tick(
+        _tick(first),
+        feed_status_for=lambda _symbol: FeedStatus.LIVE,
+        active_ids={first.id},
+    )
+    assert coordinator.diagnostics.requests_submitted == 1
+    await coordinator.shutdown()
+    assert coordinator.tracked_episode_count() == 0
+    assert coordinator.registry.ids() == set()
+    await coordinator.start()
+    coordinator.observe_tick(
+        _tick(first),
+        feed_status_for=lambda _symbol: FeedStatus.LIVE,
+        active_ids={first.id},
+    )
+    await coordinator.idle()
+    assert coordinator.diagnostics.requests_submitted == 2
+    assert len(model.calls) == 1
+    stored = coordinator.registry.get(first.id)
+    assert stored is not None
+    await coordinator.shutdown()
+    assert coordinator.tracked_episode_count() == 0
+    assert coordinator.registry.ids() == set()

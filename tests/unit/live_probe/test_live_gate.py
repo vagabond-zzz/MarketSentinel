@@ -35,7 +35,10 @@ def _obs(**overrides: object) -> Observation:
 
 
 def test_evaluate_quote_accepts_in_session_row() -> None:
-    failures = evaluate_quote(_obs(), today=date(2026, 8, 28), min_fields=80)
+    obs = _obs()
+    failures = evaluate_quote(
+        obs, today=date(2026, 8, 28), min_fields=80, now=obs.received_timestamp
+    )
     assert failures == []
 
 

@@ -16,6 +16,9 @@ class AnnotationRegistry:
     def drop(self, signal_id: str) -> None:
         self._rows.pop(signal_id, None)
 
+    def clear(self) -> None:
+        self._rows.clear()
+
     def ids(self) -> set[str]:
         return set(self._rows)
 

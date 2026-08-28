@@ -110,8 +110,12 @@ class IntelligenceCoordinator:
     async def shutdown(self) -> None:
         queue = self._queue
         if queue is None:
+            self._reset_runtime_state_after_shutdown()
             return
         self._closed = True
+        for task in self._in_flight_tasks.values():
+            if not task.done():
+                task.cancel()
         for worker in self._workers:
             worker.cancel()
         for worker in self._workers:
@@ -121,7 +125,19 @@ class IntelligenceCoordinator:
                 pass
         self._workers = []
         self._queue = None
+        self._reset_runtime_state_after_shutdown()
+
+    def _reset_runtime_state_after_shutdown(self) -> None:
+        """Drop episode lifecycle maps. Diagnostics counters are left intact."""
+        self._calls.clear()
+        self._last_priority.clear()
+        self._generation.clear()
+        self._pending.clear()
+        self._active_ids.clear()
         self._in_flight_tasks.clear()
+        self._in_flight = 0
+        self.registry.clear()
+        self._idle.set()
 
     async def idle(self) -> None:
         queue = self._queue
