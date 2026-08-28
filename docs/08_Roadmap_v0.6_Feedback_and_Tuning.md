@@ -1,8 +1,10 @@
 # Roadmap v0.6 — Feedback, Observability & Tuning
 
-> Status: Planned after v0.5
+> Status: **M0 Metrics Contract on `feat/v0.6-feedback-observability`.** Waiting for external review. Not tagged. Package versions remain **0.5.0**. Protocol **1**.
 >
 > Token target: **低**
+>
+> See `docs/16_v0.6_Metrics_Contract.md`.
 
 ---
 
@@ -239,7 +241,7 @@ new config
 
 ### M0 — Metrics contract
 
-定义什么记录、什么不记录。
+- [x] 定义什么记录、什么不记录（`docs/16_v0.6_Metrics_Contract.md`；Core types only）。
 
 ### M1 — Host interaction telemetry
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — v0.6 M0 Metrics Contract (no version bump)
+
+Optional telemetry contract on `feat/v0.6-feedback-observability`. Package versions stay **0.5.0**. Protocol stays **1**. No storage, Host UI, or online tuning.
+
+- `TelemetryEvent` / `UserFeedback` / `TuningSnapshot` types and allowlist/denylist
+- Measurement does not mutate Event/Signal; feedback is not a market fact
+
 ## 0.5.0 — 2026-08-28 (not tagged yet)
 
 Package versions are **0.5.0**. Protocol stays **1**.
