@@ -146,6 +146,34 @@ def test_middle_corruption_is_detectable(tmp_path: Path) -> None:
     assert [row["telemetry_id"] for row in result.records] == ["a", "b"]
 
 
+def test_middle_invalid_utf8_is_detectable(tmp_path: Path) -> None:
+    path = telemetry_jsonl_path(tmp_path)
+    path.write_bytes(b'{"telemetry_id":"a"}\n\xff\n{"telemetry_id":"b"}\n')
+    result = read_jsonl(path)
+    assert result.healthy is False
+    assert result.malformed_complete_lines == 1
+    assert result.skipped_trailing_partial is False
+    assert [row["telemetry_id"] for row in result.records] == ["a", "b"]
+
+
+def test_trailing_incomplete_utf8_is_recoverable(tmp_path: Path) -> None:
+    path = telemetry_jsonl_path(tmp_path)
+    sink = JsonlTelemetrySink(path)
+    SinkTelemetryCollector(sink).record(_event(telemetry_id="keep-1"))
+    SinkTelemetryCollector(sink).record(_event(telemetry_id="keep-2"))
+    sink.close()
+    path.write_bytes(path.read_bytes() + b"\xe6\xb5")
+    result = read_jsonl(path)
+    assert [row["telemetry_id"] for row in result.records] == ["keep-1", "keep-2"]
+    assert result.skipped_trailing_partial is True
+    assert result.healthy is True
+    reopened = JsonlTelemetrySink(path)
+    SinkTelemetryCollector(reopened).record(_event(telemetry_id="keep-3"))
+    reopened.close()
+    ids = [row["telemetry_id"] for row in read_jsonl(path).records]
+    assert ids == ["keep-1", "keep-2", "keep-3"]
+
+
 def test_storage_failure_does_not_change_pipeline_facts(tmp_path: Path) -> None:
     del tmp_path
     clock = FakeClock(wall=10.0, monotonic=0.0)

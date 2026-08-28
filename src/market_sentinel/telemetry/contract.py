@@ -261,6 +261,10 @@ class ClusterMembershipTracker:
 
     First time the event participates in a multi-event Signal episode.
     Composer recomputes do not re-emit.
+
+    The membership set is unbounded for the run lifetime so the once-per-run
+    contract stays exact. Reassess a bounded lifecycle before v0.6 RC; do not
+    add LRU here (that would re-emit clustered ids after eviction).
     """
 
     def __init__(self) -> None:

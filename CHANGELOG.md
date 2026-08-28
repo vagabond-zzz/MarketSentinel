@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — v0.6 M1/M2 review fixes (no version bump)
+
+Narrow telemetry-edge fixes on `feat/v0.6-feedback-observability` after M1/M2 external review. Package **0.5.0**. Protocol **1**. No M3.
+
+- Same-tick duplicate `produced` rows: episode created/escalated once per `signal.id`; `alert_suppressed(same_tick_duplicate)` unchanged
+- JSONL reader decodes complete lines as raw bytes; invalid UTF-8 is corruption, not `UnicodeDecodeError`
+
 ## Unreleased — v0.6 M2 Local JSONL Storage (no version bump)
 
 Persist Core telemetry as append-only JSONL on `feat/v0.6-feedback-observability`. Package versions stay **0.5.0**. Protocol stays **1**. No evaluation report, feedback files, TuningSnapshot persistence, SQLite, or M3.

@@ -1,6 +1,6 @@
 # Roadmap v0.6 — Feedback, Observability & Tuning
 
-> Status: **M0 Metrics Contract frozen.** M1 telemetry wiring and M2 local JSONL storage are complete on `feat/v0.6-feedback-observability`. Package versions remain **0.5.0**. Protocol **1**. **Do not start M3.**
+> Status: **M0 frozen.** M1/M2 review fixes applied on `feat/v0.6-feedback-observability`. Package versions remain **0.5.0**. Protocol **1**. **M3 is not approved.**
 >
 > Token target: **低**
 >

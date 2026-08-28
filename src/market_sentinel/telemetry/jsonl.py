@@ -3,13 +3,15 @@
 Lifecycle: open (repair trailing partial) → append + flush → rotate → close.
 
 Corruption:
-  - Trailing incomplete last line: reader skips it; next open truncates it.
+  - Trailing incomplete last line (JSON or UTF-8): reader skips it; next open truncates it.
   - Valid JSON missing a trailing newline: next open appends a newline.
-  - Complete malformed line in the middle: counted; ``healthy`` is False; file is not rewritten.
+  - Complete malformed line in the middle (invalid UTF-8 or JSON): counted;
+    ``healthy`` is False; file is not rewritten.
 
 Rotation: after a write, if size >= max_bytes, close, shift ``.1``..``N`` backups, reopen.
 A single record larger than max_bytes is still written (one record may occupy a whole file).
 
+Writes run synchronously on the producer thread (write → flush → stat → maybe rotate).
 Storage diagnostics use this module's logger, never the telemetry stream.
 """
 
@@ -133,28 +135,46 @@ class JsonlReadResult:
 
 
 def read_jsonl(path: Path) -> JsonlReadResult:
-    """Read one JSONL file. Skip trailing partials; count complete bad lines."""
+    """Read one JSONL file.
+
+    Complete newline-terminated lines are decoded one at a time. Invalid UTF-8 or
+    JSON on a complete line is corruption (``healthy`` is False), not an exception.
+    A trailing fragment without a newline is skipped, not counted as middle corruption.
+    """
     if not path.exists():
         return JsonlReadResult([], False, 0)
     raw = path.read_bytes()
     skipped_trailing = False
-    body = raw
+    complete = raw
+    extra_complete: bytes | None = None
     if raw and not raw.endswith(b"\n"):
         last_nl = raw.rfind(b"\n")
+        prefix = raw[: last_nl + 1] if last_nl >= 0 else b""
         tail = raw[last_nl + 1 :] if last_nl >= 0 else raw
         try:
             json.loads(tail.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError):
             skipped_trailing = True
-            body = raw[: last_nl + 1] if last_nl >= 0 else b""
-    text = body.decode("utf-8")
+            complete = prefix
+        else:
+            complete = prefix
+            extra_complete = tail
     records: list[dict[str, object]] = []
     malformed = 0
-    for line in text.splitlines():
-        if line.strip() == "":
+    lines = _newline_terminated_lines(complete)
+    if extra_complete is not None:
+        lines.append(extra_complete)
+    for line in lines:
+        if line.strip() == b"":
             continue
         try:
-            parsed = json.loads(line)
+            text = line.decode("utf-8")
+        except UnicodeDecodeError:
+            malformed += 1
+            logger.warning("telemetry jsonl malformed utf-8 complete line in %s", path)
+            continue
+        try:
+            parsed = json.loads(text)
         except json.JSONDecodeError:
             malformed += 1
             logger.warning("telemetry jsonl malformed complete line in %s", path)
@@ -171,3 +191,12 @@ def read_jsonl(path: Path) -> JsonlReadResult:
             malformed,
         )
     return JsonlReadResult(records, skipped_trailing, malformed)
+
+
+def _newline_terminated_lines(blob: bytes) -> list[bytes]:
+    if not blob:
+        return []
+    parts = blob.split(b"\n")
+    if blob.endswith(b"\n"):
+        return parts[:-1]
+    return parts

@@ -210,6 +210,8 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - No WebView, no alert history panel.
 - No `notified_timestamp` (alert candidate ≠ notified).
 - Intelligence is **off by default** (`MARKET_SENTINEL_INTEL_ENABLED=1` to enable). Host hover/click never calls a model. No News, MCP, auto-trading, or buy/sell advice. Default sidecar timeout is 8s. The DashScope adapter sends `enable_thinking: false`. Live model calls are **not** in default pytest.
+- `ClusterMembershipTracker` keeps clustered `event_id`s for the whole Core run (once-per-run exactness). Bounded lifecycle is a v0.6 RC question, not LRU.
+- Telemetry JSONL write/flush/rotate is synchronous on the producer thread. Fine for the current 10-symbol scope; measure tick latency before changing it.
 
 ## v0.1 status
 

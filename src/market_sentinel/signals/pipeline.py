@@ -91,8 +91,13 @@ class SignalPipeline:
         prior_priority: dict[str, SignalPriority],
         produced: list[tuple[Signal, SignalTrace]],
     ) -> None:
+        """Observe episode lifecycle once per signal.id; duplicates stay alert-only."""
         runtime = self._telemetry
+        seen: set[str] = set()
         for signal, _trace in produced:
+            if signal.id in seen:
+                continue
+            seen.add(signal.id)
             previous = prior_priority.get(signal.id)
             if previous is None:
                 self._emit_signal(TelemetryName.SIGNAL_EPISODE_CREATED, signal)
