@@ -2,7 +2,7 @@
 
 Low-latency market monitoring core for developer hosts (Cursor, DeepSeek Harness, ZCode).
 
-**Current tagged release: v0.3.0 — Cursor Host.** v0.4 work is on `feat/v0.4-live-market-data` (package versions still 0.3.0; Protocol v1). Preferred live source order is **Tencent → Sina cross-check → optional Longbridge**. Tushare is excluded. High-frequency market updates never call an LLM (`Token = 0`).
+**Current tagged release: v0.3.0 — Cursor Host.** v0.4 live-gate work remains on `feat/v0.4-live-market-data` (not tagged `v0.4.0`). v0.5 Intelligence Router is on `feat/v0.5-market-intelligence`. Package versions are still 0.3.0; Protocol v1. High-frequency market updates never call an LLM (`Token = 0` unless intelligence is explicitly enabled).
 
 ## Positioning
 
@@ -203,7 +203,7 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Unread alert count is Host-local and resets on extension reload (not written to workspaceState).
 - No WebView, no alert history panel.
 - No `notified_timestamp` (alert candidate ≠ notified).
-- No LLM, News, MCP, auto-trading, or buy/sell advice.
+- Intelligence is **off by default** (`MARKET_SENTINEL_INTEL_ENABLED=1` to enable). Host hover/click never calls a model. No News, MCP, auto-trading, or buy/sell advice.
 
 ## v0.1 status
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — v0.5 Market Intelligence Router (no version bump)
+
+Optional low-frequency Intelligence sidecar on `feat/v0.5-market-intelligence`. Package versions stay **0.3.0**. Protocol stays **1** (additive `intelligence` on `WireSignal` only). Default `MARKET_SENTINEL_INTEL_ENABLED` is off, so ordinary ticks still make **zero** model calls.
+
+- Deterministic `need_intelligence` router; Rule `Signal` is unchanged
+- Async coordinator with bounded queue, episode call budget (default 1), timeout, fallback
+- Fake provider for default tests; DashScope/Qwen adapter isolated under `intelligence/providers`
+- Cursor hover shows enrichment only when status is `enriched`
+
 ## Unreleased — v0.4 Tencent/Sina live gate (no version bump)
 
 Preferred live source is Tencent `qt.gtimg.cn` with a one-shot Sina `hq.sinajs.cn` cross-check. Longbridge stays in-tree but is optional and does not block. Tushare is excluded. Package versions stay **0.3.0**. Protocol stays **1**.

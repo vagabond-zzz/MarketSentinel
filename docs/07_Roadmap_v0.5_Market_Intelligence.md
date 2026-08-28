@@ -1,8 +1,10 @@
 # Roadmap v0.5 — Market Intelligence Router
 
-> Status: Planned after v0.4 Live Market Data
+> Status: **RC on `feat/v0.5-market-intelligence`.** Waiting for external review. Not tagged, not merged, versions remain 0.3.0.
 >
-> Token target: **极低**
+> Token target: **0 by default**; **极低** only when intelligence is explicitly enabled.
+>
+> See `docs/14_v0.5_Intelligence_Contract.md` and `docs/15_v0.5_Release_Candidate.md`.
 
 ---
 
@@ -315,22 +317,23 @@ Intelligence Router 是市场分析组件，不是 Workspace Agent。
 
 ### M7 — Release prep
 
-- docs / tests / cost audit / version。
+- docs / tests / cost / privacy / protocol-compat audit；
+- **no** version bump, tag, merge, or push — stop for external review。
 
 ---
 
 ## 14. v0.5 验收
 
-- [ ] Agent 只由 Significant Event / Episode 触发；
-- [ ] 正常行情 Token = 0；
-- [ ] 每个 episode 默认最多一次 LLM 调用；
-- [ ] raw ticks 不发送给模型；
-- [ ] LLM failure → Rule Signal fallback；
-- [ ] Rule Signal / Enrichment 可区分；
-- [ ] Intelligence latency 单独统计；
-- [ ] Core tick 不等待模型；
-- [ ] Host 不触发 intelligence decision；
-- [ ] no trading advice。
+- [x] Agent 只由 Significant Event / Episode 触发；
+- [x] 正常行情 Token = 0；
+- [x] 每个 episode 默认最多一次 LLM 调用；
+- [x] raw ticks 不发送给模型；
+- [x] LLM failure → Rule Signal fallback；
+- [x] Rule Signal / Enrichment 可区分；
+- [x] Intelligence latency 单独统计；
+- [x] Core tick 不等待模型；
+- [x] Host 不触发 intelligence decision；
+- [x] no trading advice。
 
 ---
 
