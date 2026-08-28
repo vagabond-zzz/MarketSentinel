@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — v0.4 Tencent/Sina live gate (no version bump)
+
+Preferred live source is Tencent `qt.gtimg.cn` with a one-shot Sina `hq.sinajs.cn` cross-check. Longbridge stays in-tree but is optional and does not block. Tushare is excluded. Package versions stay **0.3.0**. Protocol stays **1**.
+
+- Reused existing Tencent probe for efficient 1 / 2 / 10 symbol batches (`sh`/`sz` vendor codes)
+- In-session freshness: today's CST date, cash-session quote time, recorded received−market latency, non-decreasing volume, positive volume delta (price change not required)
+- Sina probe is one-shot with Referer; no polling loop
+- Access-denied / anti-bot payloads fail closed
+- Live tests fail closed (no skip/mock) for Tencent and Sina
+- `HealthPolicy.delayed_s` remains 3.0
+- Longbridge implementation is not deleted
+
 ## Unreleased — v0.4 audit-blocker fixes (live session gate pending)
 
 External v0.4 Release Audit rejected the previous RC. Package versions stay **0.3.0** and Protocol stays **1** until every gate passes. Do not tag `v0.4.0` yet.

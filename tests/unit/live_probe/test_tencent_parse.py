@@ -3,6 +3,8 @@ from __future__ import annotations
 import pytest
 from tools.live_probe.tencent_probe import (
     ProbeParseError,
+    ProbeTransportError,
+    fetch_tencent_quotes,
     parse_tencent_response,
     to_vendor_symbol,
 )
@@ -49,6 +51,8 @@ def test_parses_sanitized_gtimg_line_without_inventing_units() -> None:
     assert row.field_confidence["volume_raw"] == "INFERRED"
     assert row.field_confidence["turnover_raw"] == "INFERRED"
     assert row.field_confidence["market_timestamp_raw"] == "INFERRED"
+    assert row.name == "Maotai"
+    assert row.field_count is not None and row.field_count >= 38
 
 
 def test_empty_response_fails_closed() -> None:
@@ -61,6 +65,12 @@ def test_empty_response_fails_closed() -> None:
 def test_malformed_response_fails_closed() -> None:
     with pytest.raises(ProbeParseError):
         parse_tencent_response("not-a-quote", requested=["600519.SH"])
+
+
+def test_symbol_mismatch_fails_closed() -> None:
+    swapped = _SANITIZED_SH.replace("~600519~", "~000001~", 1)
+    with pytest.raises(ProbeParseError, match="symbol mismatch"):
+        parse_tencent_response(swapped, requested=["600519.SH"])
 
 
 def test_unknown_symbol_marker_fails_closed() -> None:
@@ -95,3 +105,8 @@ def test_extra_trailing_fields_still_parse() -> None:
     rows = parse_tencent_response(extra, requested=["600519.SH"])
     assert rows[0].price == 1292.30
     assert rows[0].volume_raw == 24767.0
+
+
+def test_access_denied_payload_fails_closed() -> None:
+    with pytest.raises(ProbeTransportError, match="access-denied"):
+        fetch_tencent_quotes(["600519.SH"], transport=lambda _url, _timeout: "access denied")

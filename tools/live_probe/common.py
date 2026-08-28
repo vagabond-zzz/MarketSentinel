@@ -21,6 +21,15 @@ class ProbeTransportError(RuntimeError):
     """HTTP/SDK transport failed. Fail closed."""
 
 
+_BLOCKED_TOKENS = ("访问过于频繁", "forbidden", "access denied", "anti-bot")
+
+
+def reject_blocked_payload(text: str) -> None:
+    lowered = text.lower()
+    if any(token in text or token in lowered for token in _BLOCKED_TOKENS):
+        raise ProbeTransportError("access-denied")
+
+
 @dataclass
 class Observation:
     provider: str
@@ -47,6 +56,8 @@ class Observation:
     turnover_div_volume_times_100: float | None = None
     error: str | None = None
     notes: list[str] = field(default_factory=list)
+    name: str | None = None
+    field_count: int | None = None
 
     def to_record(self) -> dict[str, Any]:
         record = asdict(self)

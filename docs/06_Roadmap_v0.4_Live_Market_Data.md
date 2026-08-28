@@ -1,11 +1,11 @@
 # Roadmap v0.4 — Live Market Data & Feed Reliability
 
-> Status: **Audit-blocker fixes on `feat/v0.4-live-market-data`; live session smoke PENDING.**
+> Status: **Tencent in-session live gate PASSED 2026-08-28 morning session.** Sina one-shot cross-check PASSED. Longbridge remains optional and is **not** a release blocker. Tushare is **excluded**. Core MarketProvider wiring is unchanged (no architecture redesign yet).
 >
 > Token target: **0**
 >
 > See `docs/12_v0.4_Longbridge_Provider_Setup.md` and `docs/13_v0.4_Release_Candidate.md`.
-> Do not tag `v0.4.0` until the credentialed A-share live gates pass.
+> Do not tag `v0.4.0` until the remaining Core-wiring / release steps are explicitly completed.
 
 ---
 
@@ -76,6 +76,8 @@ Host 不解析第三方行情响应。
 ---
 
 ## 3. Live Provider MVP
+
+**2026-08-28 plan change:** Longbridge credentials and extra realtime permissions (Tushare) must not block this release. The live **gate** uses the existing Tencent `qt.gtimg.cn` probe as primary, with a one-shot Sina cross-check. Core `MarketProvider` wiring is **not** redesigned in this step. Longbridge code stays in-tree as optional.
 
 v0.4 只要求：
 

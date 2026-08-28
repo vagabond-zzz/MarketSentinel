@@ -14,6 +14,7 @@ from tools.live_probe.common import (
     clamp_interval,
     fill_derived,
     parse_cst_compact,
+    reject_blocked_payload,
     require_ashare,
     require_finite_number,
     write_jsonl,
@@ -75,10 +76,13 @@ def _http_get(url: str, timeout_s: float) -> str:
         raise ProbeTransportError(f"transport: {reason}") from exc
     for encoding in ("gb18030", "gbk", "utf-8"):
         try:
-            return raw.decode(encoding)
+            text = raw.decode(encoding)
+            break
         except UnicodeDecodeError:
             continue
-    raise ProbeParseError("unable to decode Tencent response")
+    else:
+        raise ProbeParseError("unable to decode Tencent response")
+    return text
 
 
 def parse_tencent_response(text: str, *, requested: list[str]) -> list[Observation]:
@@ -104,6 +108,13 @@ def parse_tencent_response(text: str, *, requested: list[str]) -> list[Observati
         if len(fields) < _MIN_FIELDS:
             raise ProbeParseError("field count")
         core = vendor_to_core[vendor]
+        ticker = fields[2].strip()
+        expected_ticker = core.split(".")[0]
+        if ticker != expected_ticker:
+            raise ProbeParseError("symbol mismatch")
+        name = fields[1].strip()
+        if name == "":
+            raise ProbeParseError("name")
         composite = fields[_INFERRED_INDEX["turnover_composite"]]
         parts = composite.split("/")
         if len(parts) != 3:
@@ -130,8 +141,10 @@ def parse_tencent_response(text: str, *, requested: list[str]) -> list[Observati
             field_confidence=dict(_CONFIDENCE),
             notes=[
                 "experimental unofficial gtimg HTTP; field indexes INFERRED",
-                f"observed_field_count>={len(fields)}",
+                f"observed_field_count={len(fields)}",
             ],
+            name=name,
+            field_count=len(fields),
         )
         found[core] = row
     missing = [symbol for symbol in wanted if symbol not in found]
@@ -155,6 +168,7 @@ def fetch_tencent_quotes(
         payload = getter(url, timeout_s)
     except TimeoutError as exc:
         raise ProbeTransportError("timeout") from exc
+    reject_blocked_payload(payload)
     rows = parse_tencent_response(payload, requested=cores)
     received = received_timestamp
     if received is None:

@@ -2,7 +2,7 @@
 
 Low-latency market monitoring core for developer hosts (Cursor, DeepSeek Harness, ZCode).
 
-**Current tagged release: v0.3.0 — Cursor Host.** v0.4 Longbridge live data is on `feat/v0.4-live-market-data` (package versions still 0.3.0; Protocol v1). Audit-blocker fixes are in progress; **in-session live volume/latency gates are not passed**, so `v0.4.0` is not tagged. High-frequency market updates never call an LLM (`Token = 0`).
+**Current tagged release: v0.3.0 — Cursor Host.** v0.4 work is on `feat/v0.4-live-market-data` (package versions still 0.3.0; Protocol v1). Preferred live source order is **Tencent → Sina cross-check → optional Longbridge**. Tushare is excluded. High-frequency market updates never call an LLM (`Token = 0`).
 
 ## Positioning
 
@@ -121,7 +121,7 @@ uv run market-sentinel --watchlist data/watchlist.json run --once
 uv run market-sentinel --watchlist data/watchlist.json run --once --verbose
 ```
 
-`--provider` defaults to `fake`. `replay` reads a JSONL fixture (`--replay path`). `longbridge` is the v0.4 live A-share provider (manual `uv sync --extra live` + env credentials; Cursor spawn does not pass `--extra live`). `http` remains an unimplemented stub.
+`--provider` defaults to `fake`. `replay` reads a JSONL fixture (`--replay path`). `longbridge` is an optional Core adapter (manual `uv sync --extra live` + env credentials; Cursor spawn does not pass `--extra live`). The v0.4 live gate uses Tencent/Sina probes, not this factory path. `http` remains an unimplemented stub.
 
 Host protocol (v0.3.0; stdout is JSONL Protocol v1 only):
 
@@ -196,7 +196,7 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Session id is the **UTC+8 calendar day**. That matches current A/H MVP examples; there is no full exchange calendar.
 - `MarketBar` is an adaptive-polling **sampled/observed** 1-minute bar, not an exchange official K-line.
 - VWAP needs reliable cumulative **turnover and volume** (live Longbridge currently maps `turnover` to `None`).
-- Live Longbridge in-session smoke is **pending** (credentials + A-share hours). Tencent HTTP is experimental probe only.
+- Tencent in-session live gate passed 2026-08-28 (1 / 2 / 10 batches + freshness). Sina is a one-shot cross-check. Longbridge remains optional. Tencent/Sina are probes until Core `MarketProvider` wiring is an explicit follow-up.
 - Python runtime is **not bundled** in the VSIX (developer install: `coreRoot` + `uvPath`). Longbridge requires a **manual** `uv sync --extra live` (Host does not pass `--extra` on spawn).
 - Desktop Cursor / VS Code only (`extensionKind: ui`). Web / browser Cursor is unsupported. Remote SSH / Codespaces is not validated.
 - Untrusted workspaces are unsupported because the host starts a local Python Core.
