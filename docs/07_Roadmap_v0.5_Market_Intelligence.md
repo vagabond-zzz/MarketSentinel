@@ -1,6 +1,6 @@
 # Roadmap v0.5 — Market Intelligence Router
 
-> Status: **RC Fix Pass on `feat/v0.5-market-intelligence`.** Waiting for second external review. Not tagged, not merged, versions remain 0.3.0.
+> Status: **Final release verification complete** on `feat/v0.5-market-intelligence` @ `95398c4`. Waiting for release approval. Not tagged, not merged, versions remain 0.3.0.
 >
 > Token target: **0 by default**; **极低** only when intelligence is explicitly enabled.
 >

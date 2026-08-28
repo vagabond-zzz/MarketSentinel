@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — v0.5 Final Release Verification (no version bump)
+
+Verification-only against feature freeze `95398c4`. Package versions stay **0.3.0**. Protocol stays **1**.
+
+- Local DashScope one-shot smoke: eligible Replay episode → one real model call → `status=enriched` (30s timeout override; default 8s timed out)
+- Sidecar fail-open runtime smoke: missing key → stderr WARNING, Rule-only Core, clean stdout
+- VSIX packaging audit: `pnpm package:vsix` 0.3.0, 21 files, not published
+- Gates unchanged: 428 pytest + 5 live deselected, coverage 90.66%, 145 pnpm tests
+
 ## Unreleased — v0.5 RC Fix Pass (no version bump)
 
 External review blockers on `feat/v0.5-market-intelligence`. Package versions stay **0.3.0**. Protocol stays **1**.

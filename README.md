@@ -203,7 +203,7 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Unread alert count is Host-local and resets on extension reload (not written to workspaceState).
 - No WebView, no alert history panel.
 - No `notified_timestamp` (alert candidate ≠ notified).
-- Intelligence is **off by default** (`MARKET_SENTINEL_INTEL_ENABLED=1` to enable). Host hover/click never calls a model. No News, MCP, auto-trading, or buy/sell advice.
+- Intelligence is **off by default** (`MARKET_SENTINEL_INTEL_ENABLED=1` to enable). Host hover/click never calls a model. No News, MCP, auto-trading, or buy/sell advice. Default sidecar timeout is 8s; a local DashScope one-shot needed ~26s — raise `MARKET_SENTINEL_INTEL_TIMEOUT_S` if enabling the real provider. Live model calls are **not** in default pytest.
 
 ## v0.1 status
 
