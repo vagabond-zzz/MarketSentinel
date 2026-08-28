@@ -13,6 +13,7 @@ from market_sentinel.intelligence.contract import (
     IntelligenceStatus,
     budget_allows_call,
 )
+from market_sentinel.intelligence.router import RouterDecision, RouterPolicy, need_intelligence
 
 __all__ = [
     "EpisodeCallBudget",
@@ -23,7 +24,10 @@ __all__ = [
     "IntelligenceResult",
     "IntelligenceStatus",
     "MODEL_PAYLOAD_KEYS",
+    "RouterDecision",
+    "RouterPolicy",
     "budget_allows_call",
     "compress_intelligence_input",
+    "need_intelligence",
     "to_model_payload",
 ]
