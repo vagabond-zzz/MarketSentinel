@@ -10,6 +10,8 @@ from market_sentinel.cli.display import format_dashboard, format_updated
 from market_sentinel.clock import SystemClock
 from market_sentinel.errors import ProviderError
 from market_sentinel.health.feed_health import FeedHealthTracker
+from market_sentinel.intelligence.bootstrap import optional_intelligence
+from market_sentinel.intelligence.errors import IntelligenceAuthError
 from market_sentinel.ipc.daemon import MarketDaemon
 from market_sentinel.market_data.buffers import SymbolBuffers
 from market_sentinel.market_data.state import MarketStateStore
@@ -110,6 +112,11 @@ async def _handle_daemon(args: argparse.Namespace) -> int:
     except ProviderError as exc:
         print(str(exc), file=sys.stderr)
         return 2
+    try:
+        intelligence = optional_intelligence(clock)
+    except IntelligenceAuthError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     engine = MarketEngine(
         clock=clock,
         watchlist=Watchlist(persist=False),
@@ -118,6 +125,7 @@ async def _handle_daemon(args: argparse.Namespace) -> int:
         buffers=SymbolBuffers(),
         states=MarketStateStore(),
         health=FeedHealthTracker(clock),
+        intelligence=intelligence,
     )
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)
@@ -134,6 +142,11 @@ async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
     except ProviderError as exc:
         print(str(exc), file=sys.stderr)
         return 2
+    try:
+        intelligence = optional_intelligence(clock)
+    except IntelligenceAuthError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     engine = MarketEngine(
         clock=clock,
         watchlist=watchlist,
@@ -142,6 +155,7 @@ async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
         buffers=SymbolBuffers(),
         states=MarketStateStore(),
         health=FeedHealthTracker(clock),
+        intelligence=intelligence,
     )
     if args.once:
         result = await engine.tick()

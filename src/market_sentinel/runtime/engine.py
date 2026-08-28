@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Protocol
 
 from market_sentinel.clock import Clock
 from market_sentinel.domain.enums import FeedStatus, SchedulerLevel
@@ -10,7 +12,6 @@ from market_sentinel.domain.models import MarketSnapshot
 from market_sentinel.domain.signals import SignalPipelineResult
 from market_sentinel.features.engine import FeatureEngine
 from market_sentinel.health.feed_health import FeedHealthTracker
-from market_sentinel.intelligence.coordinator import IntelligenceCoordinator
 from market_sentinel.market_data.buffers import SymbolBuffers
 from market_sentinel.market_data.state import MarketStateStore
 from market_sentinel.orchestration.warming import WarmingPolicy
@@ -21,6 +22,22 @@ from market_sentinel.signals.pipeline import SignalPipeline
 from market_sentinel.watchlist.watchlist import Watchlist
 
 logger = logging.getLogger(__name__)
+
+
+class IntelligenceObserver(Protocol):
+    registry: object
+
+    async def start(self) -> None: ...
+
+    async def shutdown(self) -> None: ...
+
+    def observe_tick(
+        self,
+        result: EngineTickResult,
+        *,
+        feed_status_for: Callable[[str], FeedStatus],
+        active_ids: set[str] | None = None,
+    ) -> None: ...
 
 
 @dataclass
@@ -45,7 +62,7 @@ class MarketEngine:
         feature_engine: FeatureEngine | None = None,
         pipeline: SignalPipeline | None = None,
         warming: WarmingPolicy | None = None,
-        intelligence: IntelligenceCoordinator | None = None,
+        intelligence: IntelligenceObserver | None = None,
     ) -> None:
         self.clock = clock
         self.watchlist = watchlist
