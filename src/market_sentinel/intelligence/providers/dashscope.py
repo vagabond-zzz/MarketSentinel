@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable, Mapping
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -71,6 +72,7 @@ class DashScopeIntelligenceProvider:
         self._endpoint = f"{base_url.rstrip('/')}/chat/completions"
         self._max_output_tokens = max_output_tokens
         self._transport = transport or _default_transport
+        self.last_parse_latency_s = 0.0
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -116,7 +118,10 @@ class DashScopeIntelligenceProvider:
             raise IntelligenceMalformedError("model envelope missing content") from exc
         if not isinstance(content, str):
             raise IntelligenceMalformedError("model content is not a string")
-        return parse_model_output(content)
+        started = time.perf_counter()
+        parsed = parse_model_output(content)
+        self.last_parse_latency_s = time.perf_counter() - started
+        return parsed
 
     async def complete(self, payload: Mapping[str, Any], *, timeout_s: float) -> ModelCompletion:
         import asyncio

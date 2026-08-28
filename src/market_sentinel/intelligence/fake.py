@@ -24,6 +24,7 @@ class FakeIntelligenceProvider:
         self.error = error
         self.delay_s = delay_s
         self.calls: list[Mapping[str, Any]] = []
+        self.last_parse_latency_s = 0.0
 
     async def complete(self, payload: Mapping[str, Any], *, timeout_s: float) -> ModelCompletion:
         del timeout_s

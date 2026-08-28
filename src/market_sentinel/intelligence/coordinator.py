@@ -225,6 +225,8 @@ class IntelligenceCoordinator:
             elapsed = self._clock.monotonic_time() - started
             self.diagnostics.model_latency_s += elapsed
             self.diagnostics.model_latencies.append(elapsed)
+            parse_s = float(getattr(self._provider, "last_parse_latency_s", 0.0) or 0.0)
+            self.diagnostics.parse_latency_s += parse_s
             annotation = IntelligenceAnnotation(
                 signal_id=work.signal_id,
                 worth_highlight=completion.worth_highlight,
