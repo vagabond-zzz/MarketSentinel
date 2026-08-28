@@ -1,10 +1,10 @@
 # Roadmap v0.6 — Feedback, Observability & Tuning
 
-> Status: **M0 Metrics Contract fix pass on `feat/v0.6-feedback-observability`.** Direction passed external review; contract is **not finally frozen**. Package versions remain **0.5.0**. Protocol **1**.
+> Status: **M0 Metrics Contract frozen.** M1 telemetry wiring and M2 local JSONL storage are complete on `feat/v0.6-feedback-observability`. Package versions remain **0.5.0**. Protocol **1**. **Do not start M3.**
 >
 > Token target: **低**
 >
-> See `docs/16_v0.6_Metrics_Contract.md`. Do not start M1 until the contract is accepted.
+> See `docs/16_v0.6_Metrics_Contract.md`.
 
 ---
 
@@ -173,12 +173,7 @@ Protocol 与存储 schema 也不要混为一体。
 
 ## 9. Storage
 
-v0.6 MVP 可先本地保存。
-
-候选：
-
-- JSONL；
-- SQLite。
+v0.6 MVP 使用本地 append-only JSONL（不是 SQLite）。
 
 选择以：
 
@@ -191,6 +186,8 @@ simple auditability
 为优先。
 
 不要因为 telemetry 引入数据库服务 / Redis / Kafka。
+
+路径是 Market Sentinel local data directory（可用 `MARKET_SENTINEL_DATA_DIR` 注入），不是 repo / cwd / Protocol stdout。
 
 ---
 
@@ -242,21 +239,23 @@ new config
 ### M0 — Metrics contract
 
 - [x] 定义什么记录、什么不记录（`docs/16_v0.6_Metrics_Contract.md`；Core types + offline tests only）。
-- [ ] 外审后最终冻结（当前为 M0 fix pass，**暂不视为最终冻结**）。
+- [x] 外审后最终冻结（`21e96dc` on `feat/v0.6-feedback-observability`）。
 
-M0 已纳入：`run_id`、`market_timestamp`、Host→Core collector 所有权、`alert_presented` 每 candidate、`alert_suppressed`、`decision_reason` / `latency_stage`、`event_clustered` once-per-run、无 `notes` 的 `TuningSnapshot`、最低 validation。不做 storage / UI / Protocol command / run-id emitter。
+M0 已纳入：`run_id`、`market_timestamp`、Host→Core collector 所有权、`alert_presented` 每 candidate、`alert_suppressed`、`decision_reason` / `latency_stage`、`event_clustered` once-per-run、无 `notes` 的 `TuningSnapshot`、最低 validation。
 
-### M1 — Host interaction telemetry
+### M1 — Telemetry wiring
 
-- opened；
-- reset；
-- mute/dismiss placeholder。
+- [x] 每 execution 一个 opaque `run_id`（不是 market session）。
+- [x] fail-open collector；pipeline / intelligence / Host interaction 按冻结 contract emit。
+- [x] Protocol v1 additive `host_interaction`（`alert_presented` per candidate、`alert_badge_reset`）。
+- [x] `signal_opened` / `alert_dismissed` / `signal_muted` taxonomy 保留；当前 UX 不伪造 producer。
 
 ### M2 — Local storage
 
-- append-only；
-- rotation；
-- corruption-safe。
+- [x] append-only JSONL（不是 SQLite）。
+- [x] rotation（默认 1 MiB / 5 backups）。
+- [x] trailing partial 可恢复；middle-of-file malformed 可检测。
+- [x] 严格 allowlist serialization；落盘目录可注入，默认不写 repo / cwd。
 
 ### M3 — Evaluation report
 
@@ -285,14 +284,14 @@ M0 已纳入：`run_id`、`market_timestamp`、Host→Core collector 所有权�
 
 ## 13. v0.6 验收
 
-- [ ] Event → Signal → Alert → Host interaction 可追踪；
-- [ ] persistent state 与 telemetry 分离；
-- [ ] local-first storage；
+- [x] Event → Signal → Alert → Host interaction 可追踪；
+- [x] persistent state 与 telemetry 分离；
+- [x] local-first storage；
 - [ ] optional explicit feedback；
-- [ ] no automatic online rule mutation；
+- [x] no automatic online rule mutation；
 - [ ] tuning 必须跑 Replay regression；
 - [ ] Intelligence token/cost 可统计；
-- [ ] 不采集无关 workspace 内容。
+- [x] 不采集无关 workspace 内容。
 
 ---
 

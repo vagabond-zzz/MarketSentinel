@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { findRepoRoot, processExists, resolveUv } from "../integration/env";
+import { findRepoRoot, isolateTelemetryDataDir, processExists, resolveUv } from "../integration/env";
 import { HostController } from "./controller";
 import type { HostLogger } from "./types";
 
@@ -14,6 +14,16 @@ function createLogger(): HostLogger {
 }
 
 describe("HostController ↔ Python daemon", () => {
+  let restoreDataDir: () => void;
+
+  beforeEach(() => {
+    restoreDataDir = isolateTelemetryDataDir();
+  });
+
+  afterEach(() => {
+    restoreDataDir();
+  });
+
   it.skipIf(uvPath === undefined)(
     "hello → set_watchlist → start → pause → resume → shutdown",
     async () => {

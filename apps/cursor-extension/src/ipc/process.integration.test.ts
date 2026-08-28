@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { ProcessManager } from "./process";
-import { findRepoRoot, processExists, resolveUv, stderrLooksLikeJsonl } from "../integration/env";
+import {
+  findRepoRoot,
+  isolateTelemetryDataDir,
+  processExists,
+  resolveUv,
+  stderrLooksLikeJsonl,
+} from "../integration/env";
 
 const uvPath = resolveUv();
 
@@ -9,6 +15,7 @@ describe("Python ↔ Node IPC", () => {
   it.skipIf(uvPath === undefined)(
     "hello → set_watchlist → start → state → pause → resume → get_state → shutdown",
     async () => {
+      const restoreDataDir = isolateTelemetryDataDir();
       const stderr: string[] = [];
       const types: string[] = [];
       const manager = new ProcessManager({
@@ -56,6 +63,8 @@ describe("Python ↔ Node IPC", () => {
       } catch (error) {
         await manager.shutdown().catch(() => undefined);
         throw new Error(`${String(error)}\nstderr:\n${stderr.join("")}`);
+      } finally {
+        restoreDataDir();
       }
     },
     30_000,

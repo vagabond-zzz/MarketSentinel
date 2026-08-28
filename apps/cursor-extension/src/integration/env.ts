@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import fs from "node:fs";
+import fs, { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 export function findRepoRoot(): string {
@@ -44,6 +45,18 @@ export function processExists(pid: number): boolean {
   } catch {
     return false;
   }
+}
+
+export function isolateTelemetryDataDir(): () => void {
+  const previous = process.env.MARKET_SENTINEL_DATA_DIR;
+  process.env.MARKET_SENTINEL_DATA_DIR = mkdtempSync(path.join(tmpdir(), "ms-tel-"));
+  return () => {
+    if (previous === undefined) {
+      delete process.env.MARKET_SENTINEL_DATA_DIR;
+    } else {
+      process.env.MARKET_SENTINEL_DATA_DIR = previous;
+    }
+  };
 }
 
 export function stderrLooksLikeJsonl(chunks: readonly string[]): boolean {

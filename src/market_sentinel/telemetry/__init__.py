@@ -2,6 +2,7 @@ from market_sentinel.telemetry.collector import (
     FailOpenTelemetryCollector,
     InMemoryTelemetryCollector,
     NoOpTelemetryCollector,
+    SinkTelemetryCollector,
     TelemetryCollector,
 )
 from market_sentinel.telemetry.contract import (
@@ -25,15 +26,23 @@ from market_sentinel.telemetry.contract import (
     kind_for,
     project_allowlist,
 )
+from market_sentinel.telemetry.factory import jsonl_telemetry_runtime
 from market_sentinel.telemetry.host_interaction import (
     HOST_INTERACTION_ACTIONS,
     HOST_INTERACTION_TYPE,
     HostInteractionFact,
     parse_host_interaction,
 )
+from market_sentinel.telemetry.paths import (
+    DATA_DIR_ENV,
+    feedback_jsonl_path,
+    resolve_data_dir,
+    telemetry_jsonl_path,
+)
 from market_sentinel.telemetry.runtime import TelemetryRuntime, new_run_id
 
 __all__ = [
+    "DATA_DIR_ENV",
     "HOST_INTERACTION_ACTIONS",
     "HOST_INTERACTION_FACT_OWNER",
     "HOST_INTERACTION_TYPE",
@@ -50,6 +59,7 @@ __all__ = [
     "InMemoryTelemetryCollector",
     "LatencyStage",
     "NoOpTelemetryCollector",
+    "SinkTelemetryCollector",
     "SuppressionReason",
     "TelemetryCollector",
     "TelemetryEvent",
@@ -59,8 +69,12 @@ __all__ = [
     "TuningSnapshot",
     "TuningSource",
     "UserFeedback",
+    "feedback_jsonl_path",
+    "jsonl_telemetry_runtime",
     "kind_for",
     "new_run_id",
     "parse_host_interaction",
     "project_allowlist",
+    "resolve_data_dir",
+    "telemetry_jsonl_path",
 ]

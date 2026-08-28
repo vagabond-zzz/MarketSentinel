@@ -21,7 +21,7 @@ from market_sentinel.providers.factory import create_provider
 from market_sentinel.runtime.engine import MarketEngine
 from market_sentinel.runtime.results import EngineTickResult
 from market_sentinel.scheduler.scheduler import AdaptiveScheduler
-from market_sentinel.telemetry.runtime import TelemetryRuntime
+from market_sentinel.telemetry.factory import jsonl_telemetry_runtime
 from market_sentinel.watchlist.watchlist import Watchlist
 
 
@@ -129,7 +129,7 @@ async def _handle_daemon(args: argparse.Namespace) -> int:
     except ProviderError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    telemetry = TelemetryRuntime(clock)
+    telemetry = jsonl_telemetry_runtime(clock)
     intelligence = optional_intelligence(clock, telemetry=telemetry)
     engine = MarketEngine(
         clock=clock,
@@ -157,7 +157,7 @@ async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
     except ProviderError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    telemetry = TelemetryRuntime(clock)
+    telemetry = jsonl_telemetry_runtime(clock)
     intelligence = optional_intelligence(clock, telemetry=telemetry)
     engine = MarketEngine(
         clock=clock,

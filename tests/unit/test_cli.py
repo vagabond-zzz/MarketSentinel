@@ -66,6 +66,20 @@ def test_run_once_prints_state_events_and_alerts(tmp_path: Path, capsys) -> None
     assert "\x1b[" not in out
 
 
+def test_run_once_persists_telemetry_under_data_dir(
+    tmp_path: Path, capsys, telemetry_data_dir: Path
+) -> None:
+    path = tmp_path / "watchlist.json"
+    assert main(["--watchlist", str(path), "watchlist", "add", "00700.HK"]) == 0
+    capsys.readouterr()
+    assert main(["--watchlist", str(path), "run", "--once"]) == 0
+    captured = capsys.readouterr()
+    assert "event_generated" not in captured.out
+    assert (telemetry_data_dir / "telemetry.jsonl").is_file()
+    assert not (telemetry_data_dir / "feedback.jsonl").exists()
+    assert not (tmp_path / "telemetry.jsonl").exists()
+
+
 def test_http_provider_is_not_implemented(tmp_path: Path, capsys) -> None:
     path = tmp_path / "watchlist.json"
     assert main(["--watchlist", str(path), "--provider", "http", "run", "--once"]) == 2

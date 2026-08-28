@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -11,11 +12,13 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 @pytest.mark.integration
-def test_uv_daemon_stdout_is_pure_jsonl() -> None:
+def test_uv_daemon_stdout_is_pure_jsonl(tmp_path: Path) -> None:
     uv = shutil.which("uv")
     if uv is None:
         pytest.skip("uv not on PATH")
 
+    env = os.environ.copy()
+    env["MARKET_SENTINEL_DATA_DIR"] = str(tmp_path)
     proc = subprocess.Popen(
         [
             uv,
@@ -33,6 +36,7 @@ def test_uv_daemon_stdout_is_pure_jsonl() -> None:
         text=True,
         encoding="utf-8",
         cwd=str(REPO),
+        env=env,
     )
     assert proc.stdin is not None
     assert proc.stdout is not None
@@ -66,3 +70,5 @@ def test_uv_daemon_stdout_is_pure_jsonl() -> None:
     assert types[-1] == "shutdown_ack"
     assert "Resolved" not in stdout_text
     assert "INFO" not in stdout_text
+    assert "event_generated" not in stdout_text
+    assert "alert_presented" not in stdout_text

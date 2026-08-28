@@ -123,13 +123,19 @@ uv run market-sentinel --watchlist data/watchlist.json run --once --verbose
 
 `--provider` defaults to `fake`. `replay` reads a JSONL fixture (`--replay path`). `longbridge` is an optional Core adapter (manual `uv sync --extra live` + env credentials; Cursor spawn does not pass `--extra live`). The v0.4 live gate uses Tencent/Sina probes, not this factory path. `http` remains an unimplemented stub.
 
-Host protocol (stdout is JSONL Protocol v1 only):
+Host protocol (stdout is JSONL Protocol v1 only; telemetry files are separate):
 
 ```bash
 uv run market-sentinel --provider fake daemon
 ```
 
-Commands are JSON lines on stdin (`hello`, `start`, `pause`, `resume`, `set_watchlist`, `get_state`, `shutdown`). Logs go to stderr. `set_watchlist` is runtime-only and does not write `data/watchlist.json`.
+Commands are JSON lines on stdin (`hello`, `start`, `pause`, `resume`, `set_watchlist`, `get_state`, `host_interaction`, `shutdown`). Logs go to stderr. `set_watchlist` is runtime-only and does not write `data/watchlist.json`.
+
+Local telemetry JSONL (append-only, not Protocol stdout) lives under the Market Sentinel data directory:
+
+- Windows: `%LOCALAPPDATA%\MarketSentinel\telemetry.jsonl`
+- Unix: `$XDG_DATA_HOME/market-sentinel/telemetry.jsonl` or `~/.local/share/market-sentinel/telemetry.jsonl`
+- Override: `MARKET_SENTINEL_DATA_DIR`
 
 Spawn is argv-based (`shell: false`):
 

@@ -1,17 +1,26 @@
 # Changelog
 
+## Unreleased — v0.6 M2 Local JSONL Storage (no version bump)
+
+Persist Core telemetry as append-only JSONL on `feat/v0.6-feedback-observability`. Package versions stay **0.5.0**. Protocol stays **1**. No evaluation report, feedback files, TuningSnapshot persistence, SQLite, or M3.
+
+- `TelemetrySink` / `JsonlTelemetrySink` behind `SinkTelemetryCollector`; producers do not import JSONL
+- Local data dir (`MARKET_SENTINEL_DATA_DIR`, else `%LOCALAPPDATA%/MarketSentinel` or XDG); not the repo, cwd, or Protocol stdout
+- Strict `to_record()` allowlist serialization; rotation defaults 1 MiB / 5 backups; trailing-partial repair
+- CLI `run` / `daemon` persist via fail-open JSONL; storage failure does not change Event/Signal/Alert facts
+
 ## Unreleased — v0.6 M1 Telemetry Wiring (no version bump)
 
-Wire frozen M0 observations on `feat/v0.6-feedback-observability`. Package versions stay **0.5.0**. Protocol stays **1** (additive `host_interaction`). No evaluation report, tuning, or JSONL storage yet.
+Wire frozen M0 observations on `feat/v0.6-feedback-observability`. Package versions stay **0.5.0**. Protocol stays **1** (additive `host_interaction`). No evaluation report, tuning, or online mutation.
 
-- Per-execution opaque `run_id`; fail-open collector (`NoOp` / `InMemory`)
+- Per-execution opaque `run_id`; fail-open collector (`NoOp` / `InMemory`; JSONL sink in M2)
 - Pipeline: generated/deduped/clustered, episode created/escalated, alert candidate/suppressed
 - Intelligence: routed/skipped/succeeded/fallback/latency-by-stage; tokens only from adapter usage
 - Host produces `alert_presented` (per candidate) and `alert_badge_reset` via Protocol v1 `host_interaction`
 
 ## Unreleased — v0.6 M0 Metrics Contract (no version bump)
 
-Optional telemetry contract on `feat/v0.6-feedback-observability`. Package versions stay **0.5.0**. Protocol stays **1**. No storage, Host UI, or online tuning. **Not finally frozen** after external review; this is the M0 fix pass.
+Optional telemetry contract on `feat/v0.6-feedback-observability`. Package versions stay **0.5.0**. Protocol stays **1**. No storage, Host UI, or online tuning. **Frozen** after external review at `21e96dc`.
 
 - `TelemetryEvent` / `UserFeedback` / `TuningSnapshot` types and allowlist/denylist
 - `run_id` (one Core/Replay execution) and `market_timestamp` (not mixed with wall-clock `created_timestamp`); no telemetry `session_id`
