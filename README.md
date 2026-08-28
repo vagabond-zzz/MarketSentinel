@@ -2,13 +2,13 @@
 
 Low-latency market monitoring core for developer hosts (Cursor, DeepSeek Harness, ZCode).
 
-**Current tagged release: v0.3.0 — Cursor Host.** v0.4 live-gate work remains on `feat/v0.4-live-market-data` (not tagged `v0.4.0`). v0.5 Intelligence Router is on `feat/v0.5-market-intelligence`. Package versions are still 0.3.0; Protocol v1. High-frequency market updates never call an LLM (`Token = 0` unless intelligence is explicitly enabled).
+**Package version: 0.5.0.** Protocol v1. Last git tag remains `v0.3.0` until merge/tag approval. **v0.4.0 was never released.** v0.5.0 includes the unreleased v0.4 live-data lineage plus the Intelligence Router. High-frequency market updates never call an LLM (`Token = 0` unless intelligence is explicitly enabled).
 
 ## Positioning
 
 Market Sentinel watches a small watchlist, turns quotes into Features / Events / Signals, and keeps alerts rare. It is a Core plus diagnostics CLI plus a desktop Cursor host, not a trading product.
 
-## v0.3.0 Cursor Host
+## Cursor Host
 
 Desktop Cursor / VS Code extension that spawns the Python daemon over stdin/stdout JSONL (Protocol v1).
 
@@ -40,7 +40,7 @@ pnpm build
 pnpm package:vsix
 ```
 
-Then in Cursor: Extensions → **Install from VSIX…** → `apps/cursor-extension/market-sentinel-0.3.0.vsix`.
+Then in Cursor: Extensions → **Install from VSIX…** → `apps/cursor-extension/market-sentinel-0.5.0.vsix`.
 
 Open a **trusted** workspace. Set `marketSentinel.coreRoot` when the window is not a single-folder Core checkout. Confirm `marketSentinel.uvPath` (default `uv`).
 
@@ -123,7 +123,7 @@ uv run market-sentinel --watchlist data/watchlist.json run --once --verbose
 
 `--provider` defaults to `fake`. `replay` reads a JSONL fixture (`--replay path`). `longbridge` is an optional Core adapter (manual `uv sync --extra live` + env credentials; Cursor spawn does not pass `--extra live`). The v0.4 live gate uses Tencent/Sina probes, not this factory path. `http` remains an unimplemented stub.
 
-Host protocol (v0.3.0; stdout is JSONL Protocol v1 only):
+Host protocol (stdout is JSONL Protocol v1 only):
 
 ```bash
 uv run market-sentinel --provider fake daemon
@@ -203,7 +203,7 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Unread alert count is Host-local and resets on extension reload (not written to workspaceState).
 - No WebView, no alert history panel.
 - No `notified_timestamp` (alert candidate ≠ notified).
-- Intelligence is **off by default** (`MARKET_SENTINEL_INTEL_ENABLED=1` to enable). Host hover/click never calls a model. No News, MCP, auto-trading, or buy/sell advice. Default sidecar timeout is 8s; a local DashScope one-shot needed ~26s — raise `MARKET_SENTINEL_INTEL_TIMEOUT_S` if enabling the real provider. Live model calls are **not** in default pytest.
+- Intelligence is **off by default** (`MARKET_SENTINEL_INTEL_ENABLED=1` to enable). Host hover/click never calls a model. No News, MCP, auto-trading, or buy/sell advice. Default sidecar timeout is 8s. The DashScope adapter sends `enable_thinking: false`. Live model calls are **not** in default pytest.
 
 ## v0.1 status
 

@@ -1,10 +1,10 @@
 {
   "name": "market-sentinel",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.5.0",
   "publisher": "market-sentinel-local",
   "displayName": "Market Sentinel",
-  "description": "Cursor host for Market Sentinel (v0.3 local VSIX)",
+  "description": "Cursor host for Market Sentinel (v0.5 local VSIX)",
   "main": "./out/extension.js",
   "extensionKind": [
     "ui"

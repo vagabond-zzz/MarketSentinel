@@ -17,7 +17,7 @@ describe("extension packaging manifest", () => {
 
   it("has local VSIX identity fields without claiming a Marketplace publisher", () => {
     expect(pkg.name).toBe("market-sentinel");
-    expect(pkg.version).toBe("0.3.0");
+    expect(pkg.version).toBe("0.5.0");
     expect(pkg.publisher).toBe("market-sentinel-local");
     expect(pkg.main).toBe("./out/extension.js");
     expect(pkg.engines.vscode).toBe("^1.90.0");
@@ -25,6 +25,12 @@ describe("extension packaging manifest", () => {
     expect(pkg.private).toBe(true);
     expect(pkg.scripts["vscode:prepublish"]).toContain("tsc");
     expect(pkg.scripts["package:vsix"]).toContain("vsce package");
+  });
+
+  it("derives the VSIX filename from package.json instead of a hardcoded version", () => {
+    const script = fs.readFileSync(path.join(process.cwd(), "scripts", "audit-vsix.mjs"), "utf8");
+    expect(script).toMatch(/package\.json/);
+    expect(script).not.toMatch(/market-sentinel-0\.\d+\.\d+\.vsix/);
   });
 
   it("keeps a .vscodeignore that excludes sources, tests, and node_modules", () => {

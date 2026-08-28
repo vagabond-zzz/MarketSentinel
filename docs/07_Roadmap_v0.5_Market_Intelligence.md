@@ -1,6 +1,6 @@
 # Roadmap v0.5 — Market Intelligence Router
 
-> Status: **Final release verification complete** on `feat/v0.5-market-intelligence` @ `95398c4`. Waiting for release approval. Not tagged, not merged, versions remain 0.3.0.
+> Status: **v0.5.0 release prep** on `feat/v0.5-market-intelligence`. Waiting for merge/tag approval. Not tagged, not merged. Package versions **0.5.0**. Protocol **1**.
 >
 > Token target: **0 by default**; **极低** only when intelligence is explicitly enabled.
 >

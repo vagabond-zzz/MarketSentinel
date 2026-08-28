@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 — 2026-08-28 (not tagged yet)
+
+Package versions are **0.5.0**. Protocol stays **1**.
+
+**v0.4.0 was never released/tagged.** v0.5.0 includes the unreleased v0.4 live-data lineage plus the v0.5 Intelligence Router.
+
+- Optional low-frequency Intelligence sidecar; Rule `Signal` remains source of truth
+- DashScope compatible-mode adapter sends `enable_thinking: false` (default timeout remains 8s)
+- Protocol v1 additive `intelligence` on `WireSignal`
+- Cursor hover shows enrichment only when status is `enriched`
+- Unreleased Tencent/Sina live-gate probes and Longbridge optional provider from the v0.4 lineage
+
 ## Unreleased — v0.5 Final Release Verification (no version bump)
 
 Verification-only against feature freeze `95398c4`. Package versions stay **0.3.0**. Protocol stays **1**.

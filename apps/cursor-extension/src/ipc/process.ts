@@ -1,4 +1,6 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 import { IpcClient } from "./client";
 import { IpcDisconnectedError, IpcTimeoutError, ProtocolError } from "./errors";
@@ -32,6 +34,15 @@ export interface ProcessManagerOptions {
   onProtocolError?: (error: ProtocolError) => void;
   onReady?: (coreVersion: string) => void;
   onDisconnected?: (reason: string) => void;
+}
+
+function extensionVersion(): string {
+  const pkgPath = path.join(__dirname, "..", "..", "package.json");
+  const parsed = JSON.parse(readFileSync(pkgPath, "utf8")) as { version?: string };
+  if (typeof parsed.version !== "string" || parsed.version.length === 0) {
+    throw new Error("extension package.json is missing version");
+  }
+  return parsed.version;
 }
 
 function defaultDelay(ms: number): Promise<void> {
@@ -255,7 +266,7 @@ export class ProcessManager {
       const ready = await client.request({
         type: "hello",
         host: "cursor-extension",
-        host_version: "0.3.0",
+        host_version: extensionVersion(),
       });
       if (ready.type !== "ready") {
         throw new ProtocolError("unexpected_type", `expected ready, got ${ready.type}`);

@@ -5,7 +5,14 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const extRoot = path.resolve(here, "..");
-const vsixName = "market-sentinel-0.3.0.vsix";
+const pkgPath = path.join(extRoot, "package.json");
+const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+const version = typeof pkg.version === "string" ? pkg.version : "";
+if (!version) {
+  console.error("extension package.json is missing version");
+  process.exit(1);
+}
+const vsixName = `market-sentinel-${version}.vsix`;
 const vsixPath = path.join(extRoot, vsixName);
 
 if (!fs.existsSync(vsixPath)) {
