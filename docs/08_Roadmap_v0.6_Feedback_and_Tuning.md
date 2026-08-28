@@ -1,6 +1,6 @@
 # Roadmap v0.6 — Feedback, Observability & Tuning
 
-> Status: **M0 frozen.** M1/M2 review fixes applied on `feat/v0.6-feedback-observability`. Package versions remain **0.5.0**. Protocol **1**. **M3 is not approved.**
+> Status: **M0 frozen. M1/M2 PASS.** M3 evaluation report implemented on `feat/v0.6-feedback-observability` for **external review**. Package versions remain **0.5.0**. Protocol **1**. **Do not start M4.**
 >
 > Token target: **低**
 >
@@ -259,9 +259,14 @@ M0 已纳入：`run_id`、`market_timestamp`、Host→Core collector 所有权�
 
 ### M3 — Evaluation report
 
-- daily/session summary；
-- noise metrics；
-- intelligence cost。
+- [x] daily/session summary from JSONL (`run_id`, optional symbol / market date);
+- [x] pipeline funnel + noise metrics (priority, suppression by reason, repeated episode, alerts per A-share market hour);
+- [x] intelligence cost (skip/fallback breakdown, latency stages, actual token events only);
+- [x] Host unimplemented facts (`signal_opened` / dismiss / mute) reported as **unavailable**, never fake 0%.
+
+Read-only. Does not rewrite telemetry semantics, Event/Signal rules, thresholds, or RouterPolicy.
+
+**Do not start M4.**
 
 ### M4 — Explicit feedback
 
@@ -290,7 +295,7 @@ M0 已纳入：`run_id`、`market_timestamp`、Host→Core collector 所有权�
 - [ ] optional explicit feedback；
 - [x] no automatic online rule mutation；
 - [ ] tuning 必须跑 Replay regression；
-- [ ] Intelligence token/cost 可统计；
+- [x] Intelligence token/cost 可统计（actual `intelligence_token_usage` only; unavailable when none）；
 - [x] 不采集无关 workspace 内容。
 
 ---

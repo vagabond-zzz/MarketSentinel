@@ -254,7 +254,9 @@ def test_event_clustered_once_per_event_id() -> None:
     assert tracker.newly_clustered(("e1",)) == ()
     later = tracker.newly_clustered(("e1", "e2", "e3"))
     assert later == ("e3",)
+    assert tracker.seen_count == 3
     assert tracker.newly_clustered(("e1", "e2", "e3")) == ()
+    assert tracker.seen_count == 3
     singleton_then_pair = ClusterMembershipTracker()
     assert singleton_then_pair.newly_clustered(("e1",)) == ()
     assert set(singleton_then_pair.newly_clustered(("e1", "e2"))) == {"e1", "e2"}

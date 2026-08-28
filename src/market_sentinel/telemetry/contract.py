@@ -278,6 +278,11 @@ class ClusterMembershipTracker:
         self._clustered.update(fresh)
         return fresh
 
+    @property
+    def seen_count(self) -> int:
+        """Number of event_ids observed as clustered in this run. Unbounded by design."""
+        return len(self._clustered)
+
 
 # ---------------------------------------------------------------------------
 # Records (not MarketState, not Protocol DTOs, not storage rows)

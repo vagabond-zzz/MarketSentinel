@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import sys
 from collections.abc import AsyncIterator
@@ -11,6 +12,9 @@ from pathlib import Path
 from market_sentinel.cli.display import format_dashboard, format_updated
 from market_sentinel.clock import SystemClock
 from market_sentinel.errors import ProviderError
+from market_sentinel.evaluation.aggregate import evaluate
+from market_sentinel.evaluation.reader import TelemetryReader
+from market_sentinel.evaluation.render import render_text
 from market_sentinel.health.feed_health import FeedHealthTracker
 from market_sentinel.intelligence.bootstrap import optional_intelligence
 from market_sentinel.intelligence.coordinator import IntelligenceCoordinator
@@ -22,6 +26,7 @@ from market_sentinel.runtime.engine import MarketEngine
 from market_sentinel.runtime.results import EngineTickResult
 from market_sentinel.scheduler.scheduler import AdaptiveScheduler
 from market_sentinel.telemetry.factory import jsonl_telemetry_runtime
+from market_sentinel.telemetry.paths import resolve_data_dir, telemetry_jsonl_path
 from market_sentinel.watchlist.watchlist import Watchlist
 
 
@@ -36,6 +41,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.command == "daemon":
         return asyncio.run(_handle_daemon(args))
+    if args.command == "telemetry":
+        return _handle_telemetry(args)
     watchlist = Watchlist(args.watchlist)
 
     if args.command == "watchlist":
@@ -82,6 +89,12 @@ def _build_parser() -> argparse.ArgumentParser:
     disable = watch_sub.add_parser("disable")
     disable.add_argument("symbol")
     sub.add_parser("daemon", help="JSONL stdio host protocol")
+    telemetry = sub.add_parser("telemetry", help="read-only telemetry evaluation")
+    tel_sub = telemetry.add_subparsers(dest="telemetry_command", required=True)
+    report = tel_sub.add_parser("report", help="evaluation report from local JSONL")
+    report.add_argument("--data-dir", type=Path, default=None)
+    report.add_argument("--run-id", default=None)
+    report.add_argument("--format", choices=("json", "text"), default="json")
     return parser
 
 
@@ -189,6 +202,20 @@ async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
                 return 0
         finally:
             engine.telemetry.close()
+    return 0
+
+
+def _handle_telemetry(args: argparse.Namespace) -> int:
+    if args.telemetry_command != "report":
+        return 2
+    data_dir = resolve_data_dir(args.data_dir)
+    loaded = TelemetryReader().load(telemetry_jsonl_path(data_dir))
+    report = evaluate(loaded, run_id=args.run_id)
+    record = report.to_record()
+    if args.format == "text":
+        print(render_text(report), end="")
+    else:
+        print(json.dumps(record, ensure_ascii=False, indent=2))
     return 0
 
 

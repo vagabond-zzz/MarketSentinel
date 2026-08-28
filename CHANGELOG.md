@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — v0.6 M3 Evaluation Report (no version bump)
+
+Read-only evaluation over M1/M2 telemetry on `feat/v0.6-feedback-observability`. Package **0.5.0**. Protocol **1**. No M4 feedback UX, no threshold changes, no storage redesign.
+
+- `TelemetryReader` → `evaluate()` → `EvaluationReport.to_record()`; CLI `market-sentinel telemetry report`
+- Funnel, noise, repeated-episode, A-share market-hour, Intelligence skip/fallback/latency, actual token totals only
+- Host open/dismiss/mute rates are **unavailable** (`producer_not_implemented`), not 0%
+- Data quality: rotated JSONL oldest→newest; middle corruption warning; trailing partial surfaced
+- Evidence: sync JSONL vs NoOp Replay elapsed; `cluster_tracker_seen_count` (once-per-run unchanged)
+
 ## Unreleased — v0.6 M1/M2 review fixes (no version bump)
 
 Narrow telemetry-edge fixes on `feat/v0.6-feedback-observability` after M1/M2 external review. Package **0.5.0**. Protocol **1**. No M3.
