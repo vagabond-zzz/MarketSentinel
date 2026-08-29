@@ -134,8 +134,11 @@ def test_keep_alive_does_not_clear_real_failures() -> None:
     )
     tracker.observe("00700.HK", error=RuntimeError("timeout"))
     assert tracker.consecutive_failures("00700.HK") == 1
+    clock.advance_monotonic(5.0)
+    age_before = tracker.last_update_age("00700.HK")
     tracker.keep_alive("00700.HK")
     assert tracker.consecutive_failures("00700.HK") == 1
+    assert tracker.last_update_age("00700.HK") == age_before
     tracker.observe("00700.HK", error=RuntimeError("timeout"))
     tracker.observe("00700.HK", error=RuntimeError("timeout"))
     assert tracker.consecutive_failures("00700.HK") == 3

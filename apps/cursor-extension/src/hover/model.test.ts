@@ -266,5 +266,18 @@ describe("mapHover", () => {
     expect(failOpen.aiStatus).toBe("不可用（Rule-only）");
     expect(failOpen.aiStatus).not.toBe("关闭");
     expect(failOpen.headline).not.toContain("AI=关闭");
+    expect(mapAiStatus(market({ intelligence_enabled: true }), "off", true)).toBe(
+      "待重启（当前仍启用）",
+    );
+    expect(mapAiStatus(market({ intelligence_enabled: true }), "off", true)).not.toBe("关闭");
+    expect(mapAiStatus(market({ intelligence_enabled: false }), "off", true)).toBe("关闭");
+    const pendingOff = mapHover({
+      actual: "RUNNING",
+      market: market({ intelligence_enabled: true }),
+      intelligenceMode: "off",
+      restartNeeded: true,
+    });
+    expect(pendingOff.aiStatus).toBe("待重启（当前仍启用）");
+    expect(pendingOff.headline).not.toContain("AI=关闭");
   });
 });

@@ -92,6 +92,8 @@ export class HostController {
   private manager: ProcessManager | undefined;
   private spawnConfig: Omit<HostConfig, "watchlist"> | undefined;
   private lastAcked: WatchlistItem[] = [];
+  private inFlightWatchlist: WatchlistItem[] | undefined;
+  private inFlightWatchlistPromise: Promise<void> | undefined;
   private retryCount = 0;
   private restartNeededInternal = false;
   private disposed = false;
@@ -230,14 +232,11 @@ export class HostController {
       return { ok: false, error: message };
     }
     if (this.manager !== undefined && this.manager.connected) {
-      if (!watchlistsEqual(items, this.lastAcked)) {
-        try {
-          await this.manager.setWatchlist(items);
-          this.lastAcked = this.manager.acknowledgedWatchlist;
-        } catch (error) {
-          this.options.logger.host(`${WATCHLIST_RUNTIME_FAILED}: ${this.errorMessage(error)}`);
-          return { ok: false, error: WATCHLIST_RUNTIME_FAILED };
-        }
+      try {
+        await this.syncWatchlist(items);
+      } catch (error) {
+        this.options.logger.host(`${WATCHLIST_RUNTIME_FAILED}: ${this.errorMessage(error)}`);
+        return { ok: false, error: WATCHLIST_RUNTIME_FAILED };
       }
     }
     this.emitUi();
@@ -404,15 +403,63 @@ export class HostController {
     if (this.manager === undefined || !this.manager.connected) {
       return;
     }
-    if (watchlistsEqual(parsed.config.watchlist, this.lastAcked)) {
-      return;
-    }
     try {
-      await this.manager.setWatchlist(parsed.config.watchlist);
-      this.lastAcked = this.manager.acknowledgedWatchlist;
+      await this.syncWatchlist(parsed.config.watchlist);
     } catch (error) {
       this.options.logger.host(`${WATCHLIST_RUNTIME_FAILED}: ${this.errorMessage(error)}`);
     }
+  }
+
+  private async syncWatchlist(target: WatchlistItem[]): Promise<void> {
+    if (this.manager === undefined || !this.manager.connected) {
+      return;
+    }
+    const snapshot = target.map((item) => ({ symbol: item.symbol, enabled: item.enabled }));
+    if (watchlistsEqual(snapshot, this.lastAcked) && this.inFlightWatchlistPromise === undefined) {
+      return;
+    }
+    if (
+      this.inFlightWatchlistPromise !== undefined &&
+      this.inFlightWatchlist !== undefined &&
+      watchlistsEqual(snapshot, this.inFlightWatchlist)
+    ) {
+      await this.inFlightWatchlistPromise;
+      return;
+    }
+
+    const previous = this.inFlightWatchlistPromise;
+    const pending = this.sendWatchlistAfter(snapshot, previous);
+    this.inFlightWatchlist = snapshot;
+    this.inFlightWatchlistPromise = pending;
+    try {
+      await pending;
+    } finally {
+      if (this.inFlightWatchlistPromise === pending) {
+        this.inFlightWatchlistPromise = undefined;
+        this.inFlightWatchlist = undefined;
+      }
+    }
+  }
+
+  private async sendWatchlistAfter(
+    snapshot: WatchlistItem[],
+    previous: Promise<void> | undefined,
+  ): Promise<void> {
+    if (previous !== undefined) {
+      try {
+        await previous;
+      } catch {
+        // Previous target failed; still apply the latest snapshot.
+      }
+    }
+    if (this.manager === undefined || !this.manager.connected) {
+      throw new Error("daemon is not running");
+    }
+    if (watchlistsEqual(snapshot, this.lastAcked)) {
+      return;
+    }
+    await this.manager.setWatchlist(snapshot);
+    this.lastAcked = this.manager.acknowledgedWatchlist;
   }
 
   private async connectFromSettings(): Promise<void> {

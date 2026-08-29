@@ -36,6 +36,8 @@ function scriptDaemon(
     hangHostInteraction?: boolean;
     deferHostInteraction?: unknown[];
     failWatchlistAfter?: number;
+    deferWatchlist?: Array<{ request_id: string; items?: WatchlistItem[] }>;
+    deferWatchlistAfter?: number;
   } = {},
 ): void {
   const decoder = new JsonlDecoder();
@@ -74,6 +76,13 @@ function scriptDaemon(
               message: "runtime watchlist failed",
             }) + "\n",
           );
+          return;
+        }
+        if (
+          options.deferWatchlist !== undefined &&
+          (options.deferWatchlistAfter === undefined || priorSets > options.deferWatchlistAfter)
+        ) {
+          options.deferWatchlist.push(command);
           return;
         }
         if (items.length > 10) {
@@ -210,6 +219,33 @@ function writeAlert(
   );
 }
 
+function replyWatchlist(
+  child: FakeChild | undefined,
+  command: { request_id: string; items?: WatchlistItem[] },
+  ok: boolean,
+): void {
+  if (ok) {
+    child?.stdout.write(
+      JSON.stringify({
+        protocol_version: 1,
+        type: "ack",
+        request_id: command.request_id,
+        watchlist_count: command.items?.length ?? 0,
+      }) + "\n",
+    );
+    return;
+  }
+  child?.stdout.write(
+    JSON.stringify({
+      protocol_version: 1,
+      type: "error",
+      request_id: command.request_id,
+      code: "internal",
+      message: "runtime watchlist failed",
+    }) + "\n",
+  );
+}
+
 function alertCandidate(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: "a1",
@@ -242,6 +278,7 @@ function createHarness(
     folders?: string[];
     onUiSnapshot?: (snapshot: { statusBar: { kind: string; text: string } }) => void;
     onAlertEdge?: (message: { candidates: unknown[] }) => void;
+    persistWatchlist?: (items: WatchlistItem[]) => Promise<void>;
     now?: () => number;
     alertHoldMs?: number;
     setTimeoutFn?: typeof setTimeout;
@@ -271,9 +308,11 @@ function createHarness(
     clearTimeoutFn: extras.clearTimeoutFn,
     onUiSnapshot: extras.onUiSnapshot,
     onAlertEdge: extras.onAlertEdge,
-    persistWatchlist: async (items) => {
-      settings.watchlist = items.map((item) => ({ symbol: item.symbol, enabled: item.enabled }));
-    },
+    persistWatchlist:
+      extras.persistWatchlist ??
+      (async (items) => {
+        settings.watchlist = items.map((item) => ({ symbol: item.symbol, enabled: item.enabled }));
+      }),
     createManager: (options) => {
       const manager = new ProcessManager(options);
       managers.push(manager);
@@ -1320,5 +1359,101 @@ describe("HostController", () => {
     expect(newPresented.some((item) => item.signal_id === "old-a" || item.signal_id === "old-b")).toBe(
       false,
     );
+  });
+
+  it("shares one in-flight set_watchlist across persist callback and command commit", async () => {
+    const commands: unknown[] = [];
+    const deferred: Array<{ request_id: string; items?: WatchlistItem[] }> = [];
+    const harness = createHarness({
+      script: (child) =>
+        scriptDaemon(child, commands, { deferWatchlist: deferred, deferWatchlistAfter: 1 }),
+      persistWatchlist: async (items) => {
+        harness.settings.watchlist = items.map((item) => ({
+          symbol: item.symbol,
+          enabled: item.enabled,
+        }));
+        void harness.controller.onConfigurationChanged(["watchlist"]);
+        await vi.waitFor(() => {
+          expect(deferred).toHaveLength(1);
+        });
+      },
+    });
+    await harness.controller.start();
+    const before = commands.filter((item) => (item as { type?: string }).type === "set_watchlist").length;
+    const addPromise = harness.controller.addWatchlistSymbol("600519.SH");
+    await vi.waitFor(() => {
+      expect(deferred).toHaveLength(1);
+    });
+    expect(commands.filter((item) => (item as { type?: string }).type === "set_watchlist")).toHaveLength(
+      before + 1,
+    );
+    replyWatchlist(harness.children[0], deferred[0]!, true);
+    await expect(addPromise).resolves.toEqual({ ok: true });
+    expect(commands.filter((item) => (item as { type?: string }).type === "set_watchlist")).toHaveLength(
+      before + 1,
+    );
+    expect(harness.controller.lastAcknowledgedWatchlist).toEqual([
+      { symbol: "600519.SH", enabled: true },
+    ]);
+  });
+
+  it("propagates a shared set_watchlist failure to the command path", async () => {
+    const commands: unknown[] = [];
+    const deferred: Array<{ request_id: string; items?: WatchlistItem[] }> = [];
+    const harness = createHarness({
+      script: (child) =>
+        scriptDaemon(child, commands, { deferWatchlist: deferred, deferWatchlistAfter: 1 }),
+      persistWatchlist: async (items) => {
+        harness.settings.watchlist = items.map((item) => ({
+          symbol: item.symbol,
+          enabled: item.enabled,
+        }));
+        void harness.controller.onConfigurationChanged(["watchlist"]);
+        await vi.waitFor(() => {
+          expect(deferred).toHaveLength(1);
+        });
+      },
+    });
+    await harness.controller.start();
+    const addPromise = harness.controller.addWatchlistSymbol("600519.SH");
+    await vi.waitFor(() => {
+      expect(deferred).toHaveLength(1);
+    });
+    replyWatchlist(harness.children[0], deferred[0]!, false);
+    await expect(addPromise).resolves.toEqual({
+      ok: false,
+      error: "watchlist saved; runtime update failed and will apply after reconnect/restart",
+    });
+    expect(harness.settings.watchlist).toEqual([{ symbol: "600519.SH", enabled: true }]);
+  });
+
+  it("does not let an in-flight older watchlist ack overwrite a newer target", async () => {
+    const commands: unknown[] = [];
+    const deferred: Array<{ request_id: string; items?: WatchlistItem[] }> = [];
+    const harness = createHarness({
+      script: (child) =>
+        scriptDaemon(child, commands, { deferWatchlist: deferred, deferWatchlistAfter: 1 }),
+    });
+    await harness.controller.start();
+    harness.settings.watchlist = [{ symbol: "A.SH", enabled: true }];
+    const first = harness.controller.onConfigurationChanged(["watchlist"]);
+    await vi.waitFor(() => {
+      expect(deferred).toHaveLength(1);
+    });
+    harness.settings.watchlist = [{ symbol: "B.SH", enabled: true }];
+    const second = harness.controller.onConfigurationChanged(["watchlist"]);
+    expect(deferred).toHaveLength(1);
+    replyWatchlist(harness.children[0], deferred[0]!, true);
+    await vi.waitFor(() => {
+      expect(deferred).toHaveLength(2);
+    });
+    replyWatchlist(harness.children[0], deferred[1]!, true);
+    await first;
+    await second;
+    expect(harness.controller.lastAcknowledgedWatchlist).toEqual([{ symbol: "B.SH", enabled: true }]);
+    const sets = commands.filter((item) => (item as { type?: string }).type === "set_watchlist") as Array<{
+      items?: WatchlistItem[];
+    }>;
+    expect(sets.at(-1)?.items).toEqual([{ symbol: "B.SH", enabled: true }]);
   });
 });

@@ -18,11 +18,12 @@ Host daily-usability polish on `feat/v0.6.5-ux-polish`. Package stays **0.6.0**.
 
 - StatusBar priority: real feed STALE/DISCONNECTED → ALERT hold → Replay complete → DELAYED → HOT/WARM/NORMAL
 - Replay last-batch missing quote is not treated as graceful EOF
-- `keep_alive` refreshes last-success age without clearing real consecutive failures
+- `keep_alive` freezes a healthy last quote on Replay EOF, but does not refresh freshness after a real failure
 - `alert_presented` is bound to the origin Core IPC/generation and uses presentation `created_timestamp`. Connected/graceful teardown flushes; abrupt Core loss is best-effort and never misattributed to a new run
-- Watchlist persist keeps `enabled`; Add/Remove plus the settings-change callback send at most one `set_watchlist`
-- Hover AI status uses requested setting vs actual `intelligence_enabled` (unavailable / pending restart, not a false “关闭”)
+- Watchlist persist keeps `enabled`; runtime sync is serialized/deduped so a settings-change callback and command share one `set_watchlist`
+- Hover AI status uses requested setting vs actual `intelligence_enabled` (unavailable / pending restart, including off-requested while Core is still enabled)
 - StatusBar/QuickPick aliases are sanitized; Hover `last_market_timestamp` is UTC+8 market time labeled 最后行情; `signal.family` is labeled 信号类型
+- Restored `docs/AGENTS.md` as a pointer to root `AGENTS.md`
 
 ## 0.6.0 — 2026-08-29 (not tagged yet)
 

@@ -58,9 +58,6 @@ function renderSymbol(symbol: HoverSymbolView): string {
     `${symbol.price} · ${symbol.changeDay} · ${symbol.level}${feed}`,
   ];
   if (symbol.signals.length === 0) {
-    lines.push(`价格：${symbol.price}`);
-    lines.push(`当日：${symbol.changeDay}`);
-    lines.push(`状态：${symbol.level}`);
     lines.push("");
     lines.push(...renderMetrics(symbol));
     return lines.join("\n");

@@ -59,13 +59,16 @@ class FeedHealthTracker:
         return self.status(symbol)
 
     def keep_alive(self, symbol: str) -> None:
-        """Refresh last-success age without treating the tick as a new quote or error.
+        """Freeze a healthy last quote so Replay EOF does not age LIVE → STALE.
 
-        Used when Replay is exhausted so clock aging does not move LIVE → STALE.
-        No-op when the symbol never had a successful snapshot.
+        No-op when the symbol never had a successful snapshot, or when a real
+        provider/data failure is already recorded. Failures must still age to
+        STALE / DISCONNECTED; EOF must not refresh their freshness.
         """
         record = self._symbols.get(symbol)
         if record is None or record.last_success_mono is None:
+            return
+        if record.consecutive_failures > 0:
             return
         record.last_success_mono = self._clock.monotonic_time()
 

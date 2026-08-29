@@ -33,6 +33,7 @@ const LEVEL_ORDER: Record<SchedulerLevel, number> = {
 export type AiStatusLabel =
   | "关闭"
   | "待重启"
+  | "待重启（当前仍启用）"
   | "不可用（Rule-only）"
   | "已启用"
   | "处理中"
@@ -225,6 +226,9 @@ export function mapAiStatus(
 ): AiStatusLabel {
   const actual = market?.intelligence_enabled === true;
   if (requested === "off") {
+    if (actual) {
+      return "待重启（当前仍启用）";
+    }
     return "关闭";
   }
   if (requested === "on" && !actual) {

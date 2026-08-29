@@ -333,3 +333,62 @@ async def test_replay_final_batch_wrong_symbol_is_missing_quote_not_graceful_eof
     await engine.tick()
     assert "missing quote" not in caplog.text
     assert engine.health.status("BBB.SH") is not FeedStatus.LIVE
+
+
+async def test_replay_failure_before_eof_ages_to_stale(tmp_path: Path, caplog) -> None:
+    from market_sentinel.providers.replay import ReplayProvider
+
+    caplog.set_level("WARNING")
+    fixture = tmp_path / "replay.jsonl"
+    batch_ok = {
+        "symbol": "BBB.SH",
+        "price": 10.0,
+        "open": 10.0,
+        "high": 10.0,
+        "low": 10.0,
+        "prev_close": 10.0,
+        "volume": 100.0,
+        "market_timestamp": 1_700_000_010.0,
+    }
+    batch_other = {
+        **batch_ok,
+        "symbol": "AAA.SH",
+        "market_timestamp": 1_700_000_010.1,
+    }
+    fixture.write_text(
+        json.dumps([batch_ok]) + "\n" + json.dumps([batch_other]) + "\n",
+        encoding="utf-8",
+    )
+    clock = FakeClock(wall=1_700_000_010.2, monotonic=0.0)
+    watchlist = Watchlist(tmp_path / "watchlist.json")
+    watchlist.add("BBB.SH")
+    provider = ReplayProvider(fixture, clock)
+    engine = MarketEngine(
+        clock=clock,
+        watchlist=watchlist,
+        provider=provider,
+        scheduler=AdaptiveScheduler(clock),
+        buffers=SymbolBuffers(),
+        states=MarketStateStore(),
+        health=FeedHealthTracker(clock),
+    )
+    await engine.tick()
+    assert engine.health.status("BBB.SH") is FeedStatus.LIVE
+    clock.advance_monotonic(10.0)
+    await engine.tick()
+    assert provider.source_exhausted() is True
+    assert "missing quote" in caplog.text
+    assert engine.health.consecutive_failures("BBB.SH") == 1
+    age_after_failure = engine.health.last_update_age("BBB.SH")
+    assert age_after_failure == 10.0
+    caplog.clear()
+    clock.advance_monotonic(10.0)
+    await engine.tick()
+    assert "missing quote" not in caplog.text
+    assert "provider error" not in caplog.text
+    assert engine.health.consecutive_failures("BBB.SH") == 1
+    assert engine.health.last_update_age("BBB.SH") == 20.0
+    clock.advance_monotonic(10.0)
+    await engine.tick()
+    assert engine.health.last_update_age("BBB.SH") == 30.0
+    assert engine.health.status("BBB.SH") is FeedStatus.STALE

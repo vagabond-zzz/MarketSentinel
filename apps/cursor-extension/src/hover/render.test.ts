@@ -75,9 +75,10 @@ describe("renderHoverMarkdown", () => {
     expect(text).toContain("AI：关闭");
     expect(text).toContain("未读提醒：0");
     expect(text).toContain("00700.HK");
-    expect(text).toContain("价格：602.50");
-    expect(text).toContain("当日：+1.28%");
-    expect(text).toContain("状态：COLD");
+    expect(text).toContain("602.50 · +1.28% · COLD");
+    expect(text).not.toContain("价格：");
+    expect(text).not.toContain("当日：");
+    expect(text).not.toContain("状态：COLD");
     expect(text).toContain("1m +0.80% | 5m +1.26% | 15m --");
     expect(text).not.toContain("规则信号");
   });
