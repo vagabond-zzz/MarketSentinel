@@ -36,3 +36,11 @@ class ProviderUnavailableError(ProviderError):
 
 class ProviderNoDataError(ProviderError):
     """Vendor returned no quotes for the request (e.g. 301603). Not an auth failure."""
+
+
+class TuningConfigError(MarketSentinelError):
+    """OfflineTuningConfig failed strict validation. Comparison must fail closed."""
+
+
+class TuningSnapshotError(MarketSentinelError):
+    """Tuning snapshot artifact is missing, immutable-conflicted, or semantically invalid."""

@@ -18,6 +18,18 @@ _BREAKOUT_TYPES = frozenset({EventType.DAY_HIGH_BREAKOUT, EventType.DAY_LOW_BREA
 
 
 @dataclass(frozen=True)
+class WarmingConfig:
+    """WARM/HOT entry thresholds. Defaults are current production constants."""
+
+    hot_event_severity: int = HOT_EVENT_SEVERITY
+    hot_volume_ratio_5m: float = HOT_VOLUME_RATIO_5M
+    hot_change_5m: float = HOT_CHANGE_5M
+    warm_change_1m: float = WARM_CHANGE_1M
+    warm_change_5m: float = WARM_CHANGE_5M
+    warm_volume_ratio: float = WARM_VOLUME_RATIO
+
+
+@dataclass(frozen=True)
 class LevelRequest:
     symbol: str
     level: SchedulerLevel
@@ -31,49 +43,64 @@ class WarmingPolicy:
     force a downgrade while the market condition is still abnormal.
     """
 
+    def __init__(self, config: WarmingConfig | None = None) -> None:
+        self._config = config or WarmingConfig()
+
     def request(
         self,
         symbol: str,
         features: MarketFeatures | None,
         events: Sequence[MarketEvent],
     ) -> LevelRequest:
-        if _is_hot(features, events):
+        if self._is_hot(features, events):
             return LevelRequest(symbol=symbol, level=SchedulerLevel.HOT, reason="strong")
-        if _is_warm(features):
+        if self._is_warm(features):
             return LevelRequest(symbol=symbol, level=SchedulerLevel.WARM, reason="precursor")
         return LevelRequest(symbol=symbol, level=SchedulerLevel.COLD, reason="quiet")
 
-
-def _is_hot(features: MarketFeatures | None, events: Sequence[MarketEvent]) -> bool:
-    if any(item.severity >= HOT_EVENT_SEVERITY for item in events):
-        return True
-    if any(item.type in _BREAKOUT_TYPES for item in events):
-        return True
-    if features is None:
+    def _is_hot(self, features: MarketFeatures | None, events: Sequence[MarketEvent]) -> bool:
+        cfg = self._config
+        if any(item.severity >= cfg.hot_event_severity for item in events):
+            return True
+        if any(item.type in _BREAKOUT_TYPES for item in events):
+            return True
+        if features is None:
+            return False
+        if (
+            features.volume_ratio_5m is not None
+            and features.volume_ratio_5m >= cfg.hot_volume_ratio_5m
+        ):
+            return True
+        if features.change_5m is not None and abs(features.change_5m) >= cfg.hot_change_5m:
+            return True
+        if (
+            features.session_high_ref is not None
+            and features.session_high_obs > features.session_high_ref
+        ):
+            return True
+        if (
+            features.session_low_ref is not None
+            and features.session_low_obs < features.session_low_ref
+        ):
+            return True
         return False
-    if features.volume_ratio_5m is not None and features.volume_ratio_5m >= HOT_VOLUME_RATIO_5M:
-        return True
-    if features.change_5m is not None and abs(features.change_5m) >= HOT_CHANGE_5M:
-        return True
-    if (
-        features.session_high_ref is not None
-        and features.session_high_obs > features.session_high_ref
-    ):
-        return True
-    if features.session_low_ref is not None and features.session_low_obs < features.session_low_ref:
-        return True
-    return False
 
-
-def _is_warm(features: MarketFeatures | None) -> bool:
-    if features is None:
+    def _is_warm(self, features: MarketFeatures | None) -> bool:
+        cfg = self._config
+        if features is None:
+            return False
+        if features.change_1m is not None and abs(features.change_1m) >= cfg.warm_change_1m:
+            return True
+        if features.change_5m is not None and abs(features.change_5m) >= cfg.warm_change_5m:
+            return True
+        if (
+            features.volume_ratio_1m is not None
+            and features.volume_ratio_1m >= cfg.warm_volume_ratio
+        ):
+            return True
+        if (
+            features.volume_ratio_5m is not None
+            and features.volume_ratio_5m >= cfg.warm_volume_ratio
+        ):
+            return True
         return False
-    if features.change_1m is not None and abs(features.change_1m) >= WARM_CHANGE_1M:
-        return True
-    if features.change_5m is not None and abs(features.change_5m) >= WARM_CHANGE_5M:
-        return True
-    if features.volume_ratio_1m is not None and features.volume_ratio_1m >= WARM_VOLUME_RATIO:
-        return True
-    if features.volume_ratio_5m is not None and features.volume_ratio_5m >= WARM_VOLUME_RATIO:
-        return True
-    return False

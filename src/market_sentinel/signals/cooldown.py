@@ -11,6 +11,9 @@ _PRIORITY_RANK = {
 }
 
 
+DEFAULT_COOLDOWN_S = 300.0
+
+
 class CooldownGate:
     """Per-signal-episode cooldown on the monotonic clock.
 
@@ -18,7 +21,7 @@ class CooldownGate:
     alert of a new episode, even when symbol/family/priority match.
     """
 
-    def __init__(self, clock: Clock, cooldown_s: float = 300.0) -> None:
+    def __init__(self, clock: Clock, cooldown_s: float = DEFAULT_COOLDOWN_S) -> None:
         self._clock = clock
         self._cooldown_s = cooldown_s
         self._last: dict[str, tuple[float, SignalPriority]] = {}
