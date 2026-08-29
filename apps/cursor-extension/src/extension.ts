@@ -1,9 +1,10 @@
 import * as vscode from "vscode";
 
 import { parseAlertToast, planCriticalToast } from "./alerts/state";
+import { MarketDetailsPanel } from "./details/panel";
 import { HostController } from "./host/controller";
 import { bindCommands, type FeedbackPrompt, type WatchlistPrompt } from "./host/session";
-import type { RawSettings } from "./host/types";
+import { HOST_COMMANDS, type RawSettings } from "./host/types";
 import type { AlertMessage, WatchlistItem } from "./protocol/types";
 import { applyStatusBar } from "./statusbar/adapter";
 
@@ -109,6 +110,7 @@ function vscodeFeedbackPrompt(): FeedbackPrompt {
 
 export async function activate(context: vscode.ExtensionContext): Promise<ExtensionApi> {
   const output = vscode.window.createOutputChannel("Market Sentinel");
+  const details = new MarketDetailsPanel();
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
   const logger = {
     host: (message: string) => {
@@ -124,22 +126,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
       vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [],
     logger,
     persistWatchlist,
-    onUiSnapshot: (snapshot) => applyStatusBar(statusBar, snapshot.statusBar, snapshot.hover),
+    onUiSnapshot: (snapshot) => {
+      applyStatusBar(statusBar, snapshot.statusBar, snapshot.hover);
+      details.update(snapshot.hover);
+    },
     onAlertEdge: (message) => presentHostAlertToast(message, readSettings().alertToast),
   });
   controller = host;
   applyStatusBar(statusBar, host.statusBarModel(), host.hoverModel());
-  const commands = bindCommands(
-    host,
-    { show: () => output.show() },
-    logger,
-    vscodeFeedbackPrompt(),
-    vscodeWatchlistPrompt(),
-  );
+  const commands = {
+    ...bindCommands(
+      host,
+      { show: () => output.show() },
+      logger,
+      vscodeFeedbackPrompt(),
+      vscodeWatchlistPrompt(),
+    ),
+    [HOST_COMMANDS.showDetails]: async () => {
+      details.show(host.hoverModel());
+    },
+  };
   for (const [id, handler] of Object.entries(commands)) {
     context.subscriptions.push(vscode.commands.registerCommand(id, handler));
   }
-  context.subscriptions.push(output, statusBar);
+  context.subscriptions.push(output, details, statusBar);
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) => {
       const keys = [

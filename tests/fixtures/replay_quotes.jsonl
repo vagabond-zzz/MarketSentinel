@@ -1,2 +1,2 @@
-[{"symbol": "00700.HK", "price": 600.0, "open": 595.0, "high": 601.0, "low": 594.0, "prev_close": 595.0, "volume": 1000.0, "market_timestamp": 1700000010.0}, {"symbol": "600519.SH", "price": 1480.0, "open": 1476.0, "high": 1481.0, "low": 1475.0, "prev_close": 1476.0, "volume": 500.0, "market_timestamp": 1700000010.0}]
-[{"symbol": "00700.HK", "price": 602.5, "open": 595.0, "high": 605.0, "low": 594.0, "prev_close": 595.0, "volume": 1100.0, "market_timestamp": 1700000013.0}]
+[{"symbol": "000001.SZ", "price": 11.2, "open": 11.15, "high": 11.25, "low": 11.1, "prev_close": 11.15, "volume": 1000.0, "market_timestamp": 1700000010.0}, {"symbol": "600519.SH", "price": 1480.0, "open": 1476.0, "high": 1481.0, "low": 1475.0, "prev_close": 1476.0, "volume": 500.0, "market_timestamp": 1700000010.0}]
+[{"symbol": "000001.SZ", "price": 11.25, "open": 11.15, "high": 11.3, "low": 11.1, "prev_close": 11.15, "volume": 1100.0, "market_timestamp": 1700000013.0}]

@@ -125,5 +125,47 @@ export function renderHoverMarkdown(model: HoverModel): string {
     lines.push("");
     lines.push(renderSymbol(symbol));
   }
+  lines.push("");
+  lines.push("点击状态栏打开行情详情面板");
+  return joinMarkdownLines(lines).trimEnd();
+}
+
+export function renderHoverSummaryMarkdown(model: HoverModel): string {
+  if (!model.enableDetails) {
+    return model.headline;
+  }
+
+  const lines = [model.title];
+  if (model.connection !== undefined) {
+    lines.push(`连接：${model.connection}`);
+  }
+  if (model.feedSource !== undefined) {
+    lines.push(`行情源：${model.feedSource}`);
+  }
+  if (model.aiStatus !== undefined) {
+    lines.push(`AI：${model.aiStatus}`);
+  }
+  if (model.unreadLine !== undefined) {
+    lines.push(model.unreadLine);
+  }
+  if (model.replayMode === true && model.replayStatus !== undefined) {
+    lines.push(`Replay：${model.replayStatus}`);
+  }
+  if (model.lifecycleMessage !== undefined && model.symbols.length === 0) {
+    lines.push(model.lifecycleMessage);
+  }
+
+  const shown = model.symbols.slice(0, 3);
+  for (const symbol of shown) {
+    const feed = symbol.feedStatus !== undefined ? ` · ${symbol.feedStatus}` : "";
+    lines.push(
+      `${escapeMarkdown(symbol.displayName)}  ${symbol.price} · ${symbol.changeDay} · ${symbol.level}${feed}`,
+    );
+  }
+  if (model.symbols.length > shown.length) {
+    lines.push(`+${model.symbols.length - shown.length} more symbols`);
+  }
+
+  lines.push("点击状态栏打开行情详情面板");
   return joinMarkdownLines(lines).trimEnd();
 }

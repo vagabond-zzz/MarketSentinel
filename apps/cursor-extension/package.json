@@ -44,6 +44,10 @@
         "title": "Market Sentinel: Show Output"
       },
       {
+        "command": "marketSentinel.showDetails",
+        "title": "Market Sentinel: Show Details"
+      },
+      {
         "command": "marketSentinel.resetAlertBadge",
         "title": "Market Sentinel: Reset Alert Badge"
       },
@@ -109,7 +113,7 @@
         "marketSentinel.enableHoverDetails": {
           "type": "boolean",
           "default": true,
-          "description": "Show full market details in the StatusBar hover. Host-only; changing it does not restart the Python Core."
+          "description": "Show a compact market snapshot in the StatusBar hover. Full scrollable details are available from Market Sentinel: Show Details. Host-only; changing it does not restart the Python Core."
         },
         "marketSentinel.alertToast": {
           "type": "string",

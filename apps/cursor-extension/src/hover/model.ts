@@ -293,7 +293,7 @@ function emptyLifecycle(
     return { message: "Monitoring stopped" };
   }
   if (actual === "DISCONNECTED" && market === undefined) {
-    return { message: "Core disconnected", hint: "Click the StatusBar to view Output" };
+    return { message: "Core disconnected", hint: "点击状态栏打开行情详情面板；日志请使用 Market Sentinel: Show Output" };
   }
   if (actual === "RUNNING" && market === undefined) {
     return { message: "Core starting" };

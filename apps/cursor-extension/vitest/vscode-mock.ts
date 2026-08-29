@@ -17,6 +17,15 @@ export const vscodeState = {
   commands: new Map<string, () => Promise<void> | void>(),
   outputLines: [] as string[],
   outputShown: false,
+  detailsPanel: {
+    shown: false,
+    html: "",
+    messages: [] as unknown[],
+    disposed: false,
+    revealCount: 0,
+    title: "",
+    viewType: "",
+  },
   toasts: [] as string[],
   configListeners: [] as Array<(event: { affectsConfiguration: (key: string) => boolean }) => void>,
   statusBar: {
@@ -34,6 +43,15 @@ export function resetVscodeMock(): void {
   vscodeState.commands.clear();
   vscodeState.outputLines = [];
   vscodeState.outputShown = false;
+  vscodeState.detailsPanel = {
+    shown: false,
+    html: "",
+    messages: [],
+    disposed: false,
+    revealCount: 0,
+    title: "",
+    viewType: "",
+  };
   vscodeState.toasts = [];
   vscodeState.configListeners = [];
   vscodeState.statusBar = {
@@ -54,6 +72,14 @@ export const StatusBarAlignment = {
   Right: 2,
 } as const;
 
+export const ViewColumn = {
+  One: 1,
+  Two: 2,
+  Three: 3,
+  Active: -1,
+  Beside: -2,
+} as const;
+
 export const ConfigurationTarget = {
   Global: 1,
   Workspace: 2,
@@ -66,11 +92,49 @@ export const window = {
       appendLine(line: string) {
         vscodeState.outputLines.push(line);
       },
+      clear() {
+        vscodeState.outputLines = [];
+      },
       show() {
         vscodeState.outputShown = true;
       },
       dispose() {
         return undefined;
+      },
+    };
+  },
+  createWebviewPanel(viewType: string, title: string, _column?: number, _options?: unknown) {
+    let disposeListener: (() => void) | undefined;
+    const webview = {
+      cspSource: "vscode-webview://test",
+      get html() {
+        return vscodeState.detailsPanel.html;
+      },
+      set html(value: string) {
+        vscodeState.detailsPanel.html = value;
+      },
+      postMessage(message: unknown) {
+        vscodeState.detailsPanel.messages.push(message);
+        return Promise.resolve(true);
+      },
+    };
+    vscodeState.detailsPanel.viewType = viewType;
+    vscodeState.detailsPanel.title = title;
+    vscodeState.detailsPanel.shown = true;
+    return {
+      webview,
+      reveal() {
+        vscodeState.detailsPanel.shown = true;
+        vscodeState.detailsPanel.revealCount += 1;
+      },
+      onDidDispose(listener: () => void) {
+        disposeListener = listener;
+        return { dispose() { return undefined; } };
+      },
+      dispose() {
+        vscodeState.detailsPanel.disposed = true;
+        vscodeState.detailsPanel.shown = false;
+        disposeListener?.();
       },
     };
   },
@@ -153,4 +217,5 @@ export default {
   ThemeColor,
   MarkdownString,
   ConfigurationTarget,
+  ViewColumn,
 };

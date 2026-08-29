@@ -238,7 +238,7 @@ async def test_replay_eof_does_not_treat_exhaustion_as_missing_quote(
     fixture = Path(__file__).resolve().parents[1] / "fixtures" / "replay_quotes.jsonl"
     clock = FakeClock(wall=1_700_000_200.0, monotonic=0.0)
     watchlist = Watchlist(tmp_path / "watchlist.json")
-    watchlist.add("00700.HK")
+    watchlist.add("000001.SZ")
     provider = ReplayProvider(fixture, clock)
     engine = MarketEngine(
         clock=clock,
@@ -252,20 +252,20 @@ async def test_replay_eof_does_not_treat_exhaustion_as_missing_quote(
     await engine.tick()
     clock.advance_monotonic(10.0)
     await engine.tick()
-    live = engine.states.get("00700.HK")
+    live = engine.states.get("000001.SZ")
     assert live is not None
     assert live.latest is not None
     price = live.latest.price
     level = live.level
     clock.advance_monotonic(30.0)
     await engine.tick()
-    after = engine.states.get("00700.HK")
+    after = engine.states.get("000001.SZ")
     assert after is not None
     assert after.latest is not None
     assert after.latest.price == price
     assert after.level is level
-    assert engine.health.status("00700.HK") is not FeedStatus.STALE
-    assert engine.health.status("00700.HK") is not FeedStatus.DISCONNECTED
+    assert engine.health.status("000001.SZ") is not FeedStatus.STALE
+    assert engine.health.status("000001.SZ") is not FeedStatus.DISCONNECTED
     assert "missing quote" not in caplog.text
     wire = map_engine_state(engine).to_wire()
     assert wire.get("replay_complete") is True

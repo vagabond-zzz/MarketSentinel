@@ -28,6 +28,7 @@ suite("Extension Host smoke", function () {
     }
 
     await vscode.commands.executeCommand(HOST_COMMANDS.showOutput);
+    await vscode.commands.executeCommand(HOST_COMMANDS.showDetails);
     await vscode.commands.executeCommand(HOST_COMMANDS.resetAlertBadge);
     await api.shutdown();
   });

@@ -15,6 +15,8 @@ Host daily-usability polish on `feat/v0.6.5-ux-polish`.
 - CLI `--intelligence` / `--no-intelligence` (explicit flag > `MARKET_SENTINEL_INTEL_ENABLED` > Core default off)
 - Cursor settings: `marketSentinel.intelligence` (`off` / `on` / `inherit`, default `inherit`), `symbolNames`, `symbolDisplay`, `statusBarMaxSymbols`
 - Command Palette: Add Symbol, Remove Symbol, Manage Watchlist (Workspace `marketSentinel.watchlist`; no sync with `data/watchlist.json`)
+- Persistent `Market Sentinel: Show Details`: StatusBar click opens a dedicated scrollable Webview panel; the panel live-refreshes from Host snapshots and preserves scroll position while Hover stays compact
+- Replay fixture corpus uses A-share symbols only; `multi_a_share_ui.jsonl` provides a 3-symbol UI demo
 - StatusBar quote line with Codicons, no error/warning background, max 2 symbols + overflow
 - Hover sections: connection / feed / AI status, day change, rule vs AI, grouped 1m/5m/15m metrics
 - Replay EOF: `replay_complete` additive field, freeze last MarketState, no missing-quote warnings when the source was already exhausted before fetch

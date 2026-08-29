@@ -104,7 +104,7 @@ Market Sentinel 更偏向：
 
 最多监控 **10 个 symbol**。
 
-当前正式市场时段评估主要面向 A 股 `.SH` / `.SZ`。Core / Fake / Replay 仍可处理历史测试中的 `.HK` symbol，但 `.HK` 不会被错误套用 A 股的 `alerts_per_market_hour` 统计窗口。
+当前正式市场时段评估主要面向 A 股 `.SH` / `.SZ`。Core 的通用 symbol 模型仍可表达其他市场，但仓库内用于 Replay / tuning 的 JSONL fixture 统一使用 A 股 symbol，不再保留港股 fixture。`.HK` telemetry 仍不会被错误套用 A 股的 `alerts_per_market_hour` 统计窗口。
 
 ## 2.2 行情特征计算
 
@@ -419,6 +419,36 @@ marketSentinel.provider = replay
 marketSentinel.replayPath = <fixture.jsonl>
 ```
 
+仓库提供一个专门看多股票 UI 的 A 股 fixture：
+
+```text
+tests/fixtures/multi_a_share_ui.jsonl
+```
+
+包含：
+
+```text
+600519.SH  贵州茅台
+000001.SZ  平安银行
+300750.SZ  宁德时代
+```
+
+Cursor 示例：
+
+```json
+{
+  "marketSentinel.provider": "replay",
+  "marketSentinel.replayPath": "D:\\1\\3-wk\\Market_Sentinel\\tests\\fixtures\\multi_a_share_ui.jsonl",
+  "marketSentinel.watchlist": ["600519.SH", "000001.SZ", "300750.SZ"],
+  "marketSentinel.symbolNames": {
+    "600519.SH": "贵州茅台",
+    "000001.SZ": "平安银行",
+    "300750.SZ": "宁德时代"
+  },
+  "marketSentinel.statusBarMaxSymbols": 3
+}
+```
+
 ### Longbridge
 
 适合可选 live Core 接入。
@@ -520,9 +550,9 @@ $(circle-outline) 贵州茅台 1412.30 +1.28% | 平安银行 12.34 -0.55%
 | clock + quotes | DELAYED |
 | check Replay 已结束 | Replay 播完，不是 live 故障 |
 
-## 第五步：Hover 查看详情
+## 第五步：Hover / 可滚动详情
 
-StatusBar Hover 即使没有 Event / Signal 也显示行情快照。
+StatusBar Hover 即使没有 Event / Signal 也显示简短行情快照。Hover 是 Cursor 原生临时 tooltip，鼠标移开会消失；需要阅读完整信息时，直接点击 Market Sentinel 状态栏，打开持久的 **Market Sentinel · 行情详情** Webview 面板。该面板可滚动、不会因鼠标离开而关闭，并在 Core 状态变化时自动刷新，同时尽量保持当前滚动位置。日志仍通过 **Market Sentinel: Show Output** 单独查看。
 
 你通常可以看到：
 
@@ -541,7 +571,8 @@ Host 只有在收到新的 unsolicited `alert` edge 时才增加 unread badge。
 
 需要时可以：
 
-- Show Output；
+- Show Details（或直接点击 StatusBar，打开可滚动行情详情面板）；
+- Show Output（Core / Host 日志）；
 - Reset Alert Badge；
 - Pause；
 - Resume；
@@ -1963,10 +1994,9 @@ uv sync --extra live
 
 ## 16.9 Host 功能仍较轻
 
-当前没有：
+当前仍没有：
 
-- WebView；
-- Alert history panel；
+- Alert history panel（现有 Details Webview 只展示当前快照，不保存提醒历史）；
 - 持久 unread count；
 - `notified_timestamp`。
 

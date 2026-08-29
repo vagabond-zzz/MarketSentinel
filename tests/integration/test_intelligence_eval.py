@@ -51,7 +51,7 @@ async def _eval(
     coordinator = IntelligenceCoordinator(model, clock, budget=budget)
     await coordinator.start()
     watchlist = Watchlist(tmp_path / "watchlist.json")
-    watchlist.add("00700.HK")
+    watchlist.add("600519.SH")
     engine = MarketEngine(
         clock=clock,
         watchlist=watchlist,
@@ -101,7 +101,7 @@ async def test_eval_significant_episode_is_one_fake_call_with_private_payload(
     assert "workspace" not in blob
     assert "conversation" not in blob
     assert "DASHSCOPE" not in blob
-    state = engine.states.get("00700.HK")
+    state = engine.states.get("600519.SH")
     assert state is not None and state.active_signals
     signal_id = state.active_signals[0].id
     stored = coordinator.registry.get(signal_id)
@@ -156,7 +156,7 @@ async def test_eval_model_failure_keeps_rule_signal(tmp_path: Path, error: Excep
     engine, coordinator, _model, _clock = await _eval(
         tmp_path, "price_volume_breakout.jsonl", model
     )
-    state = engine.states.get("00700.HK")
+    state = engine.states.get("600519.SH")
     assert state is not None and state.active_signals
     stored = coordinator.registry.get(state.active_signals[0].id)
     assert stored is not None
@@ -175,7 +175,7 @@ async def test_eval_stale_feed_does_not_call_model(tmp_path: Path) -> None:
     engine.provider.set_timeout(True)
     clock.advance_monotonic(30.0)
     await engine.tick()
-    assert engine.health.status("00700.HK") is FeedStatus.STALE
+    assert engine.health.status("600519.SH") is FeedStatus.STALE
     await engine.tick()
     await coordinator.idle()
     assert coordinator.diagnostics.model_calls == before
@@ -186,6 +186,6 @@ async def test_eval_stale_feed_does_not_call_model(tmp_path: Path) -> None:
 async def test_eval_slow_fake_model_lets_replay_finish(tmp_path: Path) -> None:
     model = FakeIntelligenceProvider(delay_s=0.05)
     engine, coordinator, model, _clock = await _eval(tmp_path, "price_volume_breakout.jsonl", model)
-    assert engine.states.get("00700.HK") is not None
+    assert engine.states.get("600519.SH") is not None
     assert coordinator.diagnostics.model_calls == 1
     await coordinator.shutdown()

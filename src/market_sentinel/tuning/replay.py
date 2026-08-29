@@ -32,7 +32,7 @@ DEFAULT_CORPUS: tuple[str, ...] = (
     "episode_lifecycle",
 )
 
-DEFAULT_REPLAY_SYMBOL = "00700.HK"
+DEFAULT_REPLAY_SYMBOL = "600519.SH"
 
 
 def default_fixture_dir() -> Path:

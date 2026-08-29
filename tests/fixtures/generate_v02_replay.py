@@ -8,7 +8,7 @@ from pathlib import Path
 
 CST = timezone(timedelta(hours=8))
 T0 = datetime(2024, 1, 15, 9, 30, tzinfo=CST).timestamp()
-SYM = "00700.HK"
+SYM = "600519.SH"
 OUT = Path(__file__).resolve().parent
 
 

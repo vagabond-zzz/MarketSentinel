@@ -68,7 +68,7 @@ describe("StatusBarItem adapter", () => {
       unreadAlertCount: 2,
     });
     expect(vscodeState.statusBar.backgroundColor).toBeUndefined();
-    expect(vscodeState.statusBar.command).toBe(HOST_COMMANDS.showOutput);
+    expect(vscodeState.statusBar.command).toBe(HOST_COMMANDS.showDetails);
     expect(vscodeState.statusBar.shown).toBe(true);
   });
 
@@ -121,8 +121,10 @@ describe("StatusBarItem adapter", () => {
     expect(status.kind).toBe("HOT");
     expect(hover.unreadAlertCount).toBe(0);
     const tooltip = vscodeState.statusBar.tooltip as MarkdownString;
-    expect(tooltip.value).toContain("量价同步扩张");
-    expect(tooltip.value).toContain("规则信号");
+    expect(tooltip.value).toContain("00700.HK");
+    expect(tooltip.value).toContain("点击状态栏打开行情详情面板");
+    expect(tooltip.value).not.toContain("量价同步扩张");
+    expect(tooltip.value).not.toContain("规则信号");
     expect(tooltip.value).not.toContain("未读提醒：1");
   });
 });

@@ -68,6 +68,7 @@ export const HOST_COMMANDS = {
   resume: "marketSentinel.resume",
   restartCore: "marketSentinel.restartCore",
   showOutput: "marketSentinel.showOutput",
+  showDetails: "marketSentinel.showDetails",
   resetAlertBadge: "marketSentinel.resetAlertBadge",
   submitSignalFeedback: "marketSentinel.submitSignalFeedback",
   addSymbol: "marketSentinel.addSymbol",

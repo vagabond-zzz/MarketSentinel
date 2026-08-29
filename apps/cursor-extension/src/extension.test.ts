@@ -25,6 +25,7 @@ describe("extension adapter", () => {
     expect(vscodeState.commands.has(HOST_COMMANDS.resume)).toBe(true);
     expect(vscodeState.commands.has(HOST_COMMANDS.restartCore)).toBe(true);
     expect(vscodeState.commands.has(HOST_COMMANDS.showOutput)).toBe(true);
+    expect(vscodeState.commands.has(HOST_COMMANDS.showDetails)).toBe(true);
     expect(vscodeState.commands.has(HOST_COMMANDS.resetAlertBadge)).toBe(true);
     expect(vscodeState.commands.has(HOST_COMMANDS.submitSignalFeedback)).toBe(true);
     expect(vscodeState.commands.has(HOST_COMMANDS.addSymbol)).toBe(true);
@@ -33,10 +34,23 @@ describe("extension adapter", () => {
     expect(vscodeState.outputLines.some((line) => line.startsWith("[host]"))).toBe(true);
     expect(vscodeState.statusBar.shown).toBe(true);
     expect(vscodeState.statusBar.text).toContain("$(error)");
-    expect(vscodeState.statusBar.command).toBe(HOST_COMMANDS.showOutput);
+    expect(vscodeState.statusBar.command).toBe(HOST_COMMANDS.showDetails);
     expect(tooltipMarkdown().value).toContain("Core disconnected");
     await vscodeState.commands.get(HOST_COMMANDS.showOutput)?.();
     expect(vscodeState.outputShown).toBe(true);
+    await vscodeState.commands.get(HOST_COMMANDS.showDetails)?.();
+    expect(vscodeState.detailsPanel.shown).toBe(true);
+    expect(vscodeState.detailsPanel.viewType).toBe("marketSentinel.details");
+    expect(vscodeState.detailsPanel.title).toContain("行情详情");
+    expect(vscodeState.detailsPanel.html).toContain("Market Sentinel · 行情详情");
+    const messagesBefore = vscodeState.detailsPanel.messages.length;
+    vscodeState.settings["marketSentinel.symbolDisplay"] = "code";
+    vscodeState.configListeners[0]?.({
+      affectsConfiguration: (key) => key === "marketSentinel.symbolDisplay",
+    });
+    await vi.waitFor(() => {
+      expect(vscodeState.detailsPanel.messages.length).toBeGreaterThan(messagesBefore);
+    });
     await deactivate();
     await deactivate();
   });
@@ -46,7 +60,7 @@ describe("extension adapter", () => {
     await activate(context as never);
     const markdown = tooltipMarkdown();
     expect(markdown.value).toContain("Market Sentinel");
-    expect(markdown.value).toContain("Click the StatusBar to view Output");
+    expect(markdown.value).toContain("点击状态栏打开行情详情面板");
     expect(markdown.isTrusted).toBe(false);
 
     vscodeState.settings["marketSentinel.enableHoverDetails"] = false;

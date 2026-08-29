@@ -34,7 +34,7 @@ def _batches(name: str) -> list[list[dict]]:
     ]
 
 
-def _engine(tmp_path: Path, fixture_name: str, *, symbol: str = "00700.HK"):
+def _engine(tmp_path: Path, fixture_name: str, *, symbol: str = "600519.SH"):
     batches = _batches(fixture_name)
     start = float(batches[0][0]["market_timestamp"])
     clock = FakeClock(wall=start, monotonic=0.0)
@@ -56,7 +56,7 @@ def _engine(tmp_path: Path, fixture_name: str, *, symbol: str = "00700.HK"):
 
 
 async def _run(
-    tmp_path: Path, fixture_name: str, *, symbol: str = "00700.HK"
+    tmp_path: Path, fixture_name: str, *, symbol: str = "600519.SH"
 ) -> tuple[MarketEngine, list[EngineTickResult]]:
     clock, engine, batches = _engine(tmp_path, fixture_name, symbol=symbol)
     results: list[EngineTickResult] = []
@@ -69,8 +69,8 @@ async def _run(
 @pytest.mark.integration
 async def test_replay_normal_market_stays_cold(tmp_path: Path) -> None:
     engine, results = await _run(tmp_path, "normal_market.jsonl")
-    last = results[-1].for_symbol("00700.HK")
-    state = engine.states.get("00700.HK")
+    last = results[-1].for_symbol("600519.SH")
+    state = engine.states.get("600519.SH")
     assert last is not None and state is not None
     assert last.features is not None
     assert last.features.change_1m == pytest.approx(0.0)
@@ -85,9 +85,9 @@ async def test_replay_normal_market_stays_cold(tmp_path: Path) -> None:
 @pytest.mark.integration
 async def test_replay_precursor_warms_without_signal(tmp_path: Path) -> None:
     engine, results = await _run(tmp_path, "pre_signal_warm.jsonl")
-    first = results[0].for_symbol("00700.HK")
-    second = results[1].for_symbol("00700.HK")
-    state = engine.states.get("00700.HK")
+    first = results[0].for_symbol("600519.SH")
+    second = results[1].for_symbol("600519.SH")
+    state = engine.states.get("600519.SH")
     assert first is not None and second is not None and state is not None
     assert first.level_after is SchedulerLevel.COLD
     assert second.accepted_events == ()
@@ -100,9 +100,9 @@ async def test_replay_precursor_warms_without_signal(tmp_path: Path) -> None:
 @pytest.mark.integration
 async def test_replay_rapid_move_hot_alert_then_cooldown(tmp_path: Path) -> None:
     engine, results = await _run(tmp_path, "rapid_move.jsonl")
-    move = results[1].for_symbol("00700.HK")
-    quiet = results[2].for_symbol("00700.HK")
-    state = engine.states.get("00700.HK")
+    move = results[1].for_symbol("600519.SH")
+    quiet = results[2].for_symbol("600519.SH")
+    state = engine.states.get("600519.SH")
     assert move is not None and quiet is not None and state is not None
     assert any(item.type is EventType.RAPID_MOVE for item in move.accepted_events)
     assert move.alert_candidates
@@ -116,14 +116,14 @@ async def test_replay_rapid_move_hot_alert_then_cooldown(tmp_path: Path) -> None
 @pytest.mark.integration
 async def test_replay_volume_spike_needs_warmup(tmp_path: Path) -> None:
     engine, results = await _run(tmp_path, "volume_spike.jsonl")
-    early = results[5].for_symbol("00700.HK")
+    early = results[5].for_symbol("600519.SH")
     assert early is not None and early.features is not None
     assert early.features.volume_ratio_5m is None
     assert early.features.volume_ratio_1m is None
     assert all(item.type is not EventType.VOLUME_SPIKE for item in early.accepted_events)
 
-    last = results[-1].for_symbol("00700.HK")
-    state = engine.states.get("00700.HK")
+    last = results[-1].for_symbol("600519.SH")
+    state = engine.states.get("600519.SH")
     assert last is not None and state is not None
     assert any(item.type is EventType.VOLUME_SPIKE for item in last.accepted_events)
     assert last.alert_candidates
@@ -134,9 +134,9 @@ async def test_replay_volume_spike_needs_warmup(tmp_path: Path) -> None:
 @pytest.mark.integration
 async def test_replay_price_volume_breakout_episode(tmp_path: Path) -> None:
     engine, results = await _run(tmp_path, "price_volume_breakout.jsonl")
-    event_tick = results[-2].for_symbol("00700.HK")
-    follow = results[-1].for_symbol("00700.HK")
-    state = engine.states.get("00700.HK")
+    event_tick = results[-2].for_symbol("600519.SH")
+    follow = results[-1].for_symbol("600519.SH")
+    state = engine.states.get("600519.SH")
     assert event_tick is not None and follow is not None and state is not None
     types = {item.type for item in event_tick.accepted_events}
     assert EventType.RAPID_MOVE in types
@@ -161,16 +161,16 @@ async def test_replay_price_volume_breakout_episode(tmp_path: Path) -> None:
 @pytest.mark.integration
 async def test_replay_episode_expires_then_new_id_gets_first_alert(tmp_path: Path) -> None:
     engine, results = await _run(tmp_path, "episode_lifecycle.jsonl")
-    first = results[1].for_symbol("00700.HK")
-    expired = results[2].for_symbol("00700.HK")
-    second = results[3].for_symbol("00700.HK")
-    state = engine.states.get("00700.HK")
+    first = results[1].for_symbol("600519.SH")
+    expired = results[2].for_symbol("600519.SH")
+    second = results[3].for_symbol("600519.SH")
+    state = engine.states.get("600519.SH")
     assert first is not None and expired is not None and second is not None and state is not None
     first_id = first.alert_candidates[0].id
     created = first.alert_candidates[0].signal_created_timestamp
     assert expired.alert_candidates == ()
     assert expired.signal_updates == ()
-    assert engine.states.get("00700.HK") is not None
+    assert engine.states.get("600519.SH") is not None
     assert all(item.id != first_id for item in expired.signal_updates)
     assert second.alert_candidates
     new_signal = second.alert_candidates[0]
@@ -182,8 +182,8 @@ async def test_replay_episode_expires_then_new_id_gets_first_alert(tmp_path: Pat
 @pytest.mark.integration
 async def test_replay_reversal_has_independent_down_alert(tmp_path: Path) -> None:
     engine, results = await _run(tmp_path, "reversal.jsonl")
-    up = results[1].for_symbol("00700.HK")
-    down = results[2].for_symbol("00700.HK")
+    up = results[1].for_symbol("600519.SH")
+    down = results[2].for_symbol("600519.SH")
     assert up is not None and down is not None
     up_id = up.alert_candidates[0].id
     assert up.alert_candidates[0].direction is EventDirection.UP
@@ -191,7 +191,7 @@ async def test_replay_reversal_has_independent_down_alert(tmp_path: Path) -> Non
     down_signal = down.alert_candidates[0]
     assert down_signal.id != up_id
     assert down_signal.direction is EventDirection.DOWN
-    live = engine.states.get("00700.HK")
+    live = engine.states.get("600519.SH")
     assert live is not None
     directions = {item.direction for item in live.active_signals}
     assert EventDirection.UP in directions
@@ -207,9 +207,9 @@ async def test_replay_active_signals_keep_untouched_tape_when_vwap_updates(
     tmp_path: Path,
 ) -> None:
     engine, results = await _run(tmp_path, "tape_then_vwap.jsonl")
-    tape = results[1].for_symbol("00700.HK")
-    vwap = results[2].for_symbol("00700.HK")
-    state = engine.states.get("00700.HK")
+    tape = results[1].for_symbol("600519.SH")
+    vwap = results[2].for_symbol("600519.SH")
+    state = engine.states.get("600519.SH")
     assert tape is not None and vwap is not None and state is not None
     tape_id = next(item.id for item in tape.signal_updates if item.family != "vwap")
     families = {item.family for item in state.active_signals}
@@ -223,8 +223,8 @@ async def test_replay_active_signals_keep_untouched_tape_when_vwap_updates(
 @pytest.mark.integration
 async def test_replay_alert_candidates_are_edge_triggered(tmp_path: Path) -> None:
     _, results = await _run(tmp_path, "rapid_move.jsonl")
-    first = results[1].for_symbol("00700.HK")
-    second = results[2].for_symbol("00700.HK")
+    first = results[1].for_symbol("600519.SH")
+    second = results[2].for_symbol("600519.SH")
     assert first is not None and second is not None
     assert first.alert_candidates
     assert second.alert_candidates == ()
@@ -236,21 +236,21 @@ async def test_disconnected_fetch_does_not_forge_events(tmp_path: Path) -> None:
     for batch in batches[:2]:
         clock.set_wall(float(batch[0]["market_timestamp"]))
         await engine.tick()
-    signal_ids = {item.id for item in engine.states.get("00700.HK").active_signals}  # type: ignore[union-attr]
+    signal_ids = {item.id for item in engine.states.get("600519.SH").active_signals}  # type: ignore[union-attr]
     assert signal_ids
     engine.provider = FakeProvider(clock)
     engine.provider.set_timeout(True)
     clock.advance_monotonic(30.0)
     result = await engine.tick()
-    row = result.for_symbol("00700.HK")
-    state = engine.states.get("00700.HK")
+    row = result.for_symbol("600519.SH")
+    state = engine.states.get("600519.SH")
     assert row is not None and state is not None
     assert row.accepted_events == ()
     assert row.alert_candidates == ()
     assert {item.id for item in state.active_signals} == signal_ids
-    assert engine.health.status("00700.HK") is FeedStatus.STALE
+    assert engine.health.status("600519.SH") is FeedStatus.STALE
     clock.advance_monotonic(30.0)
     await engine.tick()
     await engine.tick()
-    assert engine.health.status("00700.HK") is FeedStatus.DISCONNECTED
-    assert engine.states.get("00700.HK").active_signals  # type: ignore[union-attr]
+    assert engine.health.status("600519.SH") is FeedStatus.DISCONNECTED
+    assert engine.states.get("600519.SH").active_signals  # type: ignore[union-attr]

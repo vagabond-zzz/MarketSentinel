@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { WireMarketState, WireSignal, WireSymbolState } from "../protocol/types";
 import { mapHover } from "./model";
-import { renderHoverMarkdown } from "./render";
+import { renderHoverMarkdown, renderHoverSummaryMarkdown } from "./render";
 
 function signal(overrides: Partial<WireSignal> = {}): WireSignal {
   return {
@@ -59,6 +59,17 @@ function market(overrides: Partial<WireMarketState> = {}): WireMarketState {
 }
 
 describe("renderHoverMarkdown", () => {
+
+  it("keeps StatusBar hover compact and points to persistent details", () => {
+    const model = mapHover({ actual: "RUNNING", market: market() });
+    const text = renderHoverSummaryMarkdown(model);
+    expect(text).toContain("Market Sentinel");
+    expect(text).toContain("00700.HK");
+    expect(text).toContain("600519.SH");
+    expect(text).toContain("点击状态栏打开行情详情面板");
+    expect(text).not.toContain("规则信号");
+    expect(text).not.toContain("技术指标");
+  });
   it("renders a useful hover with no signal as a snapshot, not a diagnostic dump", () => {
     const text = renderHoverMarkdown(
       mapHover({

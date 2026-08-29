@@ -85,8 +85,8 @@ async def test_baseline_replay_parity_with_normal_replay(tmp_path: Path) -> None
         fixture_dir=FIXTURES,
         work_dir=tmp_path / "tuned",
     )
-    assert tuned.facts == tick_facts(results, "00700.HK")
-    assert engine.states.get("00700.HK") is not None
+    assert tuned.facts == tick_facts(results, "600519.SH")
+    assert engine.states.get("600519.SH") is not None
 
 
 async def test_baseline_equals_candidate_zero_behavioral_delta(tmp_path: Path) -> None:

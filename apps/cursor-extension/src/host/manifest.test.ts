@@ -22,6 +22,7 @@ describe("extension manifest", () => {
       "marketSentinel.resume",
       "marketSentinel.restartCore",
       "marketSentinel.showOutput",
+      "marketSentinel.showDetails",
       "marketSentinel.resetAlertBadge",
       "marketSentinel.submitSignalFeedback",
       "marketSentinel.addSymbol",

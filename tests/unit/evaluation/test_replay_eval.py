@@ -38,7 +38,7 @@ def _engine(
     fixture_name: str,
     telemetry: TelemetryRuntime,
     *,
-    symbol: str = "00700.HK",
+    symbol: str = "600519.SH",
 ) -> tuple[FakeClock, MarketEngine, list[list[dict]]]:
     batches = _batches(fixture_name)
     start = float(batches[0][0]["market_timestamp"])

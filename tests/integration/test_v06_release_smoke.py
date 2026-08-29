@@ -49,7 +49,7 @@ from market_sentinel.tuning.store import (
 from market_sentinel.watchlist.watchlist import Watchlist
 
 FIXTURES = default_fixture_dir()
-_SYMBOL = "00700.HK"
+_SYMBOL = "600519.SH"
 
 
 def _batches(path: Path) -> list[list[dict]]:
