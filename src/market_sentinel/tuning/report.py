@@ -5,7 +5,7 @@ from typing import Any
 
 from market_sentinel.telemetry.contract import TELEMETRY_DENYLIST
 
-TUNING_COMPARISON_SCHEMA_VERSION = 1
+TUNING_COMPARISON_SCHEMA_VERSION = 2
 
 UNAVAILABLE_HOST_OFFLINE = "host_not_in_offline_replay"
 UNAVAILABLE_INTEL_OFFLINE = "intelligence_not_in_offline_replay"
@@ -49,7 +49,13 @@ TUNING_COMPARISON_ALLOWLIST: frozenset[str] = frozenset(
         "config_version",
         "pipeline",
         "noise",
+        "scheduler",
         "intelligence",
+        "cold_tick_count",
+        "warm_tick_count",
+        "hot_tick_count",
+        "level_transition_count",
+        "processed_tick_count",
         "events_generated",
         "events_deduped",
         "events_clustered",
@@ -88,22 +94,13 @@ TUNING_COMPARISON_ALLOWLIST: frozenset[str] = frozenset(
         "snapshot_valid",
         "wrote_telemetry_jsonl",
         "wrote_feedback_jsonl",
-        "cooldown_s",
         "cluster_lookback_s",
-        "upgrade_dwell_s",
-        "hot_downgrade_dwell_s",
-        "warm_downgrade_dwell_s",
         "hot_event_severity",
         "hot_volume_ratio_5m",
         "hot_change_5m",
         "warm_change_1m",
         "warm_change_5m",
         "warm_volume_ratio",
-        "router_min_priority",
-        "router_require_alert_edge",
-        "router_min_convergence_types",
-        "episode_max_calls",
-        "allow_escalation_recall",
         "facts_match",
     }
 )

@@ -35,7 +35,7 @@ from market_sentinel.telemetry.paths import (
 from market_sentinel.tuning.compare import compare_artifacts, empty_feedback_dataset
 from market_sentinel.tuning.config import OfflineTuningConfig, capture_baseline_config
 from market_sentinel.tuning.feedback import build_tuning_feedback_dataset
-from market_sentinel.tuning.replay import DEFAULT_CORPUS, default_fixture_dir
+from market_sentinel.tuning.replay import DEFAULT_CORPUS, default_fixture_dir, validate_corpus
 from market_sentinel.tuning.store import load_snapshot, make_artifact, write_snapshot
 from market_sentinel.watchlist.watchlist import Watchlist
 
@@ -212,7 +212,8 @@ async def _handle_tuning_compare(args: argparse.Namespace) -> int:
 def _parse_corpus(raw: str) -> tuple[str, ...]:
     if raw.strip() == "" or raw.strip() == "default":
         return DEFAULT_CORPUS
-    return tuple(part.strip() for part in raw.split(",") if part.strip())
+    parts = tuple(part.strip() for part in raw.split(",") if part.strip())
+    return validate_corpus(parts)
 
 
 def _handle_watchlist(watchlist: Watchlist, args: argparse.Namespace) -> int:

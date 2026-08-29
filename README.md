@@ -239,7 +239,7 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Evaluation `alerts_per_market_hour` is A-share only (`.SH` / `.SZ`). Non-A-share scope is unavailable rather than silently using A-share windows. The denominator is telemetry-observed market-time span per `run_id`, not process wall time or feed uptime. Weekends are excluded; official exchange holidays are not yet calendar-aware. Host open/dismiss/mute rates are unavailable until those producers exist.
 - Explicit `useful_rate` is the useful share of **submitted** feedback only (self-selection). No feedback is not “not useful”. Feedback never retunes thresholds, cooldown, or RouterPolicy.
 - `feedback_coverage` is unique `alert_presented` `(run_id, signal_id)` with at least one valid explicit feedback, not coverage of every signal the QuickPick could show. Host drops stale targets when Core restarts; Core does not maintain a signal-id registry.
-- M5 is offline evidence only: candidate snapshots are never auto-loaded by daemon/`run`. Tuning feedback must join Core telemetry by `(run_id, signal_id)`. Duplicate `feedback.jsonl` rows stay append-only; the tuning dataset uses latest-wins per target.
+- M5 is offline evidence only: candidate snapshots are never auto-loaded by daemon/`run`. Tuning feedback must join Core telemetry by `(run_id, signal_id)`. Duplicate `feedback.jsonl` rows stay append-only; the tuning dataset uses latest-wins per target. `supported` OfflineTuningConfig fields are only those with Replay + Comparison Report sensitivity proof (currently lookback + WarmingConfig). Cooldown/dwell and Intelligence router/budget are deferred.
 
 ## v0.1 status
 

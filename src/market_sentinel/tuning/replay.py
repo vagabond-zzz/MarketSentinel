@@ -13,6 +13,7 @@ from market_sentinel.orchestration.warming import WarmingPolicy
 from market_sentinel.providers.replay import ReplayProvider
 from market_sentinel.runtime.engine import MarketEngine
 from market_sentinel.runtime.results import EngineTickResult
+from market_sentinel.scheduler.policy import SchedulerPolicy
 from market_sentinel.scheduler.scheduler import AdaptiveScheduler
 from market_sentinel.signals.composer import SignalComposer
 from market_sentinel.signals.cooldown import CooldownGate
@@ -38,6 +39,15 @@ def default_fixture_dir() -> Path:
     return Path(__file__).resolve().parents[3] / "tests" / "fixtures"
 
 
+def validate_corpus(corpus: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    ids = tuple(corpus)
+    if not ids:
+        raise TuningConfigError("corpus must contain at least one corpus_id")
+    if len(ids) != len(set(ids)):
+        raise TuningConfigError("duplicate corpus_id")
+    return ids
+
+
 def corpus_fixture_path(fixture_dir: Path, corpus_id: str) -> Path:
     if "/" in corpus_id or "\\" in corpus_id or ".." in corpus_id or corpus_id.strip() == "":
         raise TuningConfigError("corpus_id is not a filesystem path")
@@ -45,6 +55,19 @@ def corpus_fixture_path(fixture_dir: Path, corpus_id: str) -> Path:
     if not path.is_file():
         raise TuningConfigError("unknown corpus_id")
     return path
+
+
+def scheduler_policy_for_replay() -> SchedulerPolicy:
+    """Always-due poll intervals; production dwells (not OfflineTuningConfig)."""
+    production = SchedulerPolicy()
+    return SchedulerPolicy(
+        cold_interval_s=0.0,
+        warm_interval_s=0.0,
+        hot_interval_s=0.0,
+        upgrade_dwell_s=production.upgrade_dwell_s,
+        hot_downgrade_dwell_s=production.hot_downgrade_dwell_s,
+        warm_downgrade_dwell_s=production.warm_downgrade_dwell_s,
+    )
 
 
 def build_tuned_engine(
@@ -59,14 +82,14 @@ def build_tuned_engine(
         clock=clock,
         watchlist=watchlist,
         provider=provider,
-        scheduler=AdaptiveScheduler(clock, config.scheduler_policy_for_replay()),
+        scheduler=AdaptiveScheduler(clock, scheduler_policy_for_replay()),
         buffers=SymbolBuffers(),
         states=MarketStateStore(),
         health=FeedHealthTracker(clock),
         pipeline=SignalPipeline(
             clock,
             composer=SignalComposer(clock, lookback_s=config.cluster_lookback_s),
-            cooldown=CooldownGate(clock, cooldown_s=config.cooldown_s),
+            cooldown=CooldownGate(clock),
             telemetry=telemetry,
         ),
         warming=WarmingPolicy(config.warming_config()),

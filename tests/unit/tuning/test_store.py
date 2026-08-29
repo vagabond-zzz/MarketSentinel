@@ -31,7 +31,7 @@ def test_snapshot_round_trip(tmp_path: Path) -> None:
     assert loaded.config == artifact.config
     assert path == snapshot_path(tmp_path, artifact.snapshot.snapshot_id)
     disk = json.loads(path.read_text(encoding="utf-8"))
-    assert disk["schema_version"] == 1
+    assert disk["schema_version"] == 2
     assert disk["snapshot"]["config_version"] == "baseline-0.5.0"
 
 
@@ -84,9 +84,9 @@ def test_unsupported_schema_version_fail_closed(tmp_path: Path) -> None:
     )
     path = write_snapshot(tmp_path, artifact)
     payload = json.loads(path.read_text(encoding="utf-8"))
-    payload["schema_version"] = 2
+    payload["schema_version"] = 1
     path.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(TuningSnapshotError, match="schema_version"):
+    with pytest.raises(TuningSnapshotError, match="unsupported tuning artifact schema_version"):
         load_snapshot(tmp_path, artifact.snapshot.snapshot_id)
 
 

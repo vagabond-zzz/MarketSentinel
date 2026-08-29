@@ -287,24 +287,25 @@ Feedback does not mutate Event/Signal, cooldown, RouterPolicy, Scheduler, or thr
 
 M5 provides **offline evidence, not automatic tuning**. Candidate configs are never automatically loaded by production runtime.
 
-Supported M5 parameters (constructor injection, production default unchanged):
+Supported M5 parameters must pass Consumed + Observable + Sensitivity proof (Comparison Report delta, not Engine facts alone):
 
 ```text
-cooldown_s, cluster_lookback_s
-upgrade_dwell_s, hot_downgrade_dwell_s, warm_downgrade_dwell_s
+cluster_lookback_s
 hot_event_severity, hot_volume_ratio_5m, hot_change_5m
 warm_change_1m, warm_change_5m, warm_volume_ratio
-router_min_priority, router_require_alert_edge, router_min_convergence_types
-episode_max_calls, allow_escalation_recall
 ```
 
-Deferred (module globals / live poll cadence / would need Event-rule or prompt refactor):
+Deferred (still in `tuning_parameter_inventory()`, rejected from candidate config):
 
 ```text
-cold/warm/hot_interval_s   # Replay corpus fetches every fixture tick (interval 0)
-event thresholds / TTL    # events/thresholds.py module globals
+cooldown_s, upgrade/hot/warm dwells   # deterministic M5 Replay freezes monotonic time
+router_* / episode_max_calls / allow_escalation_recall  # comparator does not attach Intelligence
+cold/warm/hot_interval_s             # live AdaptiveScheduler cadence; Replay uses interval 0
+event thresholds / TTL               # events/thresholds.py module globals
 prompt compactness, intelligence_timeout_s, volume_ratio_lookback
 ```
+
+Artifact `schema_version` is **2** (draft schema 1 fail-closed). Comparison report `schema_version` is **2** and includes `scheduler` tick counts. Protocol remains **1**.
 
 Feedback used for tuning must join telemetry by `(run_id, signal_id)` to Core lifecycle evidence (`signal_episode_created` / `signal_escalated` / `alert_candidate` / `alert_suppressed`). Storage stays append-only; the tuning dataset uses latest `created_timestamp` then `feedback_id` per target. `no feedback != not_useful`.
 

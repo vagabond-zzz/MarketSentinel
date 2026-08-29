@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — v0.6 M5 review fixes (no version bump)
+
+Evidence-driven `supported` parameters after external M5 review. Package **0.5.0**. Protocol **1**. No M6.
+
+- `OfflineTuningConfig` keeps only parameters that are consumed, visible in `TuningComparisonReport`, and individually sensitivity-tested
+- Intelligence router/budget and cooldown/dwell are `deferred` (comparator does not attach Intelligence; Replay freezes monotonic time)
+- Comparison report schema 2 adds `scheduler` tick counts; artifact schema 2 fail-closes draft schema 1
+- Empty or duplicate corpus ids raise `TuningConfigError` (CLI exit 2)
+
 ## Unreleased — v0.6 M5 Offline Tuning Workflow (no version bump)
 
 Offline snapshot + Replay comparison on `feat/v0.6-feedback-observability`. Package **0.5.0**. Protocol **1**. No M6. M5 provides offline evidence, not automatic tuning.

@@ -4,6 +4,9 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
+from market_sentinel.errors import TuningConfigError
 from market_sentinel.scheduler.policy import SchedulerPolicy
 from market_sentinel.signals.cluster import CLUSTER_LOOKBACK_S
 from market_sentinel.telemetry.contract import TuningSource
@@ -14,15 +17,24 @@ from market_sentinel.tuning.replay import (
     default_fixture_dir,
     run_tuned_replay,
     tick_facts,
+    validate_corpus,
 )
 from market_sentinel.tuning.report import (
     RECOMMENDATION_DENIED_KEYS,
+    TUNING_COMPARISON_SCHEMA_VERSION,
     UNAVAILABLE_HOST_OFFLINE,
     UNAVAILABLE_INTEL_OFFLINE,
 )
 from market_sentinel.tuning.store import make_artifact
 
 FIXTURES = default_fixture_dir()
+_SCHEDULER_KEYS = (
+    "cold_tick_count",
+    "warm_tick_count",
+    "hot_tick_count",
+    "level_transition_count",
+    "processed_tick_count",
+)
 
 
 def _artifact(config=None, *, version: str = "baseline-0.5.0"):
@@ -31,6 +43,35 @@ def _artifact(config=None, *, version: str = "baseline-0.5.0"):
         config_version=version,
         source=TuningSource.OFFLINE_EVAL,
     )
+
+
+def _assert_zero_delta(record: dict) -> None:
+    delta = record["delta"]["pipeline"]
+    for key in (
+        "events_generated",
+        "events_deduped",
+        "events_clustered",
+        "signal_episodes_created",
+        "signal_escalations",
+        "alert_candidates",
+        "alert_suppressed",
+    ):
+        assert delta[key]["delta"] == 0
+    noise = record["delta"]["noise"]
+    for key in (
+        "info_count",
+        "notice_count",
+        "important_count",
+        "critical_count",
+        "repeated_episode_signal_count",
+        "repeated_episode_extra_alert_count",
+    ):
+        assert noise[key]["delta"] == 0
+    assert noise["suppression_by_reason"]["cooldown"]["delta"] == 0
+    assert noise["suppression_by_reason"]["same_tick_duplicate"]["delta"] == 0
+    scheduler = record["delta"]["scheduler"]
+    for key in _SCHEDULER_KEYS:
+        assert scheduler[key]["delta"] == 0
 
 
 async def test_baseline_replay_parity_with_normal_replay(tmp_path: Path) -> None:
@@ -58,29 +99,13 @@ async def test_baseline_equals_candidate_zero_behavioral_delta(tmp_path: Path) -
         work_dir=tmp_path,
     )
     record = report.to_record()
-    delta = record["delta"]["pipeline"]
-    for key in (
-        "events_generated",
-        "events_deduped",
-        "events_clustered",
-        "signal_episodes_created",
-        "signal_escalations",
-        "alert_candidates",
-        "alert_suppressed",
-    ):
-        assert delta[key]["delta"] == 0
-    noise = record["delta"]["noise"]
-    for key in (
-        "info_count",
-        "notice_count",
-        "important_count",
-        "critical_count",
-        "repeated_episode_signal_count",
-        "repeated_episode_extra_alert_count",
-    ):
-        assert noise[key]["delta"] == 0
-    assert noise["suppression_by_reason"]["cooldown"]["delta"] == 0
-    assert noise["suppression_by_reason"]["same_tick_duplicate"]["delta"] == 0
+    assert record["schema_version"] == TUNING_COMPARISON_SCHEMA_VERSION == 2
+    _assert_zero_delta(record)
+    for row in record["per_fixture"]:
+        assert set(row["baseline_metrics"]["scheduler"]) == set(_SCHEDULER_KEYS)
+        assert set(row["candidate_metrics"]["scheduler"]) == set(_SCHEDULER_KEYS)
+        for key in _SCHEDULER_KEYS:
+            assert row["delta"]["scheduler"][key]["delta"] == 0
 
 
 async def test_candidate_run_does_not_pollute_subsequent_baseline(tmp_path: Path) -> None:
@@ -122,12 +147,14 @@ async def test_fixed_corpus_and_fixture_before_after(tmp_path: Path) -> None:
         work_dir=tmp_path,
     )
     record = report.to_record()
+    assert record["schema_version"] == 2
     assert record["corpus"] == list(DEFAULT_CORPUS)
     ids = [row["corpus_id"] for row in record["per_fixture"]]
     assert ids == list(DEFAULT_CORPUS)
     dumped = json.dumps(record)
     assert "recommended" not in dumped
     assert "optimal" not in dumped
+    assert "winner" not in dumped
     assert "D:/" not in dumped and "C:\\" not in dumped
     assert record["baseline_metrics"]["pipeline"]["alerts_presented"]["unavailable_reason"] == (
         UNAVAILABLE_HOST_OFFLINE
@@ -139,7 +166,7 @@ async def test_fixed_corpus_and_fixture_before_after(tmp_path: Path) -> None:
     assert record["data_quality"]["wrote_feedback_jsonl"] is False
     assert record["feedback_evidence"]["not_useful"] == 0
     assert record["data_quality"]["orphan_feedback_count"] == 0
-    keys = set()
+    keys: set[str] = set()
 
     def walk(node: object) -> None:
         if isinstance(node, dict):
@@ -155,6 +182,8 @@ async def test_fixed_corpus_and_fixture_before_after(tmp_path: Path) -> None:
     assert "workspace" not in keys
     assert "prompt" not in keys
     assert "title" not in keys
+    assert "scheduler" in keys
+    assert "cold_tick_count" in keys
 
 
 async def test_compare_does_not_write_telemetry_or_feedback_jsonl(
@@ -173,6 +202,25 @@ async def test_compare_does_not_write_telemetry_or_feedback_jsonl(
     assert not (telemetry_data_dir / "feedback.jsonl").exists()
 
 
+async def test_pre_signal_warm_warming_is_visible_in_comparison_report(tmp_path: Path) -> None:
+    report = await compare_artifacts(
+        _artifact(),
+        _artifact(
+            replace(capture_baseline_config(), warm_change_1m=0.99),
+            version="candidate-warm-1m",
+        ),
+        corpus=("pre_signal_warm",),
+        fixture_dir=FIXTURES,
+        work_dir=tmp_path,
+    )
+    record = report.to_record()
+    fixture = record["per_fixture"][0]
+    assert fixture["baseline_metrics"]["scheduler"]["warm_tick_count"] == 1
+    assert fixture["candidate_metrics"]["scheduler"]["warm_tick_count"] == 0
+    assert fixture["delta"]["scheduler"]["warm_tick_count"]["delta"] != 0
+    assert record["delta"]["scheduler"]["warm_tick_count"]["delta"] != 0
+
+
 async def test_warming_candidate_changes_scheduler_level(tmp_path: Path) -> None:
     baseline = await run_tuned_replay(
         capture_baseline_config(),
@@ -181,12 +229,7 @@ async def test_warming_candidate_changes_scheduler_level(tmp_path: Path) -> None
         work_dir=tmp_path / "base",
     )
     candidate = await run_tuned_replay(
-        replace(
-            capture_baseline_config(),
-            warm_change_1m=0.99,
-            warm_change_5m=0.99,
-            warm_volume_ratio=99.0,
-        ),
+        replace(capture_baseline_config(), warm_change_1m=0.99),
         "pre_signal_warm",
         fixture_dir=FIXTURES,
         work_dir=tmp_path / "cand",
@@ -200,3 +243,28 @@ def test_metrics_keep_unavailable_without_host_or_intelligence() -> None:
     metrics = metrics_from_records(())
     assert metrics["pipeline"]["alerts_presented"]["available"] is False
     assert metrics["intelligence"]["available"] is False
+    assert metrics["scheduler"] == {
+        "cold_tick_count": 0,
+        "warm_tick_count": 0,
+        "hot_tick_count": 0,
+        "level_transition_count": 0,
+        "processed_tick_count": 0,
+    }
+
+
+def test_empty_and_duplicate_corpus_fail_closed() -> None:
+    with pytest.raises(TuningConfigError, match="at least one corpus_id"):
+        validate_corpus(())
+    with pytest.raises(TuningConfigError, match="duplicate corpus_id"):
+        validate_corpus(("rapid_move", "rapid_move"))
+
+
+async def test_compare_empty_corpus_raises_config_error(tmp_path: Path) -> None:
+    with pytest.raises(TuningConfigError, match="at least one corpus_id"):
+        await compare_artifacts(
+            _artifact(),
+            _artifact(version="candidate-empty"),
+            corpus=(),
+            fixture_dir=FIXTURES,
+            work_dir=tmp_path,
+        )

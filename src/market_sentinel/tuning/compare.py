@@ -3,11 +3,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
+from market_sentinel.errors import TuningConfigError
 from market_sentinel.evaluation.aggregate import evaluate
 from market_sentinel.evaluation.reader import LoadedTelemetry
 from market_sentinel.telemetry.contract import SuppressionReason, TelemetryName
 from market_sentinel.tuning.feedback import TuningFeedbackDataset
-from market_sentinel.tuning.replay import DEFAULT_CORPUS, run_tuned_replay
+from market_sentinel.tuning.replay import DEFAULT_CORPUS, run_tuned_replay, validate_corpus
 from market_sentinel.tuning.report import (
     TUNING_COMPARISON_SCHEMA_VERSION,
     UNAVAILABLE_HOST_OFFLINE,
@@ -41,6 +42,13 @@ _NOISE_COUNTS = (
     "critical_count",
     "repeated_episode_signal_count",
     "repeated_episode_extra_alert_count",
+)
+_SCHEDULER_COUNTS = (
+    "cold_tick_count",
+    "warm_tick_count",
+    "hot_tick_count",
+    "level_transition_count",
+    "processed_tick_count",
 )
 
 
@@ -92,7 +100,37 @@ def _suppression(records: Sequence[dict[str, object]]) -> dict[str, int]:
     return counts
 
 
-def metrics_from_records(records: Sequence[dict[str, object]]) -> dict[str, object]:
+def scheduler_metrics_from_facts(facts: Sequence[dict[str, object]]) -> dict[str, int]:
+    cold = 0
+    warm = 0
+    hot = 0
+    transitions = 0
+    previous: str | None = None
+    for row in facts:
+        level = row.get("level")
+        if level == "COLD":
+            cold += 1
+        elif level == "WARM":
+            warm += 1
+        elif level == "HOT":
+            hot += 1
+        if isinstance(level, str) and level in {"COLD", "WARM", "HOT"}:
+            if previous is not None and level != previous:
+                transitions += 1
+            previous = level
+    return {
+        "cold_tick_count": cold,
+        "warm_tick_count": warm,
+        "hot_tick_count": hot,
+        "level_transition_count": transitions,
+        "processed_tick_count": len(facts),
+    }
+
+
+def metrics_from_records(
+    records: Sequence[dict[str, object]],
+    facts: Sequence[dict[str, object]] = (),
+) -> dict[str, object]:
     loaded = LoadedTelemetry(tuple(records), ("memory",), len(records), 0, False, True)
     evaluation = evaluate(loaded).to_record()
     repeated_signals, extra_alerts = _repeated(records)
@@ -116,6 +154,7 @@ def metrics_from_records(records: Sequence[dict[str, object]]) -> dict[str, obje
     return {
         "pipeline": pipeline,
         "noise": noise,
+        "scheduler": scheduler_metrics_from_facts(facts),
         "intelligence": unavailable_metric(UNAVAILABLE_INTEL_OFFLINE),
     }
 
@@ -148,6 +187,9 @@ def _add_metrics(left: dict[str, object], right: dict[str, object]) -> dict[str,
         )
     else:
         hour = unavailable_metric("incomparable_market_hour")
+    left_sched: dict[str, object] = left["scheduler"]  # type: ignore[assignment]
+    right_sched: dict[str, object] = right["scheduler"]  # type: ignore[assignment]
+    scheduler = {key: int(left_sched[key]) + int(right_sched[key]) for key in _SCHEDULER_COUNTS}
     return {
         "pipeline": pipeline,
         "noise": {
@@ -155,6 +197,7 @@ def _add_metrics(left: dict[str, object], right: dict[str, object]) -> dict[str,
             "suppression_by_reason": suppression,
             "alerts_per_market_hour": hour,
         },
+        "scheduler": scheduler,
         "intelligence": unavailable_metric(UNAVAILABLE_INTEL_OFFLINE),
     }
 
@@ -196,9 +239,15 @@ def _metric_delta(baseline: dict[str, object], candidate: dict[str, object]) -> 
         )
     else:
         noise["alerts_per_market_hour"] = unavailable_metric("incomparable_market_hour")
+    b_sched: dict[str, object] = baseline["scheduler"]  # type: ignore[assignment]
+    c_sched: dict[str, object] = candidate["scheduler"]  # type: ignore[assignment]
+    scheduler = {
+        key: _count_delta(int(b_sched[key]), int(c_sched[key])) for key in _SCHEDULER_COUNTS
+    }
     return {
         "pipeline": pipeline,
         "noise": noise,
+        "scheduler": scheduler,
         "intelligence": unavailable_metric(UNAVAILABLE_INTEL_OFFLINE),
     }
 
@@ -227,6 +276,7 @@ async def compare_artifacts(
     feedback: TuningFeedbackDataset | None = None,
 ) -> TuningComparisonReport:
     evidence = feedback if feedback is not None else empty_feedback_dataset()
+    corpus = validate_corpus(corpus)
     per_fixture: list[dict[str, object]] = []
     totals_b: dict[str, object] | None = None
     totals_c: dict[str, object] | None = None
@@ -237,8 +287,8 @@ async def compare_artifacts(
         right = await run_tuned_replay(
             candidate.config, corpus_id, fixture_dir=fixture_dir, work_dir=work_dir
         )
-        left_metrics = metrics_from_records(left.records)
-        right_metrics = metrics_from_records(right.records)
+        left_metrics = metrics_from_records(left.records, left.facts)
+        right_metrics = metrics_from_records(right.records, right.facts)
         per_fixture.append(
             {
                 "corpus_id": corpus_id,
@@ -249,7 +299,8 @@ async def compare_artifacts(
         )
         totals_b = left_metrics if totals_b is None else _add_metrics(totals_b, left_metrics)
         totals_c = right_metrics if totals_c is None else _add_metrics(totals_c, right_metrics)
-    assert totals_b is not None and totals_c is not None
+    if totals_b is None or totals_c is None:
+        raise TuningConfigError("corpus must contain at least one corpus_id")
     return TuningComparisonReport(
         schema_version=TUNING_COMPARISON_SCHEMA_VERSION,
         baseline_snapshot=baseline.snapshot.to_record(),

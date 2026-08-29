@@ -20,7 +20,7 @@ from market_sentinel.tuning.config import (
     OfflineTuningConfig,
 )
 
-TUNING_ARTIFACT_SCHEMA_VERSION = 1
+TUNING_ARTIFACT_SCHEMA_VERSION = 2
 TUNING_DIR_NAME = "tuning"
 
 TUNING_ARTIFACT_TOP_KEYS: frozenset[str] = frozenset({"schema_version", "snapshot", "config"})
