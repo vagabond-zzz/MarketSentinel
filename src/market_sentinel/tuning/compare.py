@@ -275,6 +275,8 @@ async def compare_artifacts(
     work_dir: Path,
     feedback: TuningFeedbackDataset | None = None,
 ) -> TuningComparisonReport:
+    baseline.to_record()
+    candidate.to_record()
     evidence = feedback if feedback is not None else empty_feedback_dataset()
     corpus = validate_corpus(corpus)
     per_fixture: list[dict[str, object]] = []

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from market_sentinel.errors import TuningConfigError
+from market_sentinel.errors import TuningConfigError, TuningSnapshotError
 from market_sentinel.scheduler.policy import SchedulerPolicy
 from market_sentinel.signals.cluster import CLUSTER_LOOKBACK_S
 from market_sentinel.telemetry.contract import TuningSource
@@ -24,6 +24,7 @@ from market_sentinel.tuning.report import (
     TUNING_COMPARISON_SCHEMA_VERSION,
     UNAVAILABLE_HOST_OFFLINE,
     UNAVAILABLE_INTEL_OFFLINE,
+    TuningComparisonReport,
 )
 from market_sentinel.tuning.store import make_artifact
 
@@ -268,3 +269,65 @@ async def test_compare_empty_corpus_raises_config_error(tmp_path: Path) -> None:
             fixture_dir=FIXTURES,
             work_dir=tmp_path,
         )
+
+
+async def test_compare_rejects_baseline_artifact_schema_v1(tmp_path: Path) -> None:
+    with pytest.raises(TuningSnapshotError, match="unsupported tuning artifact schema_version"):
+        await compare_artifacts(
+            replace(_artifact(), schema_version=1),
+            _artifact(version="candidate-v2"),
+            corpus=("normal_market",),
+            fixture_dir=FIXTURES,
+            work_dir=tmp_path,
+        )
+
+
+async def test_compare_rejects_candidate_artifact_schema_v1(tmp_path: Path) -> None:
+    with pytest.raises(TuningSnapshotError, match="unsupported tuning artifact schema_version"):
+        await compare_artifacts(
+            _artifact(),
+            replace(_artifact(version="candidate-v1"), schema_version=1),
+            corpus=("normal_market",),
+            fixture_dir=FIXTURES,
+            work_dir=tmp_path,
+        )
+
+
+async def test_invalid_artifact_schema_does_not_start_replay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    async def _forbidden(*_args: object, **_kwargs: object) -> object:
+        calls.append("replay")
+        raise AssertionError("run_tuned_replay must not run")
+
+    monkeypatch.setattr("market_sentinel.tuning.compare.run_tuned_replay", _forbidden)
+    with pytest.raises(TuningSnapshotError, match="unsupported tuning artifact schema_version"):
+        await compare_artifacts(
+            replace(_artifact(), schema_version=1),
+            _artifact(version="candidate-v2"),
+            corpus=("normal_market",),
+            fixture_dir=FIXTURES,
+            work_dir=tmp_path,
+        )
+    assert calls == []
+
+
+def test_comparison_report_schema_v1_fail_closed() -> None:
+    report = TuningComparisonReport(
+        schema_version=1,
+        baseline_snapshot={},
+        candidate_snapshot={},
+        baseline_config={},
+        candidate_config={},
+        corpus=["normal_market"],
+        baseline_metrics={},
+        candidate_metrics={},
+        delta={},
+        feedback_evidence={},
+        data_quality={},
+        per_fixture=[],
+    )
+    with pytest.raises(ValueError, match="unsupported tuning comparison schema_version"):
+        report.to_record()

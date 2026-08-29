@@ -173,6 +173,8 @@ class TuningComparisonReport:
     per_fixture: list[dict[str, Any]]
 
     def to_record(self) -> dict[str, Any]:
+        if self.schema_version != TUNING_COMPARISON_SCHEMA_VERSION:
+            raise ValueError("unsupported tuning comparison schema_version")
         raw = {
             "schema_version": self.schema_version,
             "baseline_snapshot": self.baseline_snapshot,
