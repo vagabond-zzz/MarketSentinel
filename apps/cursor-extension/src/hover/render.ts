@@ -26,7 +26,7 @@ function renderSignal(signal: HoverSignalView): string[] {
     }
   }
   lines.push("");
-  lines.push("触发规则");
+  lines.push("信号类型");
   lines.push(escapeMarkdown(signal.family));
   return lines;
 }
@@ -99,7 +99,11 @@ export function renderHoverMarkdown(model: HoverModel): string {
     lines.push(model.unreadLine);
   }
   if (model.lastUpdate !== undefined) {
-    lines.push(`最后更新：${model.lastUpdate}`);
+    if (model.lastUpdate === "--") {
+      lines.push(`最后行情：${model.lastUpdate}`);
+    } else {
+      lines.push(`最后行情：${model.lastUpdate}（UTC+8）`);
+    }
   }
   if (model.replayMode === true) {
     lines.push("模式：Replay");

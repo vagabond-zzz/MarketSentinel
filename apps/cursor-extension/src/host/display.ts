@@ -2,11 +2,14 @@ import { isRecord } from "../protocol/guards";
 
 export type SymbolDisplayMode = "name" | "nameAndCode" | "code";
 export type IntelligenceMode = "off" | "on" | "inherit";
+export type SymbolDisplaySurface = "statusBar" | "hover" | "quickPick";
 
 export const WATCHLIST_LIMIT = 10;
 export const STATUS_BAR_MAX_SYMBOLS_DEFAULT = 2;
 export const STATUS_BAR_MAX_SYMBOLS_MIN = 1;
 export const STATUS_BAR_MAX_SYMBOLS_MAX = 3;
+export const STATUS_BAR_ALIAS_MAX = 16;
+export const QUICK_PICK_ALIAS_MAX = 40;
 
 export function parseSymbolDisplay(raw: unknown): SymbolDisplayMode {
   if (raw === "name" || raw === "code" || raw === "nameAndCode") {
@@ -41,7 +44,7 @@ export function parseIntelligenceMode(raw: unknown): IntelligenceMode {
   if (raw === "on" || raw === "off" || raw === "inherit") {
     return raw;
   }
-  return "off";
+  return "inherit";
 }
 
 export function parseStatusBarMaxSymbols(raw: unknown): number {
@@ -55,24 +58,41 @@ export function parseStatusBarMaxSymbols(raw: unknown): number {
   );
 }
 
+export function sanitizePlainUiLabel(raw: string, maxLength: number): string {
+  let text = raw.replace(/[\r\n\t]+/g, " ");
+  text = text.replace(/\$\([^)]*\)?/g, "");
+  text = text.replace(/\|/g, "/");
+  text = text.replace(/\s+/g, " ").trim();
+  if (text.length > maxLength) {
+    text = text.slice(0, maxLength).trimEnd();
+  }
+  return text;
+}
+
 export function displaySymbol(
   symbol: string,
   names: Record<string, string>,
   mode: SymbolDisplayMode,
-  surface: "statusBar" | "hover",
+  surface: SymbolDisplaySurface,
 ): string {
   const alias = names[symbol];
-  if (surface === "statusBar") {
-    if (mode === "code" || alias === undefined) {
+  if (surface === "hover") {
+    if (alias === undefined || mode === "code") {
       return symbol;
     }
-    return alias;
+    if (mode === "name") {
+      return alias;
+    }
+    return `${alias} (${symbol})`;
   }
-  if (alias === undefined || mode === "code") {
+  if (mode === "code" || alias === undefined) {
     return symbol;
   }
-  if (mode === "name") {
-    return alias;
+  const max = surface === "statusBar" ? STATUS_BAR_ALIAS_MAX : QUICK_PICK_ALIAS_MAX;
+  const cleaned = sanitizePlainUiLabel(alias, max);
+  const name = cleaned.length === 0 ? symbol : cleaned;
+  if (surface === "statusBar" || mode === "name") {
+    return name;
   }
-  return `${alias} (${symbol})`;
+  return `${name} (${symbol})`;
 }

@@ -25,3 +25,12 @@ export function planRemoveSymbol(current: WatchlistItem[], symbol: string): Watc
   }
   return { ok: true, items: current.filter((item) => item.symbol !== symbol) };
 }
+
+export function watchlistsEqual(left: WatchlistItem[], right: WatchlistItem[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every(
+    (item, index) => item.symbol === right[index]?.symbol && item.enabled === right[index]?.enabled,
+  );
+}

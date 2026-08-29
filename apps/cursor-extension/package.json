@@ -120,8 +120,8 @@
         "marketSentinel.intelligence": {
           "type": "string",
           "enum": ["off", "on", "inherit"],
-          "default": "off",
-          "description": "Optional Intelligence sidecar. on/off pass an explicit Core CLI flag; inherit leaves MARKET_SENTINEL_INTEL_ENABLED to decide. Restart Core after changing. API keys stay in the process environment, not in settings."
+          "default": "inherit",
+          "description": "Optional Intelligence sidecar. on → --intelligence, off → --no-intelligence, inherit omits the CLI flag so MARKET_SENTINEL_INTEL_ENABLED / Core default apply. Restart Core after changing. API keys stay in the process environment, not in settings."
         },
         "marketSentinel.symbolNames": {
           "type": "object",

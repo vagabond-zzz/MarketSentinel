@@ -110,6 +110,9 @@ describe("renderHoverMarkdown", () => {
     expect(text).toContain("Volume led the move.");
     expect(text).toContain("confidence 0.82");
     expect(text.indexOf("规则信号")).toBeLessThan(text.indexOf("AI 增强"));
+    expect(text).toContain("信号类型");
+    expect(text).toContain("price\\_volume");
+    expect(text).not.toContain("触发规则");
   });
 
   it("renders queued/running as processing and fallback without raw provider text", () => {
@@ -206,6 +209,17 @@ describe("renderHoverMarkdown", () => {
     expect(text).toContain("模式：Replay");
     expect(text).toContain("状态：已播放完成");
     expect(text).toContain("602.50");
+  });
+
+  it("labels last_market_timestamp as UTC+8 market time, not host wall-clock update", () => {
+    const text = renderHoverMarkdown(
+      mapHover({
+        actual: "RUNNING",
+        market: market({ last_market_timestamp: 1_704_067_200 + 6 * 3600 + 30 * 60 }),
+      }),
+    );
+    expect(text).toContain("最后行情：14:30:00（UTC+8）");
+    expect(text).not.toContain("最后更新");
   });
 
   it("escapes Core text so it cannot become a Markdown link", () => {

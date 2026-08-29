@@ -249,4 +249,22 @@ describe("mapHover", () => {
       ),
     ).toBe("已增强");
   });
+
+  it("separates requested Intelligence setting from actual Core wire status", () => {
+    expect(mapAiStatus(market({ intelligence_enabled: false }), "off")).toBe("关闭");
+    expect(mapAiStatus(market({ intelligence_enabled: false }), "on", true)).toBe("待重启");
+    expect(mapAiStatus(market({ intelligence_enabled: false }), "on", false)).toBe(
+      "不可用（Rule-only）",
+    );
+    expect(mapAiStatus(market({ intelligence_enabled: true }), "inherit")).toBe("已启用");
+    const failOpen = mapHover({
+      actual: "RUNNING",
+      market: market({ intelligence_enabled: false }),
+      intelligenceMode: "on",
+      restartNeeded: false,
+    });
+    expect(failOpen.aiStatus).toBe("不可用（Rule-only）");
+    expect(failOpen.aiStatus).not.toBe("关闭");
+    expect(failOpen.headline).not.toContain("AI=关闭");
+  });
 });

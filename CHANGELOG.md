@@ -6,23 +6,29 @@ Host daily-usability polish on `feat/v0.6.5-ux-polish`. Package stays **0.6.0**.
 
 ### Added
 
-- CLI `--intelligence` / `--no-intelligence` (explicit flag > `MARKET_SENTINEL_INTEL_ENABLED` > default off)
-- Cursor settings: `marketSentinel.intelligence` (`off` / `on` / `inherit`, default `off`), `symbolNames`, `symbolDisplay`, `statusBarMaxSymbols`
+- CLI `--intelligence` / `--no-intelligence` (explicit flag > `MARKET_SENTINEL_INTEL_ENABLED` > Core default off)
+- Cursor settings: `marketSentinel.intelligence` (`off` / `on` / `inherit`, default `inherit`), `symbolNames`, `symbolDisplay`, `statusBarMaxSymbols`
 - Command Palette: Add Symbol, Remove Symbol, Manage Watchlist (Workspace `marketSentinel.watchlist`; no sync with `data/watchlist.json`)
 - StatusBar quote line with Codicons, no error/warning background, max 2 symbols + overflow
 - Hover sections: connection / feed / AI status, day change, rule vs AI, grouped 1m/5m/15m metrics
-- Replay EOF: `replay_complete` additive field, freeze last MarketState, no missing-quote warnings
+- Replay EOF: `replay_complete` additive field, freeze last MarketState, no missing-quote warnings when the source was already exhausted before fetch
 - Additive optional wire fields: `change_day`, session high/low refs, `intelligence_enabled`, `replay_complete`, `last_market_timestamp`
 
 ### Fixed
 
-- Host `alert_presented` is flushed before Core teardown so unread count cannot outrun telemetry
+- StatusBar priority: real feed STALE/DISCONNECTED → ALERT hold → Replay complete → DELAYED → HOT/WARM/NORMAL
+- Replay last-batch missing quote is not treated as graceful EOF
+- `keep_alive` refreshes last-success age without clearing real consecutive failures
+- `alert_presented` is bound to the origin Core IPC/generation and uses presentation `created_timestamp`. Connected/graceful teardown flushes; abrupt Core loss is best-effort and never misattributed to a new run
+- Watchlist persist keeps `enabled`; Add/Remove plus the settings-change callback send at most one `set_watchlist`
+- Hover AI status uses requested setting vs actual `intelligence_enabled` (unavailable / pending restart, not a false “关闭”)
+- StatusBar/QuickPick aliases are sanitized; Hover `last_market_timestamp` is UTC+8 market time labeled 最后行情; `signal.family` is labeled 信号类型
 
 ## 0.6.0 — 2026-08-29 (not tagged yet)
 
 **Market Sentinel v0.6.0 — Feedback, Observability & Offline Tuning**
 
-Package versions are **0.6.0**. Protocol stays **1** (`host_interaction` / `user_feedback` are v1 additive). Tuning artifact schema is **2**. Tuning comparison schema is **2**. These are independent version spaces. **Not merged. Not tagged. Not pushed.**
+Package versions are **0.6.0**. Protocol stays **1** (`host_interaction` / `user_feedback` are v1 additive). Tuning artifact schema is **2**. Tuning comparison schema is **2**. These are independent version spaces. **Local master is release-ready. Not tagged. Not pushed. No remote publication.**
 
 v0.6 does **not** automatically optimize trading parameters, rewrite production config, or collect workspace/conversation content.
 

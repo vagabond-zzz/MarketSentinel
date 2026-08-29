@@ -29,7 +29,14 @@ function asChild(child: FakeChild): ChildProcess {
 function scriptDaemon(
   child: FakeChild,
   log: unknown[],
-  options: { protocolVersion?: number; hangWatchlist?: boolean; failGetState?: boolean } = {},
+  options: {
+    protocolVersion?: number;
+    hangWatchlist?: boolean;
+    failGetState?: boolean;
+    hangHostInteraction?: boolean;
+    deferHostInteraction?: unknown[];
+    failWatchlistAfter?: number;
+  } = {},
 ): void {
   const decoder = new JsonlDecoder();
   child.stdin.on("data", (chunk: Buffer | string) => {
@@ -53,6 +60,20 @@ function scriptDaemon(
       } else if (command.type === "set_watchlist") {
         const items = command.items ?? [];
         if (options.hangWatchlist) {
+          return;
+        }
+        const priorSets = log.filter((item) => (item as { type?: string }).type === "set_watchlist")
+          .length;
+        if (options.failWatchlistAfter !== undefined && priorSets >= options.failWatchlistAfter) {
+          child.stdout.write(
+            JSON.stringify({
+              protocol_version: 1,
+              type: "error",
+              request_id: command.request_id,
+              code: "internal",
+              message: "runtime watchlist failed",
+            }) + "\n",
+          );
           return;
         }
         if (items.length > 10) {
@@ -106,6 +127,21 @@ function scriptDaemon(
         );
         child.exitCode = 0;
         child.emit("exit", 0, null);
+      } else if (command.type === "host_interaction") {
+        if (options.hangHostInteraction === true) {
+          return;
+        }
+        if (options.deferHostInteraction !== undefined) {
+          options.deferHostInteraction.push(command);
+          return;
+        }
+        child.stdout.write(
+          JSON.stringify({
+            protocol_version: 1,
+            type: "ack",
+            request_id: command.request_id,
+          }) + "\n",
+        );
       } else {
         child.stdout.write(
           JSON.stringify({
@@ -236,7 +272,7 @@ function createHarness(
     onUiSnapshot: extras.onUiSnapshot,
     onAlertEdge: extras.onAlertEdge,
     persistWatchlist: async (items) => {
-      settings.watchlist = items.map((item) => item.symbol);
+      settings.watchlist = items.map((item) => ({ symbol: item.symbol, enabled: item.enabled }));
     },
     createManager: (options) => {
       const manager = new ProcessManager(options);
@@ -422,7 +458,11 @@ describe("HostController", () => {
     expect(harness.controller.lastAcknowledgedWatchlist).toEqual([
       { symbol: "BBB.HK", enabled: true },
     ]);
-    expect(harness.lines.some((line) => line.includes("rejected"))).toBe(true);
+    expect(
+      harness.lines.some((line) =>
+        line.includes("watchlist saved; runtime update failed and will apply after reconnect/restart"),
+      ),
+    ).toBe(true);
   });
 
   it("marks restartNeeded for coreRoot/provider changes without restarting", async () => {
@@ -1107,19 +1147,20 @@ describe("HostController", () => {
     });
   });
 
-  it("passes --no-intelligence by default and --intelligence when enabled", async () => {
-    const off = createHarness();
-    await off.controller.start();
-    expect(off.spawned[0]?.args).toContain("--no-intelligence");
-    expect(off.spawned[0]?.args.join(" ")).not.toMatch(/DASHSCOPE|sk-/);
+  it("omits intelligence CLI flags by default so env/Core inherit, and passes explicit on/off", async () => {
+    const inherit = createHarness();
+    await inherit.controller.start();
+    expect(inherit.spawned[0]?.args).not.toContain("--intelligence");
+    expect(inherit.spawned[0]?.args).not.toContain("--no-intelligence");
+    expect(inherit.spawned[0]?.args.join(" ")).not.toMatch(/DASHSCOPE|sk-/);
     const on = createHarness({ settings: { intelligence: "on" } });
     await on.controller.start();
     expect(on.spawned[0]?.args).toContain("--intelligence");
     expect(on.spawned[0]?.args).not.toContain("--no-intelligence");
-    const inherit = createHarness({ settings: { intelligence: "inherit" } });
-    await inherit.controller.start();
-    expect(inherit.spawned[0]?.args).not.toContain("--intelligence");
-    expect(inherit.spawned[0]?.args).not.toContain("--no-intelligence");
+    const off = createHarness({ settings: { intelligence: "off" } });
+    await off.controller.start();
+    expect(off.spawned[0]?.args).toContain("--no-intelligence");
+    expect(off.spawned[0]?.args).not.toContain("--intelligence");
   });
 
   it("adds and removes watchlist symbols without restarting Core", async () => {
@@ -1128,7 +1169,7 @@ describe("HostController", () => {
     const before = harness.spawned.length;
     const added = await harness.controller.addWatchlistSymbol("600519.SH");
     expect(added).toEqual({ ok: true });
-    expect(harness.settings.watchlist).toEqual(["600519.SH"]);
+    expect(harness.settings.watchlist).toEqual([{ symbol: "600519.SH", enabled: true }]);
     await vi.waitFor(() => {
       const sets = (harness.commands as Array<{ type?: string; items?: Array<{ symbol: string }> }>).filter(
         (item) => item.type === "set_watchlist",
@@ -1141,7 +1182,7 @@ describe("HostController", () => {
     expect(await harness.controller.addWatchlistSymbol("NEW.SH")).toMatchObject({ ok: false });
     harness.settings.watchlist = ["600519.SH", "000001.SZ"];
     expect(await harness.controller.removeWatchlistSymbol("600519.SH")).toEqual({ ok: true });
-    expect(harness.settings.watchlist).toEqual(["000001.SZ"]);
+    expect(harness.settings.watchlist).toEqual([{ symbol: "000001.SZ", enabled: true }]);
     expect(harness.spawned).toHaveLength(before);
   });
 
@@ -1156,5 +1197,128 @@ describe("HostController", () => {
     ).filter((item) => item.type === "host_interaction" && item.action === "alert_presented");
     expect(presented).toHaveLength(1);
     expect(presented[0]?.signal_id).toBe("race-1");
+  });
+
+  it("preserves disabled watchlist items across add and remove", async () => {
+    const harness = createHarness({
+      settings: {
+        watchlist: [
+          { symbol: "A.SH", enabled: false },
+          { symbol: "B.SH", enabled: true },
+        ],
+      },
+    });
+    await harness.controller.start();
+    expect(await harness.controller.addWatchlistSymbol("C.SH")).toEqual({ ok: true });
+    expect(harness.settings.watchlist).toEqual([
+      { symbol: "A.SH", enabled: false },
+      { symbol: "B.SH", enabled: true },
+      { symbol: "C.SH", enabled: true },
+    ]);
+    expect(await harness.controller.removeWatchlistSymbol("B.SH")).toEqual({ ok: true });
+    expect(harness.settings.watchlist).toEqual([
+      { symbol: "A.SH", enabled: false },
+      { symbol: "C.SH", enabled: true },
+    ]);
+  });
+
+  it("sends exactly one set_watchlist when Add Symbol also fires the settings callback", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    const before = (harness.commands as Array<{ type?: string }>).filter(
+      (item) => item.type === "set_watchlist",
+    ).length;
+    expect(await harness.controller.addWatchlistSymbol("600519.SH")).toEqual({ ok: true });
+    await harness.controller.onConfigurationChanged(["watchlist"]);
+    const sets = (harness.commands as Array<{ type?: string }>).filter(
+      (item) => item.type === "set_watchlist",
+    );
+    expect(sets).toHaveLength(before + 1);
+  });
+
+  it("does not imply settings persist failed when runtime set_watchlist fails", async () => {
+    const commands: unknown[] = [];
+    const harness = createHarness({
+      script: (child) => scriptDaemon(child, commands, { failWatchlistAfter: 2 }),
+    });
+    await harness.controller.start();
+    const result = await harness.controller.addWatchlistSymbol("600519.SH");
+    expect(result).toEqual({
+      ok: false,
+      error: "watchlist saved; runtime update failed and will apply after reconnect/restart",
+    });
+    expect(harness.settings.watchlist).toEqual([{ symbol: "600519.SH", enabled: true }]);
+    expect(
+      harness.lines.some((line) =>
+        line.includes("watchlist saved; runtime update failed and will apply after reconnect/restart"),
+      ),
+    ).toBe(true);
+  });
+
+  it("binds alert_presented created_timestamp to presentation time, not delayed flush", async () => {
+    let nowMs = 5_000;
+    const deferred: Array<{ request_id: string }> = [];
+    const commands: unknown[] = [];
+    const harness = createHarness({
+      now: () => nowMs,
+      script: (child) => scriptDaemon(child, commands, { deferHostInteraction: deferred }),
+    });
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate({ id: "ts-1" })]);
+    await vi.waitFor(() => {
+      expect(harness.controller.unreadAlertCount).toBe(1);
+      expect(deferred).toHaveLength(1);
+    });
+    nowMs = 99_000;
+    harness.children[0]?.stdout.write(
+      JSON.stringify({
+        protocol_version: 1,
+        type: "ack",
+        request_id: deferred[0]?.request_id,
+      }) + "\n",
+    );
+    await vi.waitFor(() => {
+      const presented = (
+        commands as Array<{
+          type?: string;
+          action?: string;
+          created_timestamp?: number;
+        }>
+      ).filter((item) => item.type === "host_interaction" && item.action === "alert_presented");
+      expect(presented).toHaveLength(1);
+      expect(presented[0]?.created_timestamp).toBe(5);
+    });
+  });
+
+  it("never sends an old-generation queued alert_presented to a new Core run", async () => {
+    const logs: unknown[][] = [];
+    const harness = createHarness({
+      script: (child, generation) => {
+        const log: unknown[] = [];
+        logs.push(log);
+        scriptDaemon(child, log, { hangHostInteraction: generation === 1 });
+      },
+    });
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate({ id: "old-a" })]);
+    writeAlert(harness.children[0], [alertCandidate({ id: "old-b" })]);
+    await vi.waitFor(() => expect(harness.controller.unreadAlertCount).toBe(2));
+    harness.children[0]?.kill();
+    await vi.waitFor(() => {
+      expect(harness.children).toHaveLength(2);
+      expect(harness.controller.actualState).toBe("RUNNING");
+    });
+    await vi.waitFor(() => {
+      expect(
+        harness.lines.some((line) => line.includes("alert_presented failed (origin generation")),
+      ).toBe(true);
+    });
+    const newPresented = (logs[1] as Array<{ type?: string; action?: string; signal_id?: string }>).filter(
+      (item) => item.type === "host_interaction" && item.action === "alert_presented",
+    );
+    expect(newPresented).toHaveLength(0);
+    expect(newPresented.some((item) => item.signal_id === "old-a" || item.signal_id === "old-b")).toBe(
+      false,
+    );
   });
 });

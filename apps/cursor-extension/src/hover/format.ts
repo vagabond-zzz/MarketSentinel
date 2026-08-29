@@ -33,14 +33,16 @@ export function formatPrice(value: number | null | undefined): string {
   return value.toFixed(2);
 }
 
+const MARKET_TZ_OFFSET_MS = 8 * 60 * 60 * 1000;
+
 export function formatClock(seconds: number | null | undefined): string {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) {
     return DASH;
   }
-  const date = new Date(seconds * 1000);
-  const hh = String(date.getHours()).padStart(2, "0");
-  const mm = String(date.getMinutes()).padStart(2, "0");
-  const ss = String(date.getSeconds()).padStart(2, "0");
+  const utc8 = new Date(seconds * 1000 + MARKET_TZ_OFFSET_MS);
+  const hh = String(utc8.getUTCHours()).padStart(2, "0");
+  const mm = String(utc8.getUTCMinutes()).padStart(2, "0");
+  const ss = String(utc8.getUTCSeconds()).padStart(2, "0");
   return `${hh}:${mm}:${ss}`;
 }
 

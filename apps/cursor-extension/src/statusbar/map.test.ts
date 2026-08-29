@@ -183,6 +183,27 @@ describe("mapStatusBar", () => {
     expect(view.text).toBe("$(check) Replay 已结束");
   });
 
+  it("keeps ALERT hold ahead of Replay complete, then shows Replay complete after hold", () => {
+    const liveReplay = market({ replay_complete: true });
+    const duringHold = mapStatusBar({
+      ...running,
+      now: 1_000,
+      lastAlertAt: 1_000,
+      market: liveReplay,
+    });
+    expect(duringHold.kind).toBe("ALERT");
+    expect(duringHold.text).toContain("$(bell)");
+    expect(duringHold.text).not.toContain("Replay 已结束");
+    const afterHold = mapStatusBar({
+      ...running,
+      now: 1_000 + 15_000,
+      lastAlertAt: 1_000,
+      market: liveReplay,
+    });
+    expect(afterHold.kind).toBe("REPLAY_COMPLETE");
+    expect(afterHold.text).toBe("$(check) Replay 已结束");
+  });
+
   it("maps a configured watchlist with DISCONNECTED feed to STALE while keeping quotes", () => {
     const view = mapStatusBar({
       ...running,
@@ -267,6 +288,24 @@ describe("mapStatusBar", () => {
     });
     expect(view.text).toContain("贵州茅台 1412.30 +1.28%");
     expect(view.text).not.toContain("600519.SH");
+  });
+
+  it("sanitizes StatusBar aliases without changing canonical identity", () => {
+    const view = mapStatusBar({
+      ...running,
+      symbolDisplay: "name",
+      symbolNames: {
+        "600519.SH": "$(error) 贵州茅台 | core\nbreak",
+      },
+      market: market({
+        symbols: [symbol({ symbol: "600519.SH", price: 1412.3, change_day: 0.0128 })],
+      }),
+    });
+    expect(view.text).not.toContain("$(error)");
+    expect(view.text).not.toContain("|");
+    expect(view.text).not.toMatch(/\n/);
+    expect(view.text).toContain("1412.30");
+    expect(view.text).not.toContain("$(error) 贵州茅台");
   });
 
   it("lets ALERT win over HOT when feed is live", () => {

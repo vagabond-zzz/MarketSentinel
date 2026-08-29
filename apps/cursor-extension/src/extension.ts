@@ -83,7 +83,7 @@ async function persistWatchlist(items: WatchlistItem[]): Promise<void> {
       : vscode.ConfigurationTarget.Global;
   await cfg.update(
     "watchlist",
-    items.map((item) => item.symbol),
+    items.map((item) => ({ symbol: item.symbol, enabled: item.enabled })),
     target,
   );
 }

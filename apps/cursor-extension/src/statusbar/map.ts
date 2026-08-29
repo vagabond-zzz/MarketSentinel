@@ -175,10 +175,6 @@ export function mapStatusBar(input: StatusBarInput): StatusBarModel {
     return compose("STARTING", "启动中", input);
   }
 
-  if (input.market.replay_complete === true) {
-    return compose("REPLAY_COMPLETE", "Replay 已结束", input);
-  }
-
   if (input.market.watchlist_count === 0 && input.market.symbols.length === 0) {
     return compose("IDLE", "无标的", input);
   }
@@ -193,6 +189,10 @@ export function mapStatusBar(input: StatusBarInput): StatusBarModel {
 
   if (alertActive) {
     return compose("ALERT", quotes ?? "--", input);
+  }
+
+  if (input.market.replay_complete === true) {
+    return compose("REPLAY_COMPLETE", "Replay 已结束", input);
   }
 
   if (feed === "DELAYED") {

@@ -153,6 +153,10 @@ describe("ProcessManager", () => {
     await inherit.manager.start([]);
     expect(inherit.spawned[0]?.args).not.toContain("--intelligence");
     expect(inherit.spawned[0]?.args).not.toContain("--no-intelligence");
+    const unset = managerWith();
+    await unset.manager.start([]);
+    expect(unset.spawned[0]?.args).not.toContain("--intelligence");
+    expect(unset.spawned[0]?.args).not.toContain("--no-intelligence");
   });
 
   it("spawns longbridge provider without secrets on argv", async () => {

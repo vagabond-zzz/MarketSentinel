@@ -114,6 +114,11 @@ class MarketEngine:
         return result
 
     async def _fetch_due(self, due: list[str]) -> None:
+        if provider_source_exhausted(self.provider):
+            for symbol in due:
+                self.health.keep_alive(symbol)
+                self.scheduler.mark_fetched(symbol)
+            return
         try:
             snapshots = await self.provider.fetch_quotes(due)
         except Exception as exc:
@@ -125,11 +130,6 @@ class MarketEngine:
             return
 
         self.diagnostics.last_fetch_error = None
-        if provider_source_exhausted(self.provider) and not snapshots:
-            for symbol in due:
-                self.health.keep_alive(symbol)
-                self.scheduler.mark_fetched(symbol)
-            return
         found = {item.symbol: item for item in snapshots}
         for symbol in due:
             snapshot = found.get(symbol)

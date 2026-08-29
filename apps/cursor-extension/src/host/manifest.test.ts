@@ -47,7 +47,7 @@ describe("extension manifest", () => {
     expect(properties["marketSentinel.intelligence"]).toEqual(
       expect.objectContaining({
         type: "string",
-        default: "off",
+        default: "inherit",
         enum: ["off", "on", "inherit"],
       }),
     );

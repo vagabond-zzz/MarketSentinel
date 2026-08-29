@@ -124,3 +124,19 @@ def test_keep_alive_is_noop_before_first_success() -> None:
     clock, tracker = _tracker()
     tracker.keep_alive("00700.HK")
     assert tracker.status("00700.HK") is FeedStatus.DISCONNECTED
+
+
+def test_keep_alive_does_not_clear_real_failures() -> None:
+    clock, tracker = _tracker()
+    tracker.observe(
+        "00700.HK",
+        _snapshot(market=clock.wall_time(), received=clock.wall_time()),
+    )
+    tracker.observe("00700.HK", error=RuntimeError("timeout"))
+    assert tracker.consecutive_failures("00700.HK") == 1
+    tracker.keep_alive("00700.HK")
+    assert tracker.consecutive_failures("00700.HK") == 1
+    tracker.observe("00700.HK", error=RuntimeError("timeout"))
+    tracker.observe("00700.HK", error=RuntimeError("timeout"))
+    assert tracker.consecutive_failures("00700.HK") == 3
+    assert tracker.status("00700.HK") is FeedStatus.DISCONNECTED

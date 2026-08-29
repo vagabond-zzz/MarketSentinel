@@ -68,7 +68,10 @@ class FeedHealthTracker:
         if record is None or record.last_success_mono is None:
             return
         record.last_success_mono = self._clock.monotonic_time()
-        record.consecutive_failures = 0
+
+    def consecutive_failures(self, symbol: str) -> int:
+        record = self._symbols.get(symbol)
+        return 0 if record is None else record.consecutive_failures
 
     def peek_status(self, symbol: str) -> FeedStatus:
         return self._compute(self._symbols.get(symbol))

@@ -526,7 +526,7 @@ StatusBar Hover 即使没有 Event / Signal 也显示行情快照。
 
 你通常可以看到：
 
-- 连接 / 行情源 / AI 状态 / 未读提醒 / 最后更新；
+- 连接 / 行情源 / AI 状态 / 未读提醒 / 最后行情（UTC+8）；
 - 每只股票的价格、当日涨跌幅、COLD/WARM/HOT；
 - 规则信号与 AI 增强分开标注；
 - 1m / 5m / 15m 涨跌幅与量比各占一行。
@@ -657,7 +657,7 @@ VS Code Desktop
 | `marketSentinel.replayPath` | `replay` provider 的 JSONL 文件 |
 | `marketSentinel.enableHoverDetails` | 是否显示完整 StatusBar hover，默认 `true` |
 | `marketSentinel.alertToast` | `off` 或 `critical`，默认 `off` |
-| `marketSentinel.intelligence` | `off` / `on` / `inherit`，默认 `off`。`on`/`off` 显式传 CLI；`inherit` 让环境变量决定。改完需 Restart Core。不要把 API Key 写入 settings |
+| `marketSentinel.intelligence` | `off` / `on` / `inherit`，默认 `inherit`。`on` → `--intelligence`；`off` → `--no-intelligence`；`inherit` 不传 CLI flag，沿用 `MARKET_SENTINEL_INTEL_ENABLED` / Core 默认。改完需 Restart Core。不要把 API Key 写入 settings |
 | `marketSentinel.symbolNames` | 显示别名，仅 UI |
 | `marketSentinel.symbolDisplay` | `name` / `nameAndCode` / `code`，默认 `nameAndCode` |
 | `marketSentinel.statusBarMaxSymbols` | StatusBar 最多显示 1–3 只，默认 2 |
@@ -1367,7 +1367,7 @@ Telemetry / feedback JSONL 是独立本地文件，不走 Protocol stdout。
 MARKET_SENTINEL_INTEL_ENABLED=0
 ```
 
-或 CLI / Cursor：
+Cursor 扩展默认 `marketSentinel.intelligence = inherit`，不传 `--intelligence` / `--no-intelligence`，因此不会覆盖已有环境变量。显式关闭：
 
 ```text
 --no-intelligence

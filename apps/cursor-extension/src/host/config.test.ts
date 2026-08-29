@@ -51,7 +51,7 @@ describe("parseHostSettings", () => {
       expect(parsed.config.uvPath).toBe("uv");
       expect(parsed.config.provider).toBe("fake");
       expect(parsed.config.coreRoot).toBe("D:/repo");
-      expect(parsed.config.intelligence).toBe("off");
+      expect(parsed.config.intelligence).toBe("inherit");
     }
   });
 

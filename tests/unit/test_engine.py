@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from market_sentinel.clock import FakeClock
@@ -281,3 +282,54 @@ async def test_live_missing_quote_still_observes_provider_error(tmp_path: Path, 
     await engine.tick()
     assert "missing quote" in caplog.text
     assert engine.health.status("600519.SH") is not FeedStatus.DISCONNECTED
+
+
+async def test_replay_final_batch_wrong_symbol_is_missing_quote_not_graceful_eof(
+    tmp_path: Path, caplog
+) -> None:
+    from market_sentinel.ipc.mapping import map_engine_state
+    from market_sentinel.providers.replay import ReplayProvider
+
+    caplog.set_level("WARNING")
+    fixture = tmp_path / "replay.jsonl"
+    fixture.write_text(
+        json.dumps(
+            [
+                {
+                    "symbol": "AAA.SH",
+                    "price": 10.0,
+                    "open": 10.0,
+                    "high": 10.0,
+                    "low": 10.0,
+                    "prev_close": 10.0,
+                    "volume": 100.0,
+                    "market_timestamp": 1_700_000_010.0,
+                }
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    clock = FakeClock(wall=1_700_000_200.0, monotonic=0.0)
+    watchlist = Watchlist(tmp_path / "watchlist.json")
+    watchlist.add("BBB.SH")
+    provider = ReplayProvider(fixture, clock)
+    engine = MarketEngine(
+        clock=clock,
+        watchlist=watchlist,
+        provider=provider,
+        scheduler=AdaptiveScheduler(clock),
+        buffers=SymbolBuffers(),
+        states=MarketStateStore(),
+        health=FeedHealthTracker(clock),
+    )
+    await engine.tick()
+    assert provider.source_exhausted() is True
+    assert "missing quote" in caplog.text
+    first_wire = map_engine_state(engine).to_wire()
+    assert first_wire.get("replay_complete") is True
+    caplog.clear()
+    clock.advance_monotonic(10.0)
+    await engine.tick()
+    assert "missing quote" not in caplog.text
+    assert engine.health.status("BBB.SH") is not FeedStatus.LIVE

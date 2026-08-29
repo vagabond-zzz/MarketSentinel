@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { planAddSymbol, planRemoveSymbol } from "./watchlistEdit";
+import { planAddSymbol, planRemoveSymbol, watchlistsEqual } from "./watchlistEdit";
 
 describe("watchlist edit", () => {
   it("adds a trimmed symbol and rejects empty, duplicate, and overflow", () => {
@@ -25,5 +25,14 @@ describe("watchlist edit", () => {
       items: [{ symbol: "000001.SZ", enabled: true }],
     });
     expect(planRemoveSymbol(current, "missing").ok).toBe(false);
+  });
+
+  it("treats symbol and enabled as watchlist identity for no-op compares", () => {
+    const items = [
+      { symbol: "A.SH", enabled: false },
+      { symbol: "B.SH", enabled: true },
+    ];
+    expect(watchlistsEqual(items, items.map((item) => ({ ...item })))).toBe(true);
+    expect(watchlistsEqual(items, [{ symbol: "A.SH", enabled: true }, items[1]!])).toBe(false);
   });
 });

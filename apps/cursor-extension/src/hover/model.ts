@@ -2,6 +2,7 @@ import type { ActualState } from "../host/types";
 import {
   displaySymbol,
   parseSymbolDisplay,
+  type IntelligenceMode,
   type SymbolDisplayMode,
 } from "../host/display";
 import type {
@@ -29,7 +30,14 @@ const LEVEL_ORDER: Record<SchedulerLevel, number> = {
   COLD: 2,
 };
 
-export type AiStatusLabel = "关闭" | "已启用" | "处理中" | "已增强" | "回退";
+export type AiStatusLabel =
+  | "关闭"
+  | "待重启"
+  | "不可用（Rule-only）"
+  | "已启用"
+  | "处理中"
+  | "已增强"
+  | "回退";
 
 export interface HoverSignalView {
   priority: string;
@@ -95,6 +103,8 @@ export interface HoverInput {
   unreadAlertCount?: number;
   symbolNames?: Record<string, string>;
   symbolDisplay?: SymbolDisplayMode;
+  intelligenceMode?: IntelligenceMode;
+  restartNeeded?: boolean;
 }
 
 function countLevels(symbols: readonly WireSymbolState[]): { hot: number; warm: number } {
@@ -208,8 +218,19 @@ function collectStatuses(market: WireMarketState): IntelligenceStatus[] {
   return out;
 }
 
-export function mapAiStatus(market: WireMarketState | undefined): AiStatusLabel {
-  if (market?.intelligence_enabled !== true) {
+export function mapAiStatus(
+  market: WireMarketState | undefined,
+  requested: IntelligenceMode = "inherit",
+  restartNeeded = false,
+): AiStatusLabel {
+  const actual = market?.intelligence_enabled === true;
+  if (requested === "off") {
+    return "关闭";
+  }
+  if (requested === "on" && !actual) {
+    return restartNeeded ? "待重启" : "不可用（Rule-only）";
+  }
+  if (!actual || market === undefined) {
     return "关闭";
   }
   const statuses = collectStatuses(market);
@@ -322,7 +343,7 @@ export function mapHover(input: HoverInput): HoverModel {
         enableDetails,
         headline: shortHeadline({ lifecycle: lifecycle.message, unread }),
         connection: connectionLabel(input.actual, input.market),
-        aiStatus: mapAiStatus(input.market),
+        aiStatus: mapAiStatus(input.market, input.intelligenceMode, input.restartNeeded),
         unreadLine: `未读提醒：${unread}`,
         lastUpdate: DASH_UPDATE,
         lifecycleMessage: lifecycle.message,
@@ -341,7 +362,7 @@ export function mapHover(input: HoverInput): HoverModel {
         enableDetails,
         headline: shortHeadline({ lifecycle: "Core starting", unread }),
         connection: "启动中",
-        aiStatus: "关闭",
+        aiStatus: mapAiStatus(undefined, input.intelligenceMode, input.restartNeeded),
         unreadLine: `未读提醒：${unread}`,
         lastUpdate: DASH_UPDATE,
         lifecycleMessage: "Core starting",
@@ -358,7 +379,7 @@ export function mapHover(input: HoverInput): HoverModel {
         enableDetails,
         headline: "Market Sentinel · No symbols configured",
         connection: connectionLabel(input.actual, market),
-        aiStatus: mapAiStatus(market),
+        aiStatus: mapAiStatus(market, input.intelligenceMode, input.restartNeeded),
         unreadLine: `未读提醒：${unread}`,
         lastUpdate: lastUpdate(market),
         lifecycleMessage: "No symbols configured",
@@ -370,7 +391,7 @@ export function mapHover(input: HoverInput): HoverModel {
   }
 
   const { hot, warm } = countLevels(market.symbols);
-  const aiStatus = mapAiStatus(market);
+  const aiStatus = mapAiStatus(market, input.intelligenceMode, input.restartNeeded);
   const replay = market.replay_complete === true;
   return withUnread(
     {

@@ -1,4 +1,5 @@
 import { formatAlertDiagnostic } from "../alerts/state";
+import type { IpcClient } from "../ipc/client";
 import { ProtocolError } from "../ipc/errors";
 import {
   ProcessManager,
@@ -16,6 +17,7 @@ import {
 import { parseEnableHoverDetails, parseHostSettings } from "./config";
 import {
   displaySymbol,
+  parseIntelligenceMode,
   parseStatusBarMaxSymbols,
   parseSymbolDisplay,
   parseSymbolNames,
@@ -29,7 +31,7 @@ import type {
   SettingKey,
 } from "./types";
 import { HOST_UI_SETTING_KEYS, HOT_SETTING_KEYS, RESTART_SETTING_KEYS } from "./types";
-import { planAddSymbol, planRemoveSymbol } from "./watchlistEdit";
+import { planAddSymbol, planRemoveSymbol, watchlistsEqual } from "./watchlistEdit";
 
 export const DEFAULT_BACKOFF_MS = [1_000, 3_000, 10_000] as const;
 export const DEFAULT_MAX_RETRIES = 3;
@@ -38,6 +40,14 @@ const FEEDBACK_TYPES = new Set<FeedbackType>(["useful", "not_useful", "too_noisy
 const MAX_FEEDBACK_TARGETS = 20;
 
 const RESTART_HINT = "Market Sentinel core configuration changed; restart core to apply.";
+const WATCHLIST_RUNTIME_FAILED =
+  "watchlist saved; runtime update failed and will apply after reconnect/restart";
+
+interface AlertPresentationOrigin {
+  ipc: IpcClient | undefined;
+  generation: number;
+  created_timestamp: number;
+}
 
 export interface HostUiSnapshot {
   statusBar: StatusBarModel;
@@ -163,6 +173,8 @@ export class HostController {
       unreadAlertCount: this.unreadAlertCountInternal,
       symbolNames: parseSymbolNames(settings.symbolNames),
       symbolDisplay: parseSymbolDisplay(settings.symbolDisplay),
+      intelligenceMode: parseIntelligenceMode(settings.intelligence),
+      restartNeeded: this.restartNeededInternal,
     });
   }
 
@@ -183,7 +195,7 @@ export class HostController {
     const mode = parseSymbolDisplay(this.options.readSettings().symbolDisplay);
     return this.watchlistItems().map((item) => ({
       symbol: item.symbol,
-      label: displaySymbol(item.symbol, names, mode, "hover"),
+      label: displaySymbol(item.symbol, names, mode, "quickPick"),
     }));
   }
 
@@ -218,13 +230,14 @@ export class HostController {
       return { ok: false, error: message };
     }
     if (this.manager !== undefined && this.manager.connected) {
-      try {
-        await this.manager.setWatchlist(items);
-        this.lastAcked = this.manager.acknowledgedWatchlist;
-      } catch (error) {
-        const message = this.errorMessage(error);
-        this.options.logger.host(`watchlist update rejected: ${message}`);
-        return { ok: false, error: message };
+      if (!watchlistsEqual(items, this.lastAcked)) {
+        try {
+          await this.manager.setWatchlist(items);
+          this.lastAcked = this.manager.acknowledgedWatchlist;
+        } catch (error) {
+          this.options.logger.host(`${WATCHLIST_RUNTIME_FAILED}: ${this.errorMessage(error)}`);
+          return { ok: false, error: WATCHLIST_RUNTIME_FAILED };
+        }
       }
     }
     this.emitUi();
@@ -391,11 +404,14 @@ export class HostController {
     if (this.manager === undefined || !this.manager.connected) {
       return;
     }
+    if (watchlistsEqual(parsed.config.watchlist, this.lastAcked)) {
+      return;
+    }
     try {
       await this.manager.setWatchlist(parsed.config.watchlist);
       this.lastAcked = this.manager.acknowledgedWatchlist;
     } catch (error) {
-      this.options.logger.host(`watchlist update rejected: ${this.errorMessage(error)}`);
+      this.options.logger.host(`${WATCHLIST_RUNTIME_FAILED}: ${this.errorMessage(error)}`);
     }
   }
 
@@ -554,6 +570,11 @@ export class HostController {
   }
 
   private enqueueAlert(message: AlertMessage): void {
+    const origin: AlertPresentationOrigin = {
+      ipc: this.manager?.ipc,
+      generation: this.managerGeneration,
+      created_timestamp: (this.options.now ?? Date.now)() / 1000,
+    };
     this.unreadAlertCountInternal += message.candidates.length;
     for (const candidate of message.candidates) {
       this.options.logger.host(formatAlertDiagnostic(candidate));
@@ -569,26 +590,28 @@ export class HostController {
     }, hold);
     this.options.onAlertEdge?.(message);
     this.emitUi();
-    this.presentationQueue = this.presentationQueue.then(() => this.flushPresented(message));
+    this.presentationQueue = this.presentationQueue.then(() => this.flushPresented(message, origin));
   }
 
-  private async flushPresented(message: AlertMessage): Promise<void> {
-    const ipc = this.manager?.ipc;
+  private async flushPresented(
+    message: AlertMessage,
+    origin: AlertPresentationOrigin,
+  ): Promise<void> {
+    const ipc = origin.ipc;
     if (ipc === undefined) {
       return;
     }
     for (const candidate of message.candidates) {
-      const created_timestamp = (this.options.now ?? Date.now)() / 1000;
       try {
         await ipc.request({
           type: "host_interaction",
           action: "alert_presented",
           signal_id: candidate.id,
-          created_timestamp,
+          created_timestamp: origin.created_timestamp,
         });
       } catch (error) {
         this.options.logger.host(
-          `host_interaction alert_presented failed: ${this.errorMessage(error)}`,
+          `host_interaction alert_presented failed (origin generation ${origin.generation}): ${this.errorMessage(error)}`,
         );
       }
     }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DASH, escapeMarkdown, formatPercent, formatPrice, formatRatio, formatRsi } from "./format";
+import { DASH, escapeMarkdown, formatClock, formatPercent, formatPrice, formatRatio, formatRsi } from "./format";
 
 describe("hover formatters", () => {
   it("renders missing values as --", () => {
@@ -26,5 +26,11 @@ describe("hover formatters", () => {
     expect(escapeMarkdown("a[b](c)")).toBe("a\\[b\\]\\(c\\)");
     expect(escapeMarkdown("x*y_z")).toBe("x\\*y\\_z");
     expect(escapeMarkdown("line\nbreak")).toBe("line break");
+  });
+
+  it("formats last_market_timestamp in UTC+8 independent of host timezone", () => {
+    expect(formatClock(1_704_067_200)).toBe("08:00:00");
+    expect(formatClock(1_704_067_200 + 6 * 3600 + 30 * 60)).toBe("14:30:00");
+    expect(formatClock(undefined)).toBe(DASH);
   });
 });

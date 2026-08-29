@@ -48,7 +48,7 @@ This extension is `extensionKind: ["ui"]` (local Desktop). Remote SSH / Codespac
 - `marketSentinel.replayPath`
 - `marketSentinel.enableHoverDetails` (default true)
 - `marketSentinel.alertToast` (`off` | `critical`, default `off`)
-- `marketSentinel.intelligence` (`off` | `on` | `inherit`, default `off`; restart Core; no API keys in settings)
+- `marketSentinel.intelligence` (`off` | `on` | `inherit`, default `inherit`; restart Core; no API keys in settings)
 - `marketSentinel.symbolNames` (UI aliases only)
 - `marketSentinel.symbolDisplay` (`name` | `nameAndCode` | `code`)
 - `marketSentinel.statusBarMaxSymbols` (1–3, default 2)
