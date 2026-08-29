@@ -142,6 +142,19 @@ describe("ProcessManager", () => {
     expect(spawned[0]?.options.shell).toBe(false);
   });
 
+  it("passes explicit intelligence CLI flags and omits them on inherit", async () => {
+    const on = managerWith(undefined, { intelligence: "on" });
+    await on.manager.start([]);
+    expect(on.spawned[0]?.args).toContain("--intelligence");
+    const off = managerWith(undefined, { intelligence: "off" });
+    await off.manager.start([]);
+    expect(off.spawned[0]?.args).toContain("--no-intelligence");
+    const inherit = managerWith(undefined, { intelligence: "inherit" });
+    await inherit.manager.start([]);
+    expect(inherit.spawned[0]?.args).not.toContain("--intelligence");
+    expect(inherit.spawned[0]?.args).not.toContain("--no-intelligence");
+  });
+
   it("spawns longbridge provider without secrets on argv", async () => {
     const { manager, spawned } = managerWith(undefined, { provider: "longbridge" });
     await manager.start([]);

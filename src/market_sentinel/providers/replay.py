@@ -18,6 +18,9 @@ class ReplayProvider:
         ]
         self._index = 0
 
+    def source_exhausted(self) -> bool:
+        return self._index >= len(self._ticks)
+
     async def fetch_quotes(self, symbols: list[str]) -> list[MarketSnapshot]:
         if self._index >= len(self._ticks):
             return []

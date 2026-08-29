@@ -54,6 +54,12 @@ export const StatusBarAlignment = {
   Right: 2,
 } as const;
 
+export const ConfigurationTarget = {
+  Global: 1,
+  Workspace: 2,
+  WorkspaceFolder: 3,
+} as const;
+
 export const window = {
   createOutputChannel(_name: string) {
     return {
@@ -72,7 +78,10 @@ export const window = {
     vscodeState.toasts.push(message);
     return Promise.resolve(undefined);
   },
-  showQuickPick<T>(_items: T[]): Promise<T | undefined> {
+  showInputBox(_options?: { prompt?: string; ignoreFocusOut?: boolean }): Promise<string | undefined> {
+    return Promise.resolve(undefined);
+  },
+  showQuickPick<T>(_items: T[], _options?: { placeHolder?: string }): Promise<T | undefined> {
     return Promise.resolve(undefined);
   },
   createStatusBarItem(_alignment?: number, _priority?: number) {
@@ -118,6 +127,10 @@ export const workspace = {
       get(key: string) {
         return vscodeState.settings[`${section}.${key}`];
       },
+      update(key: string, value: unknown, _target?: number) {
+        vscodeState.settings[`${section}.${key}`] = value;
+        return Promise.resolve();
+      },
     };
   },
   onDidChangeConfiguration(
@@ -139,4 +152,5 @@ export default {
   StatusBarAlignment,
   ThemeColor,
   MarkdownString,
+  ConfigurationTarget,
 };

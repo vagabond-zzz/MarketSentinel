@@ -25,6 +25,11 @@ from market_sentinel.watchlist.watchlist import Watchlist
 logger = logging.getLogger(__name__)
 
 
+def provider_source_exhausted(provider: object) -> bool:
+    check = getattr(provider, "source_exhausted", None)
+    return callable(check) and bool(check())
+
+
 class IntelligenceObserver(Protocol):
     registry: object
 
@@ -120,6 +125,11 @@ class MarketEngine:
             return
 
         self.diagnostics.last_fetch_error = None
+        if provider_source_exhausted(self.provider) and not snapshots:
+            for symbol in due:
+                self.health.keep_alive(symbol)
+                self.scheduler.mark_fetched(symbol)
+            return
         found = {item.symbol: item for item in snapshots}
         for symbol in due:
             snapshot = found.get(symbol)

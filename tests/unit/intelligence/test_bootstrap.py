@@ -9,6 +9,28 @@ def test_intelligence_sidecar_is_off_by_default() -> None:
     assert optional_intelligence(FakeClock(), environ={}) is None
 
 
+def test_cli_on_overrides_env_off() -> None:
+    coord = optional_intelligence(
+        FakeClock(),
+        environ={"MARKET_SENTINEL_INTEL_PROVIDER": "fake"},
+        enabled=True,
+    )
+    assert coord is not None
+    assert isinstance(coord._provider, FakeIntelligenceProvider)
+
+
+def test_cli_off_overrides_env_on() -> None:
+    coord = optional_intelligence(
+        FakeClock(),
+        environ={
+            "MARKET_SENTINEL_INTEL_ENABLED": "1",
+            "MARKET_SENTINEL_INTEL_PROVIDER": "fake",
+        },
+        enabled=False,
+    )
+    assert coord is None
+
+
 def test_intelligence_sidecar_can_enable_fake_without_network() -> None:
     coord = optional_intelligence(
         FakeClock(),

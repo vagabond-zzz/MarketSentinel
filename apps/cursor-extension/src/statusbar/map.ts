@@ -1,6 +1,8 @@
 import { applyUnreadBadge } from "../alerts/state";
-import type { ActualState, DesiredState } from "../host/types";
-import type { SchedulerLevel, WireMarketState } from "../protocol/types";
+import { displaySymbol, parseStatusBarMaxSymbols, parseSymbolDisplay } from "../host/display";
+import type { ActualState, DesiredState, SymbolDisplayMode } from "../host/types";
+import { formatPercent, formatPrice } from "../hover/format";
+import type { SchedulerLevel, WireMarketState, WireSymbolState } from "../protocol/types";
 
 export type StatusBarKind =
   | "DISCONNECTED"
@@ -8,10 +10,12 @@ export type StatusBarKind =
   | "PAUSED"
   | "IDLE"
   | "STALE"
+  | "DELAYED"
   | "ALERT"
   | "HOT"
   | "WARM"
-  | "NORMAL";
+  | "NORMAL"
+  | "REPLAY_COMPLETE";
 
 export type StatusBarTone = "default" | "warning" | "error";
 
@@ -32,6 +36,9 @@ export interface StatusBarInput {
   lastError?: string;
   restartNeeded?: boolean;
   unreadAlertCount?: number;
+  symbolNames?: Record<string, string>;
+  symbolDisplay?: SymbolDisplayMode;
+  maxSymbols?: number;
 }
 
 export const DEFAULT_ALERT_HOLD_MS = 15_000;
@@ -76,12 +83,71 @@ function tooltip(kind: StatusBarKind, input: StatusBarInput): string {
   return parts.join(" · ");
 }
 
-function model(kind: StatusBarKind, tone: StatusBarTone, input: StatusBarInput): StatusBarModel {
+function iconFor(kind: StatusBarKind, feed?: WireMarketState["feed_status"]): string {
+  if (kind === "STALE" && feed === "DISCONNECTED") {
+    return "$(error)";
+  }
+  switch (kind) {
+    case "STARTING":
+      return "$(sync~spin)";
+    case "PAUSED":
+      return "$(debug-pause)";
+    case "DELAYED":
+      return "$(clock)";
+    case "STALE":
+      return "$(warning)";
+    case "DISCONNECTED":
+      return "$(error)";
+    case "ALERT":
+      return "$(bell)";
+    case "REPLAY_COMPLETE":
+      return "$(check)";
+    default:
+      return "$(circle-outline)";
+  }
+}
+
+function formatQuote(
+  symbol: WireSymbolState,
+  names: Record<string, string>,
+  mode: SymbolDisplayMode,
+): string {
+  const label = displaySymbol(symbol.symbol, names, mode, "statusBar");
+  if (symbol.price === null) {
+    return `${label} --`;
+  }
+  return `${label} ${formatPrice(symbol.price)} ${formatPercent(symbol.change_day)}`;
+}
+
+function quoteLine(input: StatusBarInput, market: WireMarketState): string | undefined {
+  if (market.symbols.length === 0) {
+    return undefined;
+  }
+  const names = input.symbolNames ?? {};
+  const mode = parseSymbolDisplay(input.symbolDisplay);
+  const max = parseStatusBarMaxSymbols(input.maxSymbols);
+  const shown = market.symbols.slice(0, max);
+  const overflow = Math.max(0, market.symbols.length - max);
+  const parts = shown.map((item) => formatQuote(item, names, mode));
+  if (overflow > 0) {
+    parts.push(`+${overflow}`);
+  }
+  return parts.join(" | ");
+}
+
+function compose(
+  kind: StatusBarKind,
+  body: string,
+  input: StatusBarInput,
+): StatusBarModel {
   return {
     kind,
-    text: applyUnreadBadge(`MS ${kind}`, input.unreadAlertCount ?? 0),
+    text: applyUnreadBadge(
+      `${iconFor(kind, input.market?.feed_status)} ${body}`,
+      input.unreadAlertCount ?? 0,
+    ),
     tooltip: tooltip(kind, input),
-    tone,
+    tone: "default",
   };
 }
 
@@ -89,44 +155,56 @@ export function mapStatusBar(input: StatusBarInput): StatusBarModel {
   const hold = input.alertHoldMs ?? DEFAULT_ALERT_HOLD_MS;
   const elapsed = input.lastAlertAt === undefined ? hold : input.now - input.lastAlertAt;
   const alertActive = input.lastAlertAt !== undefined && elapsed >= 0 && elapsed < hold;
+  const quotes = input.market !== undefined ? quoteLine(input, input.market) : undefined;
 
   if (input.actual === "STARTING") {
-    return model("STARTING", "default", input);
+    return compose("STARTING", "启动中", input);
   }
   if (
     input.actual === "DISCONNECTED" ||
     input.actual === "STOPPED" ||
     input.actual === "STOPPING"
   ) {
-    return model("DISCONNECTED", "error", input);
+    return compose("DISCONNECTED", quotes ?? "已断开", input);
   }
   if (input.actual === "PAUSED") {
-    return model("PAUSED", "default", input);
+    return compose("PAUSED", quotes ?? "已暂停", input);
   }
 
   if (input.market === undefined) {
-    return model("STARTING", "default", input);
+    return compose("STARTING", "启动中", input);
+  }
+
+  if (input.market.replay_complete === true) {
+    return compose("REPLAY_COMPLETE", "Replay 已结束", input);
   }
 
   if (input.market.watchlist_count === 0 && input.market.symbols.length === 0) {
-    return model("IDLE", "default", input);
+    return compose("IDLE", "无标的", input);
   }
 
   const feed = input.market.feed_status;
-  if (feed === "STALE" || feed === "DISCONNECTED") {
-    return model("STALE", "error", input);
+  if (feed === "STALE") {
+    return compose("STALE", quotes ?? "--", input);
+  }
+  if (feed === "DISCONNECTED") {
+    return compose("STALE", quotes ?? "--", input);
   }
 
   if (alertActive) {
-    return model("ALERT", "warning", input);
+    return compose("ALERT", quotes ?? "--", input);
+  }
+
+  if (feed === "DELAYED") {
+    return compose("DELAYED", quotes ?? "--", input);
   }
 
   const level = highestSchedulerLevel(input.market);
   if (level === "HOT") {
-    return model("HOT", "warning", input);
+    return compose("HOT", quotes ?? "--", input);
   }
   if (level === "WARM") {
-    return model("WARM", "default", input);
+    return compose("WARM", quotes ?? "--", input);
   }
-  return model("NORMAL", "default", input);
+  return compose("NORMAL", quotes ?? "--", input);
 }

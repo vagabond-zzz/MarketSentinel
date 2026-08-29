@@ -22,7 +22,7 @@ def _features() -> MarketFeatures:
         change_1m=0.006,
         change_5m=None,
         change_15m=None,
-        change_day=None,
+        change_day=0.0126,
         day_range_position=None,
         volume_1m=None,
         volume_5m=None,
@@ -95,6 +95,10 @@ def test_map_symbol_state_copies_selected_fields_only() -> None:
     assert payload["change_1m"] == 0.006
     assert payload["change_5m"] is None
     assert payload["volume_ratio_5m"] == 1.8
+    assert payload["change_day"] == 0.0126
+    assert payload["above_vwap"] is True
+    assert payload["session_high_obs"] == 101.0
+    assert payload["market_timestamp"] == 1.0
     assert payload["active_signals"][0]["id"] == "sig-1"
     assert payload["active_signals"][0]["title"] == "headline"
     assert "event_ids" not in payload["active_signals"][0]

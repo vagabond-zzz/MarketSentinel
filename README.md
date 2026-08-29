@@ -441,11 +441,21 @@ LONGBRIDGE_ACCESS_TOKEN
 
 ## 第二步：配置 Watchlist
 
-Cursor 设置：
+Command Palette：
+
+```text
+Market Sentinel: Add Symbol
+Market Sentinel: Remove Symbol
+Market Sentinel: Manage Watchlist
+```
+
+也可以继续用 Cursor 设置：
 
 ```text
 marketSentinel.watchlist
 ```
+
+Host 写入 Workspace 设置。CLI 的 `data/watchlist.json` 是另一套入口，两者不自动双向同步。
 
 Core 最多接受：
 
@@ -454,6 +464,16 @@ Core 最多接受：
 ```
 
 正式 Longbridge live 使用建议使用 `.SH` / `.SZ`。
+
+显示名（仅 UI）：
+
+```json
+"marketSentinel.symbolNames": {
+  "600519.SH": "贵州茅台"
+}
+```
+
+真正 ID 永远是 `600519.SH`。
 
 ## 第三步：启动 Cursor Host
 
@@ -477,41 +497,41 @@ marketSentinel.uvPath
 uv
 ```
 
-重新加载窗口后，StatusBar 会出现：
+重新加载窗口后，StatusBar 会出现类似：
 
 ```text
-MS …
+$(circle-outline) 贵州茅台 1412.30 +1.28% | 平安银行 12.34 -0.55%
 ```
+
+而不是诊断字 `MS NORMAL`。未配置别名时显示代码。Feed 异常用 icon，不用红/黄背景。
 
 ## 第四步：观察状态
 
-常见状态：
+常见状态（icon，不是整条变色）：
 
 | 状态 | 含义 |
 |---|---|
-| `DISCONNECTED` | Core 未连接 |
-| `STARTING` | Core 正在启动 |
-| `PAUSED` | 用户暂停 |
-| `IDLE` | Watchlist 为空 |
-| `NORMAL` | 正常观察 |
-| `WARM` | 市场关注度上升 |
-| `HOT` | 市场处于更高关注级别 |
-| `STALE` | 已配置 symbol，但 feed 过旧 / 断连 |
-| `ALERT` | 有新的 alert edge |
-
-空 Watchlist 是 `IDLE`，不是 `STALE`。
+| 启动中 | Core 正在启动 |
+| 已断开 / error icon | Core 未连接 |
+| pause icon | 用户暂停；保留最后行情 |
+| 无标的 | Watchlist 为空 |
+| quotes + warning/error icon | 已配置 symbol，但 feed 过旧 / 断连 |
+| bell + quotes · N | 有未读 alert |
+| clock + quotes | DELAYED |
+| check Replay 已结束 | Replay 播完，不是 live 故障 |
 
 ## 第五步：Hover 查看详情
 
-StatusBar Hover 展示持久的 `WireMarketState`。
+StatusBar Hover 即使没有 Event / Signal 也显示行情快照。
 
 你通常可以看到：
 
-- feed 健康状态；
-- symbols；
-- active signals；
-- 当前事件 / alert 摘要；
-- lifecycle 状态。
+- 连接 / 行情源 / AI 状态 / 未读提醒 / 最后更新；
+- 每只股票的价格、当日涨跌幅、COLD/WARM/HOT；
+- 规则信号与 AI 增强分开标注；
+- 1m / 5m / 15m 涨跌幅与量比各占一行。
+
+当日涨跌幅来自 `prev_close`（wire `change_day`）。不要把 1m/5m 当成当日涨跌。缺字段显示 `--`。
 
 Hover 本身不会触发 Intelligence 调用，也不会自动生成 feedback。
 
@@ -637,6 +657,10 @@ VS Code Desktop
 | `marketSentinel.replayPath` | `replay` provider 的 JSONL 文件 |
 | `marketSentinel.enableHoverDetails` | 是否显示完整 StatusBar hover，默认 `true` |
 | `marketSentinel.alertToast` | `off` 或 `critical`，默认 `off` |
+| `marketSentinel.intelligence` | `off` / `on` / `inherit`，默认 `off`。`on`/`off` 显式传 CLI；`inherit` 让环境变量决定。改完需 Restart Core。不要把 API Key 写入 settings |
+| `marketSentinel.symbolNames` | 显示别名，仅 UI |
+| `marketSentinel.symbolDisplay` | `name` / `nameAndCode` / `code`，默认 `nameAndCode` |
+| `marketSentinel.statusBarMaxSymbols` | StatusBar 最多显示 1–3 只，默认 2 |
 
 ## 5.3 推荐手工验收流程
 
@@ -645,19 +669,20 @@ VS Code Desktop
 3. 必要时配置 `coreRoot`；
 4. 确认 `uvPath`；
 5. 选择 provider；
-6. 配置 Watchlist；
+6. 配置 Watchlist（命令面板 Add Symbol，或 settings）；
 7. Longbridge 模式下设置环境变量；
-8. Reload Window；
-9. 确认 StatusBar 出现；
-10. Hover 查看 feed / symbols；
-11. Pause；
-12. Resume；
-13. Restart Core；
-14. Show Output；
-15. Reset Alert Badge；
-16. 可选：提交 Signal Feedback；
-17. 关闭 Cursor；
-18. 确认没有残留 `market-sentinel daemon` / Python child。
+8. 可选：`marketSentinel.intelligence` 与 `DASHSCOPE_API_KEY`；
+9. Reload Window；
+10. 确认 StatusBar 出现行情，而不是 `MS XXX`；
+11. Hover 查看连接 / AI / 当日涨跌 / 规则与 AI；
+12. Pause；
+13. Resume；
+14. Restart Core；
+15. Show Output；
+16. Reset Alert Badge；
+17. 可选：提交 Signal Feedback；
+18. 关闭 Cursor；
+19. 确认没有残留 `market-sentinel daemon` / Python child。
 
 ---
 
@@ -681,6 +706,8 @@ uv run market-sentinel --watchlist data/watchlist.json watchlist list
 
 ```bash
 uv run market-sentinel --watchlist data/watchlist.json run --once
+uv run market-sentinel --watchlist data/watchlist.json --intelligence run --once
+uv run market-sentinel --watchlist data/watchlist.json --no-intelligence run --once
 ```
 
 Verbose：
@@ -1340,11 +1367,27 @@ Telemetry / feedback JSONL 是独立本地文件，不走 Protocol stdout。
 MARKET_SENTINEL_INTEL_ENABLED=0
 ```
 
+或 CLI / Cursor：
+
+```text
+--no-intelligence
+marketSentinel.intelligence = off
+```
+
 启用：
 
 ```text
 MARKET_SENTINEL_INTEL_ENABLED=1
 ```
+
+或：
+
+```text
+--intelligence
+marketSentinel.intelligence = on
+```
+
+优先级：显式 CLI > 环境变量 > 默认关闭。`inherit` 不传 CLI，兼容旧 env。
 
 DashScope key：
 
@@ -1585,7 +1628,7 @@ Cursor Host 使用：
 marketSentinel.watchlist
 ```
 
-`set_watchlist` 是 runtime-only，不会写文件。
+`set_watchlist` 是 runtime-only，不会写 `data/watchlist.json`。Cursor Add/Remove Symbol 会写 Workspace `marketSentinel.watchlist`，然后 `set_watchlist`。两套入口不自动同步。
 
 ---
 

@@ -27,9 +27,12 @@ describe("extension adapter", () => {
     expect(vscodeState.commands.has(HOST_COMMANDS.showOutput)).toBe(true);
     expect(vscodeState.commands.has(HOST_COMMANDS.resetAlertBadge)).toBe(true);
     expect(vscodeState.commands.has(HOST_COMMANDS.submitSignalFeedback)).toBe(true);
+    expect(vscodeState.commands.has(HOST_COMMANDS.addSymbol)).toBe(true);
+    expect(vscodeState.commands.has(HOST_COMMANDS.removeSymbol)).toBe(true);
+    expect(vscodeState.commands.has(HOST_COMMANDS.manageWatchlist)).toBe(true);
     expect(vscodeState.outputLines.some((line) => line.startsWith("[host]"))).toBe(true);
     expect(vscodeState.statusBar.shown).toBe(true);
-    expect(vscodeState.statusBar.text).toContain("DISCONNECTED");
+    expect(vscodeState.statusBar.text).toContain("$(error)");
     expect(vscodeState.statusBar.command).toBe(HOST_COMMANDS.showOutput);
     expect(tooltipMarkdown().value).toContain("Core disconnected");
     await vscodeState.commands.get(HOST_COMMANDS.showOutput)?.();

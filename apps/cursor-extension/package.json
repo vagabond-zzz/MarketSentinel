@@ -50,6 +50,18 @@
       {
         "command": "marketSentinel.submitSignalFeedback",
         "title": "Market Sentinel: Signal Feedback"
+      },
+      {
+        "command": "marketSentinel.addSymbol",
+        "title": "Market Sentinel: Add Symbol"
+      },
+      {
+        "command": "marketSentinel.removeSymbol",
+        "title": "Market Sentinel: Remove Symbol"
+      },
+      {
+        "command": "marketSentinel.manageWatchlist",
+        "title": "Market Sentinel: Manage Watchlist"
       }
     ],
     "configuration": {
@@ -104,6 +116,31 @@
           "enum": ["off", "critical"],
           "default": "off",
           "description": "Optional notification for unsolicited critical alert edges. Host-only; changing it does not restart the Python Core. Default off."
+        },
+        "marketSentinel.intelligence": {
+          "type": "string",
+          "enum": ["off", "on", "inherit"],
+          "default": "off",
+          "description": "Optional Intelligence sidecar. on/off pass an explicit Core CLI flag; inherit leaves MARKET_SENTINEL_INTEL_ENABLED to decide. Restart Core after changing. API keys stay in the process environment, not in settings."
+        },
+        "marketSentinel.symbolNames": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "default": {},
+          "description": "Display aliases for watchlist symbols. UI only; canonical IDs such as 600519.SH are unchanged."
+        },
+        "marketSentinel.symbolDisplay": {
+          "type": "string",
+          "enum": ["name", "nameAndCode", "code"],
+          "default": "nameAndCode",
+          "description": "How to show symbol aliases. StatusBar prefers the short name when an alias exists."
+        },
+        "marketSentinel.statusBarMaxSymbols": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 3,
+          "default": 2,
+          "description": "Maximum quotes shown in the StatusBar before +N overflow."
         }
       }
     }

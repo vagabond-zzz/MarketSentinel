@@ -56,3 +56,12 @@ async def test_replay_provider_plays_fixture_ticks() -> None:
     assert [item.price for item in second] == [602.5]
     assert exhausted == []
     assert first[0].received_timestamp == 1_700_000_200.0
+    assert provider.source_exhausted() is True
+
+
+async def test_replay_source_exhausted_is_false_before_eof() -> None:
+    clock = FakeClock(wall=1_700_000_200.0)
+    provider = ReplayProvider(FIXTURES / "replay_quotes.jsonl", clock)
+    assert provider.source_exhausted() is False
+    await provider.fetch_quotes(["00700.HK"])
+    assert provider.source_exhausted() is False

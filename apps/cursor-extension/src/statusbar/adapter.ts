@@ -13,14 +13,9 @@ export function applyStatusBar(
   item.text = model.text;
   const tooltip = new vscode.MarkdownString(renderHoverMarkdown(hover));
   tooltip.isTrusted = false;
+  tooltip.supportThemeIcons = true;
   item.tooltip = tooltip;
   item.command = HOST_COMMANDS.showOutput;
-  if (model.tone === "error") {
-    item.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
-  } else if (model.tone === "warning") {
-    item.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
-  } else {
-    item.backgroundColor = undefined;
-  }
+  item.backgroundColor = undefined;
   item.show();
 }

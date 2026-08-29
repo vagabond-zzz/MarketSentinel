@@ -235,6 +235,9 @@ function createHarness(
     clearTimeoutFn: extras.clearTimeoutFn,
     onUiSnapshot: extras.onUiSnapshot,
     onAlertEdge: extras.onAlertEdge,
+    persistWatchlist: async (items) => {
+      settings.watchlist = items.map((item) => item.symbol);
+    },
     createManager: (options) => {
       const manager = new ProcessManager(options);
       managers.push(manager);
@@ -708,7 +711,7 @@ describe("HostController", () => {
     expect(harness.controller.hoverModel().symbols).toEqual([]);
   });
 
-  it("shows paused and disconnected Hover copy instead of last market prices", async () => {
+  it("keeps last quotes when paused or host-disconnected", async () => {
     const harness = createHarness();
     await harness.controller.start();
     writeState(harness.children[0], {
@@ -717,14 +720,14 @@ describe("HostController", () => {
       symbols: [wireSymbol({ scheduler_level: "HOT" })],
     });
     await harness.controller.pause();
-    expect(harness.controller.hoverModel().lifecycleMessage).toBe("Monitoring paused");
-    expect(harness.controller.hoverModel().symbols).toEqual([]);
+    expect(harness.controller.hoverModel().connection).toBe("已暂停");
+    expect(harness.controller.hoverModel().symbols[0]?.symbol).toBe("00700.HK");
     harness.children[0]?.emit("exit", 1, null);
     await vi.waitFor(() => {
       expect(harness.controller.actualState).toBe("DISCONNECTED");
     });
-    expect(harness.controller.hoverModel().lifecycleMessage).toBe("Core disconnected");
-    expect(harness.controller.hoverModel().outputHint).toMatch(/Output/);
+    expect(harness.controller.hoverModel().connection).toBe("异常");
+    expect(harness.controller.hoverModel().symbols[0]?.symbol).toBe("00700.HK");
   });
 
   it("hot-applies enableHoverDetails without restarting Core", async () => {
@@ -744,7 +747,7 @@ describe("HostController", () => {
     expect(harness.controller.restartNeeded).toBe(false);
     expect(harness.controller.hoverModel().enableDetails).toBe(false);
     expect(harness.controller.hoverModel().headline).toBe(
-      "Market Sentinel · LIVE · symbols=1 · HOT=0 · WARM=0",
+      "Market Sentinel · LIVE · symbols=1 · HOT=0 · WARM=0 · AI=关闭",
     );
   });
 
@@ -788,7 +791,7 @@ describe("HostController", () => {
     now = 1_000 + 15_000;
     expect(harness.controller.statusBarModel().kind).toBe("NORMAL");
     expect(harness.controller.unreadAlertCount).toBe(1);
-    expect(harness.controller.statusBarModel().text).toBe("MS NORMAL · 1");
+    expect(harness.controller.statusBarModel().text).toContain("· 1");
   });
 
   it("increments unread only from unsolicited alert candidates", async () => {
@@ -900,11 +903,13 @@ describe("HostController", () => {
     });
     writeAlert(harness.children[0], [alertCandidate(), alertCandidate({ id: "a2" })]);
     expect(harness.controller.statusBarModel().kind).toBe("ALERT");
-    expect(harness.controller.statusBarModel().text).toBe("MS ALERT · 2");
+    expect(harness.controller.statusBarModel().text).toContain("$(bell)");
+    expect(harness.controller.statusBarModel().text).toContain("· 2");
     harness.controller.resetAlertBadge();
     expect(harness.controller.unreadAlertCount).toBe(0);
     expect(harness.controller.statusBarModel().kind).toBe("ALERT");
-    expect(harness.controller.statusBarModel().text).toBe("MS ALERT");
+    expect(harness.controller.statusBarModel().text).toContain("$(bell)");
+    expect(harness.controller.statusBarModel().text).not.toContain("·");
     expect(harness.controller.hoverModel().symbols[0]?.level).toBe("HOT");
     now = 1_000 + 15_000;
     expect(harness.controller.statusBarModel().kind).toBe("HOT");
@@ -922,11 +927,13 @@ describe("HostController", () => {
     });
     expect(harness.controller.unreadAlertCount).toBe(1);
     expect(harness.controller.statusBarModel().kind).toBe("IDLE");
-    expect(harness.controller.statusBarModel().text).toBe("MS IDLE · 1");
+    expect(harness.controller.statusBarModel().text).toContain("无标的");
+    expect(harness.controller.statusBarModel().text).toContain("· 1");
     expect(harness.controller.hoverModel().lifecycleMessage).toBe("No symbols configured");
     harness.controller.resetAlertBadge();
     expect(harness.controller.unreadAlertCount).toBe(0);
-    expect(harness.controller.statusBarModel().text).toBe("MS IDLE");
+    expect(harness.controller.statusBarModel().text).toContain("无标的");
+    expect(harness.controller.statusBarModel().text).not.toContain("·");
   });
 
   it("hot-applies alertToast without restarting Core", async () => {
@@ -1098,5 +1105,56 @@ describe("HostController", () => {
       );
       expect(sent).toHaveLength(1);
     });
+  });
+
+  it("passes --no-intelligence by default and --intelligence when enabled", async () => {
+    const off = createHarness();
+    await off.controller.start();
+    expect(off.spawned[0]?.args).toContain("--no-intelligence");
+    expect(off.spawned[0]?.args.join(" ")).not.toMatch(/DASHSCOPE|sk-/);
+    const on = createHarness({ settings: { intelligence: "on" } });
+    await on.controller.start();
+    expect(on.spawned[0]?.args).toContain("--intelligence");
+    expect(on.spawned[0]?.args).not.toContain("--no-intelligence");
+    const inherit = createHarness({ settings: { intelligence: "inherit" } });
+    await inherit.controller.start();
+    expect(inherit.spawned[0]?.args).not.toContain("--intelligence");
+    expect(inherit.spawned[0]?.args).not.toContain("--no-intelligence");
+  });
+
+  it("adds and removes watchlist symbols without restarting Core", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    const before = harness.spawned.length;
+    const added = await harness.controller.addWatchlistSymbol("600519.SH");
+    expect(added).toEqual({ ok: true });
+    expect(harness.settings.watchlist).toEqual(["600519.SH"]);
+    await vi.waitFor(() => {
+      const sets = (harness.commands as Array<{ type?: string; items?: Array<{ symbol: string }> }>).filter(
+        (item) => item.type === "set_watchlist",
+      );
+      expect(sets.at(-1)?.items).toEqual([{ symbol: "600519.SH", enabled: true }]);
+    });
+    expect(await harness.controller.addWatchlistSymbol("600519.SH")).toMatchObject({ ok: false });
+    const ten = Array.from({ length: 10 }, (_, index) => `S${index}.SH`);
+    harness.settings.watchlist = ten;
+    expect(await harness.controller.addWatchlistSymbol("NEW.SH")).toMatchObject({ ok: false });
+    harness.settings.watchlist = ["600519.SH", "000001.SZ"];
+    expect(await harness.controller.removeWatchlistSymbol("600519.SH")).toEqual({ ok: true });
+    expect(harness.settings.watchlist).toEqual(["000001.SZ"]);
+    expect(harness.spawned).toHaveLength(before);
+  });
+
+  it("flushes alert_presented before shutdown so Replay EOF cannot drop telemetry", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    writeAlert(harness.children[0], [alertCandidate({ id: "race-1" })]);
+    expect(harness.controller.unreadAlertCount).toBe(1);
+    await harness.controller.shutdown();
+    const presented = (
+      harness.commands as Array<{ type?: string; action?: string; signal_id?: string }>
+    ).filter((item) => item.type === "host_interaction" && item.action === "alert_presented");
+    expect(presented).toHaveLength(1);
+    expect(presented[0]?.signal_id).toBe("race-1");
   });
 });

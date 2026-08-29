@@ -20,11 +20,15 @@ def optional_intelligence(
     *,
     environ: Mapping[str, str] | None = None,
     telemetry: TelemetryRuntime | None = None,
+    enabled: bool | None = None,
 ) -> IntelligenceCoordinator | None:
     env = os.environ if environ is None else environ
-    flag = str(env.get("MARKET_SENTINEL_INTEL_ENABLED", "")).strip().lower()
-    if flag not in {"1", "true", "yes"}:
+    if enabled is False:
         return None
+    if enabled is None:
+        flag = str(env.get("MARKET_SENTINEL_INTEL_ENABLED", "")).strip().lower()
+        if flag not in {"1", "true", "yes"}:
+            return None
     secret = ""
     try:
         settings = load_model_settings(dict(env))

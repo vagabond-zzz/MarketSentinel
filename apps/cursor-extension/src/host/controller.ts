@@ -14,6 +14,12 @@ import {
   type StatusBarModel,
 } from "../statusbar/map";
 import { parseEnableHoverDetails, parseHostSettings } from "./config";
+import {
+  displaySymbol,
+  parseStatusBarMaxSymbols,
+  parseSymbolDisplay,
+  parseSymbolNames,
+} from "./display";
 import type {
   ActualState,
   DesiredState,
@@ -23,6 +29,7 @@ import type {
   SettingKey,
 } from "./types";
 import { HOST_UI_SETTING_KEYS, HOT_SETTING_KEYS, RESTART_SETTING_KEYS } from "./types";
+import { planAddSymbol, planRemoveSymbol } from "./watchlistEdit";
 
 export const DEFAULT_BACKOFF_MS = [1_000, 3_000, 10_000] as const;
 export const DEFAULT_MAX_RETRIES = 3;
@@ -54,6 +61,7 @@ export interface HostControllerOptions {
   clearTimeoutFn?: typeof clearTimeout;
   onUiSnapshot?: (snapshot: HostUiSnapshot) => void;
   onAlertEdge?: (message: AlertMessage) => void;
+  persistWatchlist?: (items: WatchlistItem[]) => Promise<void>;
 }
 
 function defaultDelay(ms: number): Promise<void> {
@@ -86,6 +94,7 @@ export class HostController {
   private lastAlertAt: number | undefined;
   private unreadAlertCountInternal = 0;
   private alertHoldTimer: ReturnType<typeof setTimeout> | undefined;
+  private presentationQueue: Promise<void> = Promise.resolve();
 
   constructor(options: HostControllerOptions) {
     this.options = options;
@@ -128,6 +137,7 @@ export class HostController {
   }
 
   statusBarModel(): StatusBarModel {
+    const settings = this.options.readSettings();
     return mapStatusBar({
       actual: this.actualInternal,
       desired: this.desiredInternal,
@@ -138,20 +148,87 @@ export class HostController {
       lastError: this.lastErrorInternal,
       restartNeeded: this.restartNeededInternal,
       unreadAlertCount: this.unreadAlertCountInternal,
+      symbolNames: parseSymbolNames(settings.symbolNames),
+      symbolDisplay: parseSymbolDisplay(settings.symbolDisplay),
+      maxSymbols: parseStatusBarMaxSymbols(settings.statusBarMaxSymbols),
     });
   }
 
   hoverModel(): HoverModel {
+    const settings = this.options.readSettings();
     return mapHover({
       actual: this.actualInternal,
       market: this.lastMarket,
-      enableHoverDetails: parseEnableHoverDetails(this.options.readSettings().enableHoverDetails),
+      enableHoverDetails: parseEnableHoverDetails(settings.enableHoverDetails),
       unreadAlertCount: this.unreadAlertCountInternal,
+      symbolNames: parseSymbolNames(settings.symbolNames),
+      symbolDisplay: parseSymbolDisplay(settings.symbolDisplay),
     });
   }
 
   uiSnapshot(): HostUiSnapshot {
     return { statusBar: this.statusBarModel(), hover: this.hoverModel() };
+  }
+
+  watchlistItems(): WatchlistItem[] {
+    const parsed = parseHostSettings(this.options.readSettings(), this.options.workspaceFolders());
+    if (parsed.ok) {
+      return parsed.config.watchlist;
+    }
+    return this.lastAcked.map((item) => ({ ...item }));
+  }
+
+  watchlistChoices(): Array<{ label: string; symbol: string }> {
+    const names = parseSymbolNames(this.options.readSettings().symbolNames);
+    const mode = parseSymbolDisplay(this.options.readSettings().symbolDisplay);
+    return this.watchlistItems().map((item) => ({
+      symbol: item.symbol,
+      label: displaySymbol(item.symbol, names, mode, "hover"),
+    }));
+  }
+
+  async addWatchlistSymbol(raw: string): Promise<{ ok: true } | { ok: false; error: string }> {
+    const planned = planAddSymbol(this.watchlistItems(), raw);
+    if (!planned.ok) {
+      this.options.logger.host(`addSymbol rejected: ${planned.error}`);
+      return planned;
+    }
+    return this.commitWatchlist(planned.items);
+  }
+
+  async removeWatchlistSymbol(
+    symbol: string,
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    const planned = planRemoveSymbol(this.watchlistItems(), symbol);
+    if (!planned.ok) {
+      this.options.logger.host(`removeSymbol rejected: ${planned.error}`);
+      return planned;
+    }
+    return this.commitWatchlist(planned.items);
+  }
+
+  private async commitWatchlist(
+    items: WatchlistItem[],
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      await this.options.persistWatchlist?.(items);
+    } catch (error) {
+      const message = this.errorMessage(error);
+      this.options.logger.host(`watchlist persist failed: ${message}`);
+      return { ok: false, error: message };
+    }
+    if (this.manager !== undefined && this.manager.connected) {
+      try {
+        await this.manager.setWatchlist(items);
+        this.lastAcked = this.manager.acknowledgedWatchlist;
+      } catch (error) {
+        const message = this.errorMessage(error);
+        this.options.logger.host(`watchlist update rejected: ${message}`);
+        return { ok: false, error: message };
+      }
+    }
+    this.emitUi();
+    return { ok: true };
   }
 
   resetAlertBadge(): void {
@@ -213,6 +290,7 @@ export class HostController {
     this.disposed = true;
     this.restartInFlight = false;
     this.clearAlertHold();
+    await this.presentationQueue.catch(() => undefined);
     if (this.actualInternal === "STOPPED" && this.manager === undefined) {
       this.emitUi();
       return;
@@ -331,6 +409,7 @@ export class HostController {
       uvPath: parsed.config.uvPath,
       provider: parsed.config.provider,
       replayPath: parsed.config.replayPath,
+      intelligence: parsed.config.intelligence,
     };
     await this.spawnAndStart(parsed.config.watchlist);
   }
@@ -358,6 +437,7 @@ export class HostController {
       uvPath: spawnSnapshot.uvPath,
       provider: spawnSnapshot.provider,
       replayPath: spawnSnapshot.replayPath,
+      intelligence: spawnSnapshot.intelligence,
       watchlist,
       spawnFn: this.options.spawnFn,
       helloTimeoutMs: this.options.helloTimeoutMs,
@@ -390,7 +470,7 @@ export class HostController {
         if (generation !== this.managerGeneration) {
           return;
         }
-        this.noteAlert(message);
+        this.enqueueAlert(message);
       },
     });
     this.manager = manager;
@@ -410,7 +490,6 @@ export class HostController {
   private async handleUnexpectedDisconnect(): Promise<void> {
     this.manager = undefined;
     this.clearExecutionFeedbackTargets();
-    this.lastMarket = undefined;
     this.lastAlertAt = undefined;
     this.clearAlertHold();
     this.setActual("DISCONNECTED");
@@ -451,6 +530,7 @@ export class HostController {
   private async disposeManager(): Promise<void> {
     this.managerGeneration += 1;
     this.clearExecutionFeedbackTargets();
+    await this.presentationQueue.catch(() => undefined);
     this.lastMarket = undefined;
     const manager = this.manager;
     this.manager = undefined;
@@ -473,11 +553,10 @@ export class HostController {
     }
   }
 
-  private noteAlert(message: AlertMessage): void {
+  private enqueueAlert(message: AlertMessage): void {
     this.unreadAlertCountInternal += message.candidates.length;
     for (const candidate of message.candidates) {
       this.options.logger.host(formatAlertDiagnostic(candidate));
-      this.reportHostInteraction({ action: "alert_presented", signal_id: candidate.id });
       this.rememberFeedbackTarget(candidate.id, `${candidate.symbol} ${candidate.title}`);
     }
     this.lastAlertAt = (this.options.now ?? Date.now)();
@@ -490,6 +569,29 @@ export class HostController {
     }, hold);
     this.options.onAlertEdge?.(message);
     this.emitUi();
+    this.presentationQueue = this.presentationQueue.then(() => this.flushPresented(message));
+  }
+
+  private async flushPresented(message: AlertMessage): Promise<void> {
+    const ipc = this.manager?.ipc;
+    if (ipc === undefined) {
+      return;
+    }
+    for (const candidate of message.candidates) {
+      const created_timestamp = (this.options.now ?? Date.now)() / 1000;
+      try {
+        await ipc.request({
+          type: "host_interaction",
+          action: "alert_presented",
+          signal_id: candidate.id,
+          created_timestamp,
+        });
+      } catch (error) {
+        this.options.logger.host(
+          `host_interaction alert_presented failed: ${this.errorMessage(error)}`,
+        );
+      }
+    }
   }
 
   private clearExecutionFeedbackTargets(): void {

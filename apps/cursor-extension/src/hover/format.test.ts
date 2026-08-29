@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { escapeMarkdown, formatPercent, formatPrice, formatRatio, formatRsi, NA } from "./format";
+import { DASH, escapeMarkdown, formatPercent, formatPrice, formatRatio, formatRsi } from "./format";
 
 describe("hover formatters", () => {
-  it("renders null as N/A", () => {
-    expect(formatPercent(null)).toBe(NA);
-    expect(formatRatio(null)).toBe(NA);
-    expect(formatRsi(null)).toBe(NA);
-    expect(formatPrice(null)).toBe(NA);
+  it("renders missing values as --", () => {
+    expect(formatPercent(null)).toBe(DASH);
+    expect(formatRatio(null)).toBe(DASH);
+    expect(formatRsi(null)).toBe(DASH);
+    expect(formatPrice(null)).toBe(DASH);
   });
 
   it("formats percents like the CLI", () => {

@@ -19,7 +19,7 @@ from market_sentinel.ipc.dto import (
     WireSignal,
     WireSymbolState,
 )
-from market_sentinel.runtime.engine import MarketEngine
+from market_sentinel.runtime.engine import MarketEngine, provider_source_exhausted
 from market_sentinel.runtime.results import EngineTickResult
 
 
@@ -96,6 +96,13 @@ def map_symbol_state(
                 for item in state.active_signals
             )
         ),
+        change_day=None if features is None else features.change_day,
+        above_vwap=None if features is None else features.above_vwap,
+        session_high_obs=None if features is None else features.session_high_obs,
+        session_low_obs=None if features is None else features.session_low_obs,
+        session_high_ref=None if features is None else features.session_high_ref,
+        session_low_ref=None if features is None else features.session_low_ref,
+        market_timestamp=None if latest is None else latest.market_timestamp,
     )
 
 
@@ -114,10 +121,14 @@ def map_engine_state(engine: MarketEngine) -> WireMarketState:
     )
     enabled = engine.watchlist.enabled_symbols()
     feed = engine.health.aggregate_status(enabled) if enabled else FeedStatus.DISCONNECTED
+    timestamps = [item.market_timestamp for item in symbols if item.market_timestamp is not None]
     return WireMarketState(
         watchlist_count=len(items),
         feed_status=feed.value,
         symbols=symbols,
+        intelligence_enabled=engine.intelligence is not None,
+        replay_complete=provider_source_exhausted(engine.provider),
+        last_market_timestamp=max(timestamps) if timestamps else None,
     )
 
 

@@ -31,6 +31,7 @@ function symbol(overrides: Partial<WireSymbolState> = {}): WireSymbolState {
     ema20: null,
     rsi14: 67.4,
     vwap: null,
+    change_day: 0.0128,
     active_signals: [],
     ...overrides,
   };
@@ -48,6 +49,7 @@ function market(overrides: Partial<WireMarketState> = {}): WireMarketState {
         price: 1400,
         change_1m: null,
         change_5m: null,
+        change_day: 0.0128,
         volume_ratio_5m: null,
         rsi14: null,
       }),
@@ -57,38 +59,128 @@ function market(overrides: Partial<WireMarketState> = {}): WireMarketState {
 }
 
 describe("renderHoverMarkdown", () => {
-  it("renders a scannable LIVE hover with details only for HOT/WARM/signal symbols", () => {
-    const text = renderHoverMarkdown(mapHover({ actual: "RUNNING", market: market() }));
+  it("renders a useful hover with no signal as a snapshot, not a diagnostic dump", () => {
+    const text = renderHoverMarkdown(
+      mapHover({
+        actual: "RUNNING",
+        market: market({
+          watchlist_count: 1,
+          symbols: [symbol({ scheduler_level: "COLD", active_signals: [] })],
+        }),
+      }),
+    );
     expect(text).toContain("Market Sentinel");
-    expect(text).toContain("Feed: LIVE");
-    expect(text).toContain("Symbols: 2");
-    expect(text).toContain("HOT: 1");
-    expect(text).toContain("00700.HK  HOT");
-    expect(text).toContain("Price: 602.50");
-    expect(text).toContain("1m: +0.80% | 5m: +1.26%");
-    expect(text).toContain("Vol 5m: 2.63x");
-    expect(text).toContain("[IMPORTANT][UP] price\\_volume");
-    expect(text).toContain("量价同步扩张");
-    expect(text).toContain("RSI14: 67.4");
-    expect(text).toContain("600519.SH  COLD");
-    expect(text).not.toMatch(/600519\.SH[\s\S]*Price:/);
+    expect(text).toContain("连接：正常");
+    expect(text).toContain("行情源：LIVE");
+    expect(text).toContain("AI：关闭");
+    expect(text).toContain("未读提醒：0");
+    expect(text).toContain("00700.HK");
+    expect(text).toContain("价格：602.50");
+    expect(text).toContain("当日：+1.28%");
+    expect(text).toContain("状态：COLD");
+    expect(text).toContain("1m +0.80% | 5m +1.26% | 15m --");
+    expect(text).not.toContain("规则信号");
   });
 
-  it("renders empty-watchlist copy without Feed DISCONNECTED", () => {
+  it("separates rule summary from AI enrichment", () => {
+    const text = renderHoverMarkdown(
+      mapHover({
+        actual: "RUNNING",
+        market: market({
+          intelligence_enabled: true,
+          symbols: [
+            symbol({
+              active_signals: [
+                signal({
+                  intelligence: {
+                    status: "enriched",
+                    summary: "Volume led the move.",
+                    confidence: 0.82,
+                  },
+                }),
+              ],
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(text).toContain("规则信号");
+    expect(text).toContain("量价同步扩张");
+    expect(text).toContain("AI 增强");
+    expect(text).toContain("Volume led the move.");
+    expect(text).toContain("confidence 0.82");
+    expect(text.indexOf("规则信号")).toBeLessThan(text.indexOf("AI 增强"));
+  });
+
+  it("renders queued/running as processing and fallback without raw provider text", () => {
+    const running = renderHoverMarkdown(
+      mapHover({
+        actual: "RUNNING",
+        market: market({
+          intelligence_enabled: true,
+          symbols: [
+            symbol({
+              active_signals: [signal({ intelligence: { status: "running" } })],
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(running).toContain("AI 增强：处理中…");
+    const fallback = renderHoverMarkdown(
+      mapHover({
+        actual: "RUNNING",
+        market: market({
+          intelligence_enabled: true,
+          symbols: [
+            symbol({
+              active_signals: [
+                signal({
+                  intelligence: {
+                    status: "fallback",
+                    fallback_reason: "timeout",
+                    reason: "DashScope 500 body should not appear",
+                  },
+                }),
+              ],
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(fallback).toContain("AI 增强：本次未完成（timeout）");
+    expect(fallback).not.toContain("DashScope");
+  });
+
+  it("groups metrics and separates multiple signals", () => {
+    const text = renderHoverMarkdown(
+      mapHover({
+        actual: "RUNNING",
+        market: market({
+          symbols: [
+            symbol({
+              active_signals: [
+                signal({ id: "a", family: "tape", summary: "first" }),
+                signal({ id: "b", family: "vwap", summary: "second" }),
+              ],
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(text).toContain("---");
+    expect(text).toContain("1m +0.80% | 5m +1.26% | 15m --");
+    expect(text).toContain("1m -- | 5m 2.63x");
+    expect(text.split("1m +0.80%").length).toBe(2);
+  });
+
+  it("renders empty-watchlist copy without Feed DISCONNECTED as the headline", () => {
     const empty = { watchlist_count: 0, feed_status: "DISCONNECTED" as const, symbols: [] };
     const text = renderHoverMarkdown(mapHover({ actual: "RUNNING", market: empty }));
     expect(text).toContain("Market Sentinel");
     expect(text).toContain("No symbols configured");
     expect(text).toContain("Configure marketSentinel.watchlist to start monitoring");
-    expect(text).not.toContain("Feed:");
-    expect(text).not.toContain("DISCONNECTED");
-    expect(text).not.toContain("Symbols:");
-    expect(text).not.toContain("HOT:");
-    expect(
-      renderHoverMarkdown(
-        mapHover({ actual: "RUNNING", enableHoverDetails: false, market: empty }),
-      ),
-    ).toBe("Market Sentinel · No symbols configured");
+    expect(text).not.toContain("行情源：DISCONNECTED");
   });
 
   it("keeps STALE/DISCONNECTED feeds visible at the top", () => {
@@ -96,25 +188,24 @@ describe("renderHoverMarkdown", () => {
       renderHoverMarkdown(
         mapHover({ actual: "RUNNING", market: market({ feed_status: "STALE" }) }),
       ),
-    ).toContain("Feed: STALE");
+    ).toContain("行情源：STALE");
     expect(
       renderHoverMarkdown(
         mapHover({ actual: "RUNNING", market: market({ feed_status: "DISCONNECTED" }) }),
       ),
-    ).toContain("Feed: DISCONNECTED");
+    ).toContain("行情源：DISCONNECTED");
   });
 
-  it("renders lifecycle copy instead of last market prices", () => {
-    const paused = renderHoverMarkdown(
-      mapHover({ actual: "PAUSED", market: market() }),
+  it("renders Replay complete without treating it as a live failure", () => {
+    const text = renderHoverMarkdown(
+      mapHover({
+        actual: "RUNNING",
+        market: market({ replay_complete: true, last_market_timestamp: 1 }),
+      }),
     );
-    expect(paused).toContain("Monitoring paused");
-    expect(paused).not.toContain("Feed:");
-    expect(paused).not.toContain("00700.HK");
-
-    const disconnected = renderHoverMarkdown(mapHover({ actual: "DISCONNECTED" }));
-    expect(disconnected).toContain("Core disconnected");
-    expect(disconnected).toContain("Click the StatusBar to view Output");
+    expect(text).toContain("模式：Replay");
+    expect(text).toContain("状态：已播放完成");
+    expect(text).toContain("602.50");
   });
 
   it("escapes Core text so it cannot become a Markdown link", () => {
@@ -152,8 +243,8 @@ describe("renderHoverMarkdown", () => {
         market: market({ symbols: [symbol({ active_signals: many })] }),
       }),
     );
-    expect(text).toContain("[IMPORTANT][UP] fam1");
-    expect(text).toContain("[IMPORTANT][UP] fam3");
+    expect(text).toContain("fam1");
+    expect(text).toContain("fam3");
     expect(text).not.toContain("fam4");
     expect(text).toContain("+2 more active signals");
   });
@@ -166,8 +257,8 @@ describe("renderHoverMarkdown", () => {
         market: market(),
       }),
     );
-    expect(text).toBe("Market Sentinel · LIVE · symbols=2 · HOT=1 · WARM=0");
-    expect(text).not.toContain("Price:");
+    expect(text).toBe("Market Sentinel · LIVE · symbols=2 · HOT=1 · WARM=0 · AI=关闭");
+    expect(text).not.toContain("价格：");
   });
 
   it("shows unread at the top when count is positive", () => {
@@ -178,49 +269,7 @@ describe("renderHoverMarkdown", () => {
         market: market(),
       }),
     );
-    expect(text).toContain("Unread alerts: 2");
-    expect(text.indexOf("Unread alerts: 2")).toBeLessThan(text.indexOf("Feed: LIVE"));
-  });
-
-  it("shows enrichment under the rule summary and hides fallback noise", () => {
-    const enriched = renderHoverMarkdown(
-      mapHover({
-        actual: "RUNNING",
-        market: market({
-          symbols: [
-            symbol({
-              scheduler_level: "HOT",
-              active_signals: [
-                signal({
-                  intelligence: { status: "enriched", summary: "Volume led the move." },
-                }),
-              ],
-            }),
-          ],
-        }),
-      }),
-    );
-    expect(enriched).toContain("量价同步扩张");
-    expect(enriched).toContain("Volume led the move.");
-    const fallback = renderHoverMarkdown(
-      mapHover({
-        actual: "RUNNING",
-        market: market({
-          symbols: [
-            symbol({
-              scheduler_level: "HOT",
-              active_signals: [
-                signal({
-                  intelligence: { status: "fallback", fallback_reason: "timeout" },
-                }),
-              ],
-            }),
-          ],
-        }),
-      }),
-    );
-    expect(fallback).toContain("量价同步扩张");
-    expect(fallback).not.toContain("timeout");
-    expect(fallback).not.toContain("fallback");
+    expect(text).toContain("未读提醒：2");
+    expect(text.indexOf("未读提醒：2")).toBeLessThan(text.indexOf("00700.HK"));
   });
 });

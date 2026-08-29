@@ -35,6 +35,9 @@ This extension is `extensionKind: ["ui"]` (local Desktop). Remote SSH / Codespac
 - Market Sentinel: Show Output
 - Market Sentinel: Reset Alert Badge
 - Market Sentinel: Signal Feedback (`useful` / `not_useful` / `too_noisy` / `too_late`; no free text)
+- Market Sentinel: Add Symbol
+- Market Sentinel: Remove Symbol
+- Market Sentinel: Manage Watchlist
 
 ## Settings
 
@@ -45,6 +48,10 @@ This extension is `extensionKind: ["ui"]` (local Desktop). Remote SSH / Codespac
 - `marketSentinel.replayPath`
 - `marketSentinel.enableHoverDetails` (default true)
 - `marketSentinel.alertToast` (`off` | `critical`, default `off`)
+- `marketSentinel.intelligence` (`off` | `on` | `inherit`, default `off`; restart Core; no API keys in settings)
+- `marketSentinel.symbolNames` (UI aliases only)
+- `marketSentinel.symbolDisplay` (`name` | `nameAndCode` | `code`)
+- `marketSentinel.statusBarMaxSymbols` (1–3, default 2)
 
 ## Manual smoke
 

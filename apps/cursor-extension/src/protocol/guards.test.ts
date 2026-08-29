@@ -59,6 +59,9 @@ describe("parseCoreMessage", () => {
     if (parsed.ok && parsed.message.type === "state") {
       expect(parsed.message.state.symbols[0]?.change_5m).toBeNull();
       expect(parsed.message.state.symbols[0]?.price).toBe(100);
+      expect(parsed.message.state.symbols[0]?.change_day).toBeNull();
+      expect(parsed.message.state.replay_complete).toBe(false);
+      expect(parsed.message.state.intelligence_enabled).toBe(false);
     }
   });
 
@@ -189,6 +192,40 @@ describe("parseCoreMessage", () => {
       expect(withIntel.message.state.symbols[0]?.active_signals[0]?.intelligence?.summary).toBe(
         "note",
       );
+    }
+  });
+
+  it("accepts additive optional v1 fields without requiring them", () => {
+    const parsed = parseCoreMessage({
+      protocol_version: 1,
+      type: "state",
+      state: {
+        ...validState,
+        intelligence_enabled: true,
+        replay_complete: true,
+        last_market_timestamp: 12.5,
+        extra_ignored: true,
+        symbols: [
+          {
+            ...validState.symbols[0],
+            change_day: 0.0128,
+            above_vwap: false,
+            session_high_obs: 101,
+            session_low_obs: 99,
+            session_high_ref: 100.4,
+            session_low_ref: 100,
+            market_timestamp: 12.5,
+          },
+        ],
+      },
+    });
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok && parsed.message.type === "state") {
+      expect(parsed.message.state.intelligence_enabled).toBe(true);
+      expect(parsed.message.state.replay_complete).toBe(true);
+      expect(parsed.message.state.last_market_timestamp).toBe(12.5);
+      expect(parsed.message.state.symbols[0]?.change_day).toBe(0.0128);
+      expect(parsed.message.state.symbols[0]?.above_vwap).toBe(false);
     }
   });
 });

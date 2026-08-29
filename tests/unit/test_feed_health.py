@@ -104,3 +104,23 @@ def test_wall_clock_skew_does_not_go_negative() -> None:
     )
     assert status is FeedStatus.LIVE
     assert tracker.feed_latency("00700.HK") == 0.0
+
+
+def test_keep_alive_freezes_age_without_logging_error(caplog) -> None:
+    caplog.set_level("WARNING")
+    clock, tracker = _tracker()
+    tracker.observe("00700.HK", _snapshot(market=clock.wall_time(), received=clock.wall_time()))
+    clock.advance_monotonic(10.0)
+    tracker.keep_alive("00700.HK")
+    assert tracker.status("00700.HK") is FeedStatus.LIVE
+    assert tracker.last_update_age("00700.HK") == 0.0
+    clock.advance_monotonic(30.0)
+    tracker.keep_alive("00700.HK")
+    assert tracker.status("00700.HK") is FeedStatus.LIVE
+    assert "provider error" not in caplog.text
+
+
+def test_keep_alive_is_noop_before_first_success() -> None:
+    clock, tracker = _tracker()
+    tracker.keep_alive("00700.HK")
+    assert tracker.status("00700.HK") is FeedStatus.DISCONNECTED

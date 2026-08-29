@@ -11,6 +11,8 @@ export type ActualState =
   | "STOPPED";
 
 export type ProviderName = "fake" | "replay" | "longbridge";
+export type IntelligenceMode = "off" | "on" | "inherit";
+export type SymbolDisplayMode = "name" | "nameAndCode" | "code";
 
 export interface HostConfig {
   coreRoot: string;
@@ -18,6 +20,7 @@ export interface HostConfig {
   watchlist: WatchlistItem[];
   provider: ProviderName;
   replayPath?: string;
+  intelligence: IntelligenceMode;
 }
 
 export interface RawSettings {
@@ -28,6 +31,10 @@ export interface RawSettings {
   replayPath?: string;
   enableHoverDetails?: unknown;
   alertToast?: unknown;
+  intelligence?: unknown;
+  symbolNames?: unknown;
+  symbolDisplay?: unknown;
+  statusBarMaxSymbols?: unknown;
 }
 
 export interface HostLogger {
@@ -36,8 +43,20 @@ export interface HostLogger {
 }
 
 export const HOT_SETTING_KEYS = ["watchlist"] as const;
-export const HOST_UI_SETTING_KEYS = ["enableHoverDetails", "alertToast"] as const;
-export const RESTART_SETTING_KEYS = ["coreRoot", "uvPath", "provider", "replayPath"] as const;
+export const HOST_UI_SETTING_KEYS = [
+  "enableHoverDetails",
+  "alertToast",
+  "symbolNames",
+  "symbolDisplay",
+  "statusBarMaxSymbols",
+] as const;
+export const RESTART_SETTING_KEYS = [
+  "coreRoot",
+  "uvPath",
+  "provider",
+  "replayPath",
+  "intelligence",
+] as const;
 
 export type SettingKey =
   | (typeof HOT_SETTING_KEYS)[number]
@@ -51,6 +70,9 @@ export const HOST_COMMANDS = {
   showOutput: "marketSentinel.showOutput",
   resetAlertBadge: "marketSentinel.resetAlertBadge",
   submitSignalFeedback: "marketSentinel.submitSignalFeedback",
+  addSymbol: "marketSentinel.addSymbol",
+  removeSymbol: "marketSentinel.removeSymbol",
+  manageWatchlist: "marketSentinel.manageWatchlist",
 } as const;
 
 export const EXTENSION_ID = "market-sentinel-local.market-sentinel";

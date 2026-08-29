@@ -1,5 +1,6 @@
 import { isRecord } from "../protocol/guards";
 import type { WatchlistItem } from "../protocol/types";
+import { parseIntelligenceMode } from "./display";
 import type { HostConfig, ProviderName, RawSettings } from "./types";
 
 export class HostConfigError extends Error {
@@ -96,6 +97,7 @@ export function parseHostSettings(
       throw new HostConfigError("marketSentinel.replayPath is required when provider is replay");
     }
     const watchlist = parseWatchlist(raw.watchlist);
+    const intelligence = parseIntelligenceMode(raw.intelligence);
     return {
       ok: true,
       config: {
@@ -103,6 +105,7 @@ export function parseHostSettings(
         uvPath,
         provider,
         watchlist,
+        intelligence,
         ...(replayPath !== undefined ? { replayPath } : {}),
       },
     };

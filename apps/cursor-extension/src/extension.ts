@@ -2,9 +2,9 @@ import * as vscode from "vscode";
 
 import { parseAlertToast, planCriticalToast } from "./alerts/state";
 import { HostController } from "./host/controller";
-import { bindCommands, type FeedbackPrompt } from "./host/session";
+import { bindCommands, type FeedbackPrompt, type WatchlistPrompt } from "./host/session";
 import type { RawSettings } from "./host/types";
-import type { AlertMessage } from "./protocol/types";
+import type { AlertMessage, WatchlistItem } from "./protocol/types";
 import { applyStatusBar } from "./statusbar/adapter";
 
 export interface ExtensionApi {
@@ -24,6 +24,10 @@ function readSettings(): RawSettings {
     replayPath: cfg.get<string>("replayPath"),
     enableHoverDetails: cfg.get<boolean>("enableHoverDetails"),
     alertToast: cfg.get<string>("alertToast"),
+    intelligence: cfg.get<string>("intelligence"),
+    symbolNames: cfg.get("symbolNames"),
+    symbolDisplay: cfg.get<string>("symbolDisplay"),
+    statusBarMaxSymbols: cfg.get<number>("statusBarMaxSymbols"),
   };
 }
 
@@ -40,6 +44,48 @@ export function presentHostAlertToast(message: AlertMessage, alertToast: unknown
   if (plan.show && plan.message !== undefined) {
     void vscode.window.showInformationMessage(plan.message);
   }
+}
+
+function vscodeWatchlistPrompt(): WatchlistPrompt {
+  return {
+    inputSymbol: async () => {
+      const value = await vscode.window.showInputBox({
+        prompt: "输入标的代码，例如 600519.SH",
+        ignoreFocusOut: true,
+      });
+      return value;
+    },
+    pickSymbol: async (items) => {
+      const picked = await vscode.window.showQuickPick(
+        items.map((item) => ({ label: item.label, symbol: item.symbol })),
+        { placeHolder: "选择要移除的标的" },
+      );
+      return picked?.symbol;
+    },
+    pickManageAction: async (count, max) => {
+      const picked = await vscode.window.showQuickPick(
+        [
+          { label: "Add", action: "add" as const },
+          { label: "Remove", action: "remove" as const },
+        ],
+        { placeHolder: `当前 ${count} / ${max}` },
+      );
+      return picked?.action;
+    },
+  };
+}
+
+async function persistWatchlist(items: WatchlistItem[]): Promise<void> {
+  const cfg = vscode.workspace.getConfiguration("marketSentinel");
+  const target =
+    vscode.workspace.workspaceFolders !== undefined && vscode.workspace.workspaceFolders.length > 0
+      ? vscode.ConfigurationTarget.Workspace
+      : vscode.ConfigurationTarget.Global;
+  await cfg.update(
+    "watchlist",
+    items.map((item) => item.symbol),
+    target,
+  );
 }
 
 function vscodeFeedbackPrompt(): FeedbackPrompt {
@@ -77,12 +123,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
     workspaceFolders: () =>
       vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [],
     logger,
+    persistWatchlist,
     onUiSnapshot: (snapshot) => applyStatusBar(statusBar, snapshot.statusBar, snapshot.hover),
     onAlertEdge: (message) => presentHostAlertToast(message, readSettings().alertToast),
   });
   controller = host;
   applyStatusBar(statusBar, host.statusBarModel(), host.hoverModel());
-  const commands = bindCommands(host, { show: () => output.show() }, logger, vscodeFeedbackPrompt());
+  const commands = bindCommands(
+    host,
+    { show: () => output.show() },
+    logger,
+    vscodeFeedbackPrompt(),
+    vscodeWatchlistPrompt(),
+  );
   for (const [id, handler] of Object.entries(commands)) {
     context.subscriptions.push(vscode.commands.registerCommand(id, handler));
   }
@@ -97,6 +150,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
         "replayPath",
         "enableHoverDetails",
         "alertToast",
+        "intelligence",
+        "symbolNames",
+        "symbolDisplay",
+        "statusBarMaxSymbols",
       ].filter((key) => event.affectsConfiguration(`marketSentinel.${key}`));
       if (keys.length > 0) {
         void host.onConfigurationChanged(keys);

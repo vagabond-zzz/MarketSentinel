@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — v0.6.5 UX polish (no version bump)
+
+Host daily-usability polish on `feat/v0.6.5-ux-polish`. Package stays **0.6.0**. Protocol stays **1** (additive optional wire fields only). Market semantics unchanged. **Not merged. Not tagged. Not pushed.**
+
+### Added
+
+- CLI `--intelligence` / `--no-intelligence` (explicit flag > `MARKET_SENTINEL_INTEL_ENABLED` > default off)
+- Cursor settings: `marketSentinel.intelligence` (`off` / `on` / `inherit`, default `off`), `symbolNames`, `symbolDisplay`, `statusBarMaxSymbols`
+- Command Palette: Add Symbol, Remove Symbol, Manage Watchlist (Workspace `marketSentinel.watchlist`; no sync with `data/watchlist.json`)
+- StatusBar quote line with Codicons, no error/warning background, max 2 symbols + overflow
+- Hover sections: connection / feed / AI status, day change, rule vs AI, grouped 1m/5m/15m metrics
+- Replay EOF: `replay_complete` additive field, freeze last MarketState, no missing-quote warnings
+- Additive optional wire fields: `change_day`, session high/low refs, `intelligence_enabled`, `replay_complete`, `last_market_timestamp`
+
+### Fixed
+
+- Host `alert_presented` is flushed before Core teardown so unread count cannot outrun telemetry
+
 ## 0.6.0 — 2026-08-29 (not tagged yet)
 
 **Market Sentinel v0.6.0 — Feedback, Observability & Offline Tuning**

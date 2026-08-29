@@ -26,8 +26,36 @@ describe("bindCommands", () => {
     expect(commands[HOST_COMMANDS.restartCore]).toBeTypeOf("function");
     expect(commands[HOST_COMMANDS.resetAlertBadge]).toBeTypeOf("function");
     expect(commands[HOST_COMMANDS.submitSignalFeedback]).toBeTypeOf("function");
+    expect(commands[HOST_COMMANDS.addSymbol]).toBeTypeOf("function");
+    expect(commands[HOST_COMMANDS.removeSymbol]).toBeTypeOf("function");
+    expect(commands[HOST_COMMANDS.manageWatchlist]).toBeTypeOf("function");
     await commands[HOST_COMMANDS.resetAlertBadge]?.();
     expect(controller.unreadAlertCount).toBe(0);
+  });
+
+  it("adds a symbol from the command prompt and persists watchlist identity", async () => {
+    const persisted: string[][] = [];
+    const controller = new HostController({
+      readSettings: () => ({ watchlist: [] }),
+      workspaceFolders: () => ["D:/repo"],
+      logger: { host: () => undefined, core: () => undefined },
+      persistWatchlist: async (items) => {
+        persisted.push(items.map((item) => item.symbol));
+      },
+    });
+    const commands = bindCommands(
+      controller,
+      { show: () => undefined },
+      { host: () => undefined, core: () => undefined },
+      undefined,
+      {
+        inputSymbol: async () => "600519.SH",
+        pickSymbol: async () => undefined,
+        pickManageAction: async () => undefined,
+      },
+    );
+    await commands[HOST_COMMANDS.addSymbol]?.();
+    expect(persisted).toEqual([["600519.SH"]]);
   });
 
   it("only sends user_feedback after explicit QuickPick choices", async () => {

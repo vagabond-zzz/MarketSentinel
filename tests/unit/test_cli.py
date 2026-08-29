@@ -187,6 +187,68 @@ def test_run_once_starts_and_shuts_down_fake_intelligence(
     assert events[-1] == "shutdown"
 
 
+def test_cli_intelligence_flag_enables_sidecar_when_env_is_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from market_sentinel.intelligence.coordinator import IntelligenceCoordinator
+
+    events: list[str] = []
+    orig_start = IntelligenceCoordinator.start
+    orig_shutdown = IntelligenceCoordinator.shutdown
+
+    async def start(self) -> None:
+        events.append("start")
+        await orig_start(self)
+
+    async def shutdown(self) -> None:
+        events.append("shutdown")
+        await orig_shutdown(self)
+
+    monkeypatch.setattr(IntelligenceCoordinator, "start", start)
+    monkeypatch.setattr(IntelligenceCoordinator, "shutdown", shutdown)
+    monkeypatch.delenv("MARKET_SENTINEL_INTEL_ENABLED", raising=False)
+    monkeypatch.setenv("MARKET_SENTINEL_INTEL_PROVIDER", "fake")
+    path = tmp_path / "watchlist.json"
+    assert main(["--watchlist", str(path), "watchlist", "add", "00700.HK"]) == 0
+    assert main(["--watchlist", str(path), "--intelligence", "run", "--once"]) == 0
+    assert events[:1] == ["start"]
+    assert events[-1] == "shutdown"
+
+
+def test_cli_no_intelligence_overrides_env_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from market_sentinel.intelligence.coordinator import IntelligenceCoordinator
+
+    events: list[str] = []
+
+    async def start(self) -> None:
+        events.append("start")
+
+    monkeypatch.setattr(IntelligenceCoordinator, "start", start)
+    monkeypatch.setenv("MARKET_SENTINEL_INTEL_ENABLED", "1")
+    monkeypatch.setenv("MARKET_SENTINEL_INTEL_PROVIDER", "fake")
+    path = tmp_path / "watchlist.json"
+    assert main(["--watchlist", str(path), "watchlist", "add", "00700.HK"]) == 0
+    assert main(["--watchlist", str(path), "--no-intelligence", "run", "--once"]) == 0
+    assert events == []
+
+
+def test_cli_intelligence_on_missing_key_keeps_core(
+    tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("MARKET_SENTINEL_INTEL_ENABLED", raising=False)
+    monkeypatch.setenv("MARKET_SENTINEL_INTEL_PROVIDER", "dashscope")
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    path = tmp_path / "watchlist.json"
+    assert main(["--watchlist", str(path), "watchlist", "add", "00700.HK"]) == 0
+    capsys.readouterr()
+    assert main(["--watchlist", str(path), "--intelligence", "run", "--once"]) == 0
+    captured = capsys.readouterr()
+    assert "MARKET SENTINEL" in captured.out
+    assert "API key" not in captured.out
+
+
 def test_run_once_verbose_includes_scheduler_transition(tmp_path: Path, capsys) -> None:
     path = tmp_path / "watchlist.json"
     assert main(["--watchlist", str(path), "watchlist", "add", "00700.HK"]) == 0

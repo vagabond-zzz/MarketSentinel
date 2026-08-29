@@ -225,3 +225,59 @@ async def test_duplicate_timestamp_does_not_repeat_alert_edge(tmp_path: Path) ->
     assert latest is not None
     assert latest.market_timestamp == move_ts
     assert latest.price == 100.8
+
+
+async def test_replay_eof_does_not_treat_exhaustion_as_missing_quote(
+    tmp_path: Path, caplog
+) -> None:
+    from market_sentinel.ipc.mapping import map_engine_state
+    from market_sentinel.providers.replay import ReplayProvider
+
+    caplog.set_level("WARNING")
+    fixture = Path(__file__).resolve().parents[1] / "fixtures" / "replay_quotes.jsonl"
+    clock = FakeClock(wall=1_700_000_200.0, monotonic=0.0)
+    watchlist = Watchlist(tmp_path / "watchlist.json")
+    watchlist.add("00700.HK")
+    provider = ReplayProvider(fixture, clock)
+    engine = MarketEngine(
+        clock=clock,
+        watchlist=watchlist,
+        provider=provider,
+        scheduler=AdaptiveScheduler(clock),
+        buffers=SymbolBuffers(),
+        states=MarketStateStore(),
+        health=FeedHealthTracker(clock),
+    )
+    await engine.tick()
+    clock.advance_monotonic(10.0)
+    await engine.tick()
+    live = engine.states.get("00700.HK")
+    assert live is not None
+    assert live.latest is not None
+    price = live.latest.price
+    level = live.level
+    clock.advance_monotonic(30.0)
+    await engine.tick()
+    after = engine.states.get("00700.HK")
+    assert after is not None
+    assert after.latest is not None
+    assert after.latest.price == price
+    assert after.level is level
+    assert engine.health.status("00700.HK") is not FeedStatus.STALE
+    assert engine.health.status("00700.HK") is not FeedStatus.DISCONNECTED
+    assert "missing quote" not in caplog.text
+    wire = map_engine_state(engine).to_wire()
+    assert wire.get("replay_complete") is True
+
+
+async def test_live_missing_quote_still_observes_provider_error(tmp_path: Path, caplog) -> None:
+    caplog.set_level("WARNING")
+    clock, provider, engine = _engine(tmp_path)
+    engine.watchlist.add("600519.SH")
+    provider.set_quote("600519.SH", price=100.0, market_timestamp=clock.wall_time() - 0.2)
+    await engine.tick()
+    clock.advance(10.0)
+    provider.fail_symbol("600519.SH")
+    await engine.tick()
+    assert "missing quote" in caplog.text
+    assert engine.health.status("600519.SH") is not FeedStatus.DISCONNECTED

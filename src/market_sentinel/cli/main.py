@@ -81,6 +81,21 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--replay", type=Path, default=None, help="JSONL fixture for replay provider"
     )
+    intel = parser.add_mutually_exclusive_group()
+    intel.add_argument(
+        "--intelligence",
+        dest="intelligence",
+        action="store_const",
+        const="on",
+        help="enable optional intelligence sidecar (overrides MARKET_SENTINEL_INTEL_ENABLED)",
+    )
+    intel.add_argument(
+        "--no-intelligence",
+        dest="intelligence",
+        action="store_const",
+        const="off",
+        help="disable optional intelligence sidecar (overrides MARKET_SENTINEL_INTEL_ENABLED)",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="run diagnostics")
     run.add_argument("--once", action="store_true", help="run a single tick and exit")
@@ -209,6 +224,15 @@ async def _handle_tuning_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def _intelligence_override(args: argparse.Namespace) -> bool | None:
+    flag = getattr(args, "intelligence", None)
+    if flag == "on":
+        return True
+    if flag == "off":
+        return False
+    return None
+
+
 def _parse_corpus(raw: str) -> tuple[str, ...]:
     if raw.strip() == "" or raw.strip() == "default":
         return DEFAULT_CORPUS
@@ -261,7 +285,11 @@ async def _handle_daemon(args: argparse.Namespace) -> int:
         print(str(exc), file=sys.stderr)
         return 2
     telemetry = jsonl_telemetry_runtime(clock)
-    intelligence = optional_intelligence(clock, telemetry=telemetry)
+    intelligence = optional_intelligence(
+        clock,
+        telemetry=telemetry,
+        enabled=_intelligence_override(args),
+    )
     engine = MarketEngine(
         clock=clock,
         watchlist=Watchlist(persist=False),
@@ -289,7 +317,11 @@ async def _handle_run(watchlist: Watchlist, args: argparse.Namespace) -> int:
         print(str(exc), file=sys.stderr)
         return 2
     telemetry = jsonl_telemetry_runtime(clock)
-    intelligence = optional_intelligence(clock, telemetry=telemetry)
+    intelligence = optional_intelligence(
+        clock,
+        telemetry=telemetry,
+        enabled=_intelligence_override(args),
+    )
     engine = MarketEngine(
         clock=clock,
         watchlist=watchlist,

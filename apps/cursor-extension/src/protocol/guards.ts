@@ -80,6 +80,45 @@ function readNumberOrNull(
   return value;
 }
 
+function readOptionalNumberOrNull(
+  record: Record<string, unknown>,
+  key: string,
+): number | null | string {
+  if (!(key in record) || record[key] === undefined) {
+    return null;
+  }
+  return readNumberOrNull(record, key);
+}
+
+function readOptionalBool(
+  record: Record<string, unknown>,
+  key: string,
+): boolean | string {
+  if (!(key in record) || record[key] === undefined) {
+    return false;
+  }
+  if (typeof record[key] !== "boolean") {
+    return `${key} must be a boolean`;
+  }
+  return record[key];
+}
+
+function readOptionalBoolOrNull(
+  record: Record<string, unknown>,
+  key: string,
+): boolean | null | string {
+  if (!(key in record) || record[key] === undefined) {
+    return null;
+  }
+  if (record[key] === null) {
+    return null;
+  }
+  if (typeof record[key] !== "boolean") {
+    return `${key} must be boolean or null`;
+  }
+  return record[key];
+}
+
 function isString(value: unknown): value is string {
   return typeof value === "string";
 }
@@ -193,6 +232,13 @@ function parseSymbolState(value: unknown): WireSymbolState | string {
   const ema20 = readNumberOrNull(value, "ema20");
   const rsi14 = readNumberOrNull(value, "rsi14");
   const vwap = readNumberOrNull(value, "vwap");
+  const change_day = readOptionalNumberOrNull(value, "change_day");
+  const session_high_obs = readOptionalNumberOrNull(value, "session_high_obs");
+  const session_low_obs = readOptionalNumberOrNull(value, "session_low_obs");
+  const session_high_ref = readOptionalNumberOrNull(value, "session_high_ref");
+  const session_low_ref = readOptionalNumberOrNull(value, "session_low_ref");
+  const market_timestamp = readOptionalNumberOrNull(value, "market_timestamp");
+  const above_vwap = readOptionalBoolOrNull(value, "above_vwap");
   if (typeof price === "string") return price;
   if (typeof change_1m === "string") return change_1m;
   if (typeof change_5m === "string") return change_5m;
@@ -203,6 +249,13 @@ function parseSymbolState(value: unknown): WireSymbolState | string {
   if (typeof ema20 === "string") return ema20;
   if (typeof rsi14 === "string") return rsi14;
   if (typeof vwap === "string") return vwap;
+  if (typeof change_day === "string") return change_day;
+  if (typeof session_high_obs === "string") return session_high_obs;
+  if (typeof session_low_obs === "string") return session_low_obs;
+  if (typeof session_high_ref === "string") return session_high_ref;
+  if (typeof session_low_ref === "string") return session_low_ref;
+  if (typeof market_timestamp === "string") return market_timestamp;
+  if (typeof above_vwap === "string") return above_vwap;
   if (!Array.isArray(value.active_signals)) {
     return "active_signals must be an array";
   }
@@ -229,6 +282,13 @@ function parseSymbolState(value: unknown): WireSymbolState | string {
     rsi14,
     vwap,
     active_signals,
+    change_day,
+    above_vwap,
+    session_high_obs,
+    session_low_obs,
+    session_high_ref,
+    session_low_ref,
+    market_timestamp,
   };
 }
 
@@ -253,10 +313,25 @@ function parseMarketState(value: unknown): WireMarketState | string {
     }
     symbols.push(parsed);
   }
+  const intelligence_enabled = readOptionalBool(value, "intelligence_enabled");
+  const replay_complete = readOptionalBool(value, "replay_complete");
+  const last_market_timestamp = readOptionalNumberOrNull(value, "last_market_timestamp");
+  if (typeof intelligence_enabled === "string") {
+    return intelligence_enabled;
+  }
+  if (typeof replay_complete === "string") {
+    return replay_complete;
+  }
+  if (typeof last_market_timestamp === "string") {
+    return last_market_timestamp;
+  }
   return {
     watchlist_count: value.watchlist_count,
     feed_status: value.feed_status,
     symbols,
+    intelligence_enabled,
+    replay_complete,
+    last_market_timestamp,
   };
 }
 

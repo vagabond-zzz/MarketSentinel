@@ -68,9 +68,16 @@ class WireSymbolState:
     rsi14: float | None
     vwap: float | None
     active_signals: tuple[WireSignal, ...]
+    change_day: float | None = None
+    above_vwap: bool | None = None
+    session_high_obs: float | None = None
+    session_low_obs: float | None = None
+    session_high_ref: float | None = None
+    session_low_ref: float | None = None
+    market_timestamp: float | None = None
 
     def to_wire(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "symbol": self.symbol,
             "price": self.price,
             "scheduler_level": self.scheduler_level,
@@ -86,6 +93,21 @@ class WireSymbolState:
             "vwap": self.vwap,
             "active_signals": [item.to_wire() for item in self.active_signals],
         }
+        if self.change_day is not None:
+            payload["change_day"] = self.change_day
+        if self.above_vwap is not None:
+            payload["above_vwap"] = self.above_vwap
+        if self.session_high_obs is not None:
+            payload["session_high_obs"] = self.session_high_obs
+        if self.session_low_obs is not None:
+            payload["session_low_obs"] = self.session_low_obs
+        if self.session_high_ref is not None:
+            payload["session_high_ref"] = self.session_high_ref
+        if self.session_low_ref is not None:
+            payload["session_low_ref"] = self.session_low_ref
+        if self.market_timestamp is not None:
+            payload["market_timestamp"] = self.market_timestamp
+        return payload
 
 
 @dataclass(frozen=True)
@@ -93,13 +115,23 @@ class WireMarketState:
     watchlist_count: int
     feed_status: str
     symbols: tuple[WireSymbolState, ...]
+    intelligence_enabled: bool = False
+    replay_complete: bool = False
+    last_market_timestamp: float | None = None
 
     def to_wire(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "watchlist_count": self.watchlist_count,
             "feed_status": self.feed_status,
             "symbols": [item.to_wire() for item in self.symbols],
         }
+        if self.intelligence_enabled:
+            payload["intelligence_enabled"] = True
+        if self.replay_complete:
+            payload["replay_complete"] = True
+        if self.last_market_timestamp is not None:
+            payload["last_market_timestamp"] = self.last_market_timestamp
+        return payload
 
 
 @dataclass(frozen=True)

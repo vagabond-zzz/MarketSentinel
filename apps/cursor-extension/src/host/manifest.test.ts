@@ -24,8 +24,11 @@ describe("extension manifest", () => {
       "marketSentinel.showOutput",
       "marketSentinel.resetAlertBadge",
       "marketSentinel.submitSignalFeedback",
+      "marketSentinel.addSymbol",
+      "marketSentinel.removeSymbol",
+      "marketSentinel.manageWatchlist",
     ]);
-    expect(JSON.stringify(pkg.contributes)).not.toContain("statusBar");
+    expect(pkg.contributes).not.toHaveProperty("statusBar");
     expect(pkg.activationEvents).toEqual(["onStartupFinished"]);
   });
 
@@ -40,6 +43,23 @@ describe("extension manifest", () => {
     );
     expect(properties["marketSentinel.alertToast"]).toEqual(
       expect.objectContaining({ type: "string", default: "off", enum: ["off", "critical"] }),
+    );
+    expect(properties["marketSentinel.intelligence"]).toEqual(
+      expect.objectContaining({
+        type: "string",
+        default: "off",
+        enum: ["off", "on", "inherit"],
+      }),
+    );
+    expect(properties["marketSentinel.symbolDisplay"]).toEqual(
+      expect.objectContaining({
+        type: "string",
+        default: "nameAndCode",
+        enum: ["name", "nameAndCode", "code"],
+      }),
+    );
+    expect(properties["marketSentinel.statusBarMaxSymbols"]).toEqual(
+      expect.objectContaining({ type: "number", default: 2 }),
     );
     expect(properties["marketSentinel.provider"]).toEqual(
       expect.objectContaining({

@@ -69,12 +69,22 @@ export interface WireSymbolState {
   rsi14: number | null;
   vwap: number | null;
   active_signals: WireSignal[];
+  change_day?: number | null;
+  above_vwap?: boolean | null;
+  session_high_obs?: number | null;
+  session_low_obs?: number | null;
+  session_high_ref?: number | null;
+  session_low_ref?: number | null;
+  market_timestamp?: number | null;
 }
 
 export interface WireMarketState {
   watchlist_count: number;
   feed_status: FeedStatus;
   symbols: WireSymbolState[];
+  intelligence_enabled?: boolean;
+  replay_complete?: boolean;
+  last_market_timestamp?: number | null;
 }
 
 export interface WireAlertCandidate {

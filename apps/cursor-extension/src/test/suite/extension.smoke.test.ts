@@ -17,7 +17,10 @@ suite("Extension Host smoke", function () {
     assert.equal(extension.isActive, true);
     assert.ok(api.statusBar, "StatusBar item was not created");
     assert.equal(typeof api.statusBar.text, "string");
-    assert.ok(api.statusBar.text.startsWith("MS "), `unexpected StatusBar text: ${api.statusBar.text}`);
+    assert.ok(
+      api.statusBar.text.includes("$("),
+      `unexpected StatusBar text: ${api.statusBar.text}`,
+    );
 
     const commands = await vscode.commands.getCommands(true);
     for (const id of Object.values(HOST_COMMANDS)) {

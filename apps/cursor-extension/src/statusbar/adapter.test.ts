@@ -23,6 +23,7 @@ function symbol(overrides: Partial<WireSymbolState> = {}): WireSymbolState {
     ema20: null,
     rsi14: 67.4,
     vwap: null,
+    change_day: 0.0128,
     active_signals: [],
     ...overrides,
   };
@@ -52,48 +53,36 @@ function apply(kindInput: Parameters<typeof mapStatusBar>[0], hoverActual = kind
 }
 
 describe("StatusBarItem adapter", () => {
-  it("applies DISCONNECTED, STARTING, IDLE, NORMAL, WARM, HOT, STALE, and PAUSED without throwing", () => {
-    expect(apply({ ...running, actual: "DISCONNECTED" }).status.kind).toBe("DISCONNECTED");
-    expect(vscodeState.statusBar.text).toBe("MS DISCONNECTED");
+  it("never applies error or warning StatusBar backgrounds", () => {
+    apply({ ...running, actual: "DISCONNECTED" });
+    expect(vscodeState.statusBar.backgroundColor).toBeUndefined();
+    apply({
+      ...running,
+      market: market({ feed_status: "STALE", symbols: [symbol({ feed_status: "STALE" })] }),
+    });
+    expect(vscodeState.statusBar.backgroundColor).toBeUndefined();
+    apply({
+      ...running,
+      market: market({ symbols: [symbol({ scheduler_level: "HOT" })] }),
+      lastAlertAt: 1_000,
+      unreadAlertCount: 2,
+    });
+    expect(vscodeState.statusBar.backgroundColor).toBeUndefined();
+    expect(vscodeState.statusBar.command).toBe(HOST_COMMANDS.showOutput);
+    expect(vscodeState.statusBar.shown).toBe(true);
+  });
+
+  it("applies quote text and Codicon status without MS KIND as the main content", () => {
+    expect(apply({ ...running, actual: "DISCONNECTED" }).status.text).toContain("$(error)");
     expect(apply({ ...running, actual: "STARTING" }).status.kind).toBe("STARTING");
     const idle = apply({
       ...running,
       market: { watchlist_count: 0, feed_status: "DISCONNECTED", symbols: [] },
     });
     expect(idle.status.kind).toBe("IDLE");
-    expect(idle.status.tone).toBe("default");
-    expect(vscodeState.statusBar.text).toBe("MS IDLE");
-    expect(vscodeState.statusBar.backgroundColor).toBeUndefined();
-    expect(apply({ ...running, market: market() }).status.kind).toBe("NORMAL");
-    expect(
-      apply({
-        ...running,
-        market: market({ symbols: [symbol({ scheduler_level: "WARM" })] }),
-      }).status.kind,
-    ).toBe("WARM");
-    expect(
-      apply({
-        ...running,
-        market: market({ symbols: [symbol({ scheduler_level: "HOT" })] }),
-      }).status.kind,
-    ).toBe("HOT");
-    expect(
-      apply({
-        ...running,
-        market: market({ feed_status: "STALE", symbols: [symbol({ feed_status: "STALE" })] }),
-      }).status.kind,
-    ).toBe("STALE");
-    expect(vscodeState.statusBar.backgroundColor?.id).toBe("statusBarItem.errorBackground");
-    expect(
-      apply({
-        ...running,
-        actual: "PAUSED",
-        desired: "PAUSED",
-        market: market({ symbols: [symbol({ scheduler_level: "HOT" })] }),
-      }).status.kind,
-    ).toBe("PAUSED");
-    expect(vscodeState.statusBar.command).toBe(HOST_COMMANDS.showOutput);
-    expect(vscodeState.statusBar.shown).toBe(true);
+    expect(vscodeState.statusBar.text).toContain("无标的");
+    expect(apply({ ...running, market: market() }).status.text).toContain("602.50");
+    expect(apply({ ...running, market: market() }).status.text).not.toContain("MS NORMAL");
   });
 
   it("shows unread badge for an alert edge and keeps Markdown untrusted", () => {
@@ -104,7 +93,8 @@ describe("StatusBarItem adapter", () => {
       unreadAlertCount: 2,
     });
     expect(status.kind).toBe("ALERT");
-    expect(vscodeState.statusBar.text).toBe("MS ALERT · 2");
+    expect(vscodeState.statusBar.text).toContain("$(bell)");
+    expect(vscodeState.statusBar.text).toContain("· 2");
     expect(vscodeState.statusBar.tooltip).toBeInstanceOf(MarkdownString);
     expect((vscodeState.statusBar.tooltip as MarkdownString).isTrusted).toBe(false);
   });
@@ -129,10 +119,10 @@ describe("StatusBarItem adapter", () => {
     });
     const { status, hover } = apply({ ...running, market: snapshot, unreadAlertCount: 0 });
     expect(status.kind).toBe("HOT");
-    expect(status.text).toBe("MS HOT");
     expect(hover.unreadAlertCount).toBe(0);
     const tooltip = vscodeState.statusBar.tooltip as MarkdownString;
     expect(tooltip.value).toContain("量价同步扩张");
-    expect(tooltip.value).not.toContain("Unread alerts:");
+    expect(tooltip.value).toContain("规则信号");
+    expect(tooltip.value).not.toContain("未读提醒：1");
   });
 });

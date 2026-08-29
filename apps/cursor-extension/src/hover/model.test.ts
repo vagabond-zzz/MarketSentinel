@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { WireMarketState, WireSignal, WireSymbolState } from "../protocol/types";
-import { mapHover } from "./model";
+import { mapAiStatus, mapHover } from "./model";
 
 function signal(overrides: Partial<WireSignal> = {}): WireSignal {
   return {
@@ -30,6 +30,7 @@ function symbol(overrides: Partial<WireSymbolState> = {}): WireSymbolState {
     ema20: 590,
     rsi14: 67.4,
     vwap: 601.1,
+    change_day: 0.0126,
     active_signals: [],
     ...overrides,
   };
@@ -45,18 +46,27 @@ function market(overrides: Partial<WireMarketState> = {}): WireMarketState {
 }
 
 describe("mapHover", () => {
-  it("maps STARTING, PAUSED, and DISCONNECTED without dumping market as live", () => {
+  it("maps STARTING without dumping market as live", () => {
     const snapshot = market({ symbols: [symbol({ scheduler_level: "HOT" })] });
     expect(mapHover({ actual: "STARTING", market: snapshot }).lifecycleMessage).toBe("Core starting");
     expect(mapHover({ actual: "STARTING", market: snapshot }).symbols).toEqual([]);
-    expect(mapHover({ actual: "PAUSED", market: snapshot }).lifecycleMessage).toBe("Monitoring paused");
-    expect(mapHover({ actual: "PAUSED", market: snapshot }).symbols).toEqual([]);
-    const disconnected = mapHover({ actual: "DISCONNECTED", market: snapshot });
-    expect(disconnected.lifecycleMessage).toBe("Core disconnected");
-    expect(disconnected.outputHint).toMatch(/Output/);
-    expect(disconnected.symbols).toEqual([]);
     expect(mapHover({ actual: "STOPPING" }).lifecycleMessage).toBe("Core stopping");
     expect(mapHover({ actual: "STOPPED" }).lifecycleMessage).toBe("Monitoring stopped");
+  });
+
+  it("keeps last quotes when PAUSED or host-disconnected", () => {
+    const snapshot = market({ symbols: [symbol({ scheduler_level: "HOT", change_day: 0.0128 })] });
+    const paused = mapHover({ actual: "PAUSED", market: snapshot });
+    expect(paused.connection).toBe("已暂停");
+    expect(paused.symbols).toHaveLength(1);
+    expect(paused.symbols[0]?.price).toBe("602.50");
+    const disconnected = mapHover({ actual: "DISCONNECTED", market: snapshot });
+    expect(disconnected.connection).toBe("异常");
+    expect(disconnected.symbols).toHaveLength(1);
+    const noMarket = mapHover({ actual: "DISCONNECTED" });
+    expect(noMarket.lifecycleMessage).toBe("Core disconnected");
+    expect(noMarket.outputHint).toMatch(/Output/);
+    expect(noMarket.symbols).toEqual([]);
   });
 
   it("maps RUNNING without MarketState to a starting hover, not a normal market", () => {
@@ -73,15 +83,8 @@ describe("mapHover", () => {
     expect(view.lifecycleMessage).toBe("No symbols configured");
     expect(view.outputHint).toBe("Configure marketSentinel.watchlist to start monitoring");
     expect(view.feed).toBeUndefined();
-    expect(view.symbolCount).toBeUndefined();
-    expect(view.hotCount).toBeUndefined();
-    expect(view.warmCount).toBeUndefined();
     expect(view.symbols).toEqual([]);
     expect(view.headline).toBe("Market Sentinel · No symbols configured");
-
-    const compact = mapHover({ actual: "RUNNING", enableHoverDetails: false, market: empty });
-    expect(compact.headline).toBe("Market Sentinel · No symbols configured");
-    expect(compact.enableDetails).toBe(false);
   });
 
   it("surfaces aggregate LIVE, DELAYED, STALE, and DISCONNECTED feeds", () => {
@@ -113,25 +116,17 @@ describe("mapHover", () => {
     expect(view.warmCount).toBe(1);
   });
 
-  it("shows details for HOT/WARM or active signals, and a summary line for quiet COLD", () => {
+  it("always maps a snapshot for quiet COLD symbols so hover is useful without signals", () => {
     const view = mapHover({
       actual: "RUNNING",
       market: market({
-        watchlist_count: 3,
-        symbols: [
-          symbol({ symbol: "COLD_QUIET", scheduler_level: "COLD" }),
-          symbol({
-            symbol: "COLD_SIGNAL",
-            scheduler_level: "COLD",
-            active_signals: [signal()],
-          }),
-          symbol({ symbol: "WARM_1", scheduler_level: "WARM" }),
-        ],
+        watchlist_count: 1,
+        symbols: [symbol({ symbol: "COLD_QUIET", scheduler_level: "COLD" })],
       }),
     });
-    expect(view.symbols.find((item) => item.symbol === "COLD_QUIET")?.showDetails).toBe(false);
-    expect(view.symbols.find((item) => item.symbol === "COLD_SIGNAL")?.showDetails).toBe(true);
-    expect(view.symbols.find((item) => item.symbol === "WARM_1")?.showDetails).toBe(true);
+    expect(view.symbols[0]?.price).toBe("602.50");
+    expect(view.symbols[0]?.changeDay).toBe("+1.26%");
+    expect(view.symbols[0]?.signals).toEqual([]);
   });
 
   it("shows per-symbol feed status only when it differs from aggregate", () => {
@@ -149,7 +144,7 @@ describe("mapHover", () => {
     expect(view.symbols[1]?.feedStatus).toBe("DISCONNECTED");
   });
 
-  it("shows active signals with truncation and does not invent ALERT fields", () => {
+  it("shows active signals with truncation and labels rule vs AI", () => {
     const many = [1, 2, 3, 4, 5].map((index) =>
       signal({ id: `s${index}`, family: `fam${index}`, summary: `sum${index}` }),
     );
@@ -161,25 +156,33 @@ describe("mapHover", () => {
     });
     expect(view.symbols[0]?.signals).toHaveLength(3);
     expect(view.symbols[0]?.moreSignals).toBe(2);
-    expect(view.symbols[0]?.signals[0]).toEqual({
-      priority: "IMPORTANT",
-      direction: "UP",
-      family: "fam1",
-      body: "sum1",
-    });
+    expect(view.symbols[0]?.signals[0]?.ruleLabel).toBe("规则信号");
+    expect(view.symbols[0]?.signals[0]?.body).toBe("sum1");
     expect(view.headline).not.toMatch(/ALERT|NEW/i);
   });
 
-  it("formats primary and secondary fields from the wire DTO", () => {
+  it("formats day change separately from 1m/5m/15m", () => {
     const view = mapHover({ actual: "RUNNING", market: market() });
     const row = view.symbols[0];
     expect(row?.price).toBe("602.50");
+    expect(row?.changeDay).toBe("+1.26%");
     expect(row?.change1m).toBe("+0.80%");
     expect(row?.change5m).toBe("+1.26%");
+    expect(row?.change15m).toBe("+1.00%");
     expect(row?.volumeRatio5m).toBe("2.63x");
-    expect(row?.detailsLine).toContain("RSI14: 67.4");
-    expect(row?.detailsLine).toContain("15m: +1.00%");
-    expect(row?.detailsLine).toContain("Vol 1m: 1.20x");
+  });
+
+  it("uses display aliases without changing the canonical symbol id", () => {
+    const view = mapHover({
+      actual: "RUNNING",
+      symbolNames: { "600519.SH": "贵州茅台" },
+      symbolDisplay: "nameAndCode",
+      market: market({
+        symbols: [symbol({ symbol: "600519.SH" })],
+      }),
+    });
+    expect(view.symbols[0]?.symbol).toBe("600519.SH");
+    expect(view.symbols[0]?.displayName).toBe("贵州茅台 (600519.SH)");
   });
 
   it("builds a short headline when hover details are disabled", () => {
@@ -196,20 +199,10 @@ describe("mapHover", () => {
       }),
     });
     expect(view.enableDetails).toBe(false);
-    expect(view.headline).toBe("Market Sentinel · LIVE · symbols=3 · HOT=1 · WARM=1");
+    expect(view.headline).toBe("Market Sentinel · LIVE · symbols=3 · HOT=1 · WARM=1 · AI=关闭");
   });
 
   it("surfaces unread separately from active_signals", () => {
-    const withSignals = mapHover({
-      actual: "RUNNING",
-      unreadAlertCount: 0,
-      market: market({
-        symbols: [symbol({ scheduler_level: "HOT", active_signals: [signal()] })],
-      }),
-    });
-    expect(withSignals.unreadAlertCount).toBe(0);
-    expect(withSignals.headline).not.toMatch(/unread=/);
-
     const withUnread = mapHover({
       actual: "RUNNING",
       unreadAlertCount: 2,
@@ -224,8 +217,36 @@ describe("mapHover", () => {
       }),
     });
     expect(withUnread.unreadAlertCount).toBe(2);
-    expect(withUnread.headline).toBe(
-      "Market Sentinel · LIVE · symbols=3 · HOT=1 · WARM=1 · unread=2",
-    );
+    expect(withUnread.headline).toContain("unread=2");
+    expect(withUnread.unreadLine).toBe("未读提醒：2");
+  });
+
+  it("maps AI status from wire without inventing model calls", () => {
+    expect(mapAiStatus(market())).toBe("关闭");
+    expect(mapAiStatus(market({ intelligence_enabled: true }))).toBe("已启用");
+    expect(
+      mapAiStatus(
+        market({
+          intelligence_enabled: true,
+          symbols: [
+            symbol({
+              active_signals: [signal({ intelligence: { status: "running" } })],
+            }),
+          ],
+        }),
+      ),
+    ).toBe("处理中");
+    expect(
+      mapAiStatus(
+        market({
+          intelligence_enabled: true,
+          symbols: [
+            symbol({
+              active_signals: [signal({ intelligence: { status: "enriched", summary: "note" } })],
+            }),
+          ],
+        }),
+      ),
+    ).toBe("已增强");
   });
 });

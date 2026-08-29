@@ -20,6 +20,7 @@ export interface ProcessManagerOptions {
   uvPath?: string;
   coreRoot: string;
   provider?: "fake" | "replay" | "longbridge";
+  intelligence?: "off" | "on" | "inherit";
   replayPath?: string;
   watchlist?: WatchlistItem[];
   spawnFn?: SpawnFn;
@@ -117,6 +118,11 @@ export class ProcessManager {
         throw new Error("--replay path is required for replay provider");
       }
       args.push("--replay", this.options.replayPath);
+    }
+    if (this.options.intelligence === "on") {
+      args.push("--intelligence");
+    } else if (this.options.intelligence === "off") {
+      args.push("--no-intelligence");
     }
     args.push("daemon");
     return { command, args };
