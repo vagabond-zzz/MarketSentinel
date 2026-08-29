@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.6.0 — 2026-08-29 (not tagged yet)
+
+**Market Sentinel v0.6.0 — Feedback, Observability & Offline Tuning**
+
+Package versions are **0.6.0**. Protocol stays **1** (`host_interaction` / `user_feedback` are v1 additive). Tuning artifact schema is **2**. Tuning comparison schema is **2**. These are independent version spaces. **Not merged. Not tagged. Not pushed.**
+
+v0.6 does **not** automatically optimize trading parameters, rewrite production config, or collect workspace/conversation content.
+
+### Added
+
+- Deterministic telemetry contract: opaque `run_id`, `market_timestamp` vs `created_timestamp`, pipeline / Host interaction / Intelligence events, strict privacy allowlist
+- Local-first append-only `telemetry.jsonl` (rotation, corruption-safe reader, data-quality warnings). Not Protocol stdout
+- Read-only `EvaluationReport`: funnel, noise, repeated episodes, A-share market-hour semantics, per-run / per-market-date, Intelligence metrics, explicit-feedback metrics, corruption/data-quality warnings
+- Optional explicit signal feedback only: `useful` / `not_useful` / `too_noisy` / `too_late`. Append-only `feedback.jsonl`. Correlation `(run_id, signal_id)`. No free text
+- Offline tuning snapshots (immutable schema-v2) and baseline/candidate Replay comparison. CLI is `snapshot` / `compare` / `report` only
+
+### Safety / boundaries
+
+- No online self-modification. No `apply` / `promote` / `activate` / `deploy`
+- A candidate tuning snapshot is not active production config. Normal runtime does not scan or load `tuning/`
+- Supported offline parameters are only the seven with Consumed + Observable + Sensitivity proof: `cluster_lookback_s`, `hot_event_severity`, `hot_volume_ratio_5m`, `hot_change_5m`, `warm_change_1m`, `warm_change_5m`, `warm_volume_ratio`
+- Deferred (cannot enter a candidate): cooldown/dwell, Intelligence Router / call budget, live scheduler polling intervals, Event thresholds/TTL, and other parameters not injected into Offline Replay
+- No trading advice. No workspace / conversation / source / prompt / API-key collection. Signal title/summary are not stored in telemetry or feedback
+- Draft tuning artifact schema 1 was never a released v0.6 artifact; load fail-closes; no migration
+- Old Protocol v1 clients that omit `host_interaction` / `user_feedback` keep the previous path. New local files do not change MarketState / Event / Signal wire semantics
+
+### Limitations
+
+- A-share `.SH`/`.SZ` market-hour metric; weekends excluded; no full exchange holiday calendar; HK market-hour is unavailable rather than an A-share window
+- Host `signal_opened` / `alert_dismissed` / `signal_muted` producers are unimplemented (rates unavailable, not 0%)
+- JSONL writes stay synchronous (`write` → `flush` → `stat` → possible rotate)
+- `ClusterMembershipTracker` retains clustered event ids for the run (theoretically unbounded within a run)
+- Tuning Replay is monotonic-frozen, so cooldown/dwell stay deferred. Comparator does not attach Intelligence. Event module-global thresholds/TTL stay deferred
+- Explicit feedback samples have self-selection bias. Trusted local Protocol may store structurally valid unknown `signal_id`; tuning datasets join telemetry and drop orphans
+
+## Development lineage — v0.6 M0–M5 (logged while package was still 0.5.0)
+
+Historical milestone notes below are unchanged. They describe work landed before the 0.6.0 version bump.
+
 ## Unreleased — v0.6 M5 review fixes (no version bump)
 
 Evidence-driven `supported` parameters after external M5 review. Package **0.5.0**. Protocol **1**. No M6.

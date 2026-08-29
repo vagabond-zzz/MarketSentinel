@@ -2,7 +2,7 @@
 
 Low-latency market monitoring core for developer hosts (Cursor, DeepSeek Harness, ZCode).
 
-**Package version: 0.5.0.** Protocol v1. Last git tag remains `v0.3.0` until merge/tag approval. **v0.4.0 was never released.** v0.5.0 includes the unreleased v0.4 live-data lineage plus the Intelligence Router. High-frequency market updates never call an LLM (`Token = 0` unless intelligence is explicitly enabled).
+**Package version: 0.6.0.** Protocol v1 (not 2). Tuning artifact schema **2** and comparison schema **2** are separate version spaces — they are not “schema 0.6”. Last git tag remains `v0.3.0` until merge/tag approval. **v0.4.0 was never released.** v0.5.0 added the unreleased v0.4 live-data lineage plus the Intelligence Router. v0.6.0 adds local observability, explicit feedback, and offline-only tuning comparison. High-frequency market updates never call an LLM (`Token = 0` unless intelligence is explicitly enabled). Release-prep record: `docs/17_v0.6_Release_Candidate.md`.
 
 ## Positioning
 
@@ -40,7 +40,7 @@ pnpm build
 pnpm package:vsix
 ```
 
-Then in Cursor: Extensions → **Install from VSIX…** → `apps/cursor-extension/market-sentinel-0.5.0.vsix`.
+Then in Cursor: Extensions → **Install from VSIX…** → `apps/cursor-extension/market-sentinel-0.6.0.vsix`.
 
 Open a **trusted** workspace. Set `marketSentinel.coreRoot` when the window is not a single-folder Core checkout. Confirm `marketSentinel.uvPath` (default `uv`).
 
@@ -97,7 +97,7 @@ pnpm install
 
 ```bash
 uv run pytest
-uv run pytest --cov=market_sentinel
+uv run pytest --cov=market_sentinel --deselect tests/integration/test_engine_perf.py::test_ten_symbol_engine_replay_stays_within_regression_budget
 uv run ruff check .
 uv run ruff format --check .
 ```
@@ -111,7 +111,7 @@ pnpm package:vsix
 pnpm test:extension-host
 ```
 
-Default pytest is offline. Coverage fails under 85%. Do not depend on live market HTTP. `pnpm test:extension-host` downloads a VS Code Desktop binary via `@vscode/test-electron` (not Cursor).
+Default pytest is offline. Coverage fails under 85%. The ten-symbol Replay timing regression is a wall-clock budget; run it **without** coverage (`uv run pytest tests/integration/test_engine_perf.py`). Coverage instrumentation can exceed that budget without being a product regression. Do not depend on live market HTTP. `pnpm test:extension-host` downloads a VS Code Desktop binary via `@vscode/test-electron` (not Cursor).
 
 ## CLI
 
@@ -144,20 +144,28 @@ Default `--format` is JSON (`EvaluationReport.to_record()`). `--data-dir` overri
 Offline tuning (does not mutate production config; does not start the daemon):
 
 ```bash
-uv run market-sentinel tuning snapshot --config-version baseline-0.5.0
+uv run market-sentinel tuning snapshot --config-version baseline-v0.6
 uv run market-sentinel tuning snapshot --config-version candidate-001 --config candidate.json --source manual
 uv run market-sentinel tuning compare --baseline <snapshot_id> --candidate <snapshot_id> --corpus default
 ```
 
-There is no `apply` / `promote` / `activate`. Snapshots live under `<data-dir>/tuning/<snapshot_id>.json`. Production runtime never loads them.
+There is no `apply` / `promote` / `activate` / `deploy`. `--config-version` is snapshot identity, not the package version. A candidate tuning snapshot is **not** active production config. Normal runtime (`run` / `daemon` / Host) does not scan or load `tuning/`. Snapshots live under `<data-dir>/tuning/<snapshot_id>.json`.
 
-Local telemetry JSONL (append-only, not Protocol stdout) lives under the Market Sentinel data directory:
+Local telemetry JSONL (append-only, not Protocol stdout) lives under the Market Sentinel data directory (override: `MARKET_SENTINEL_DATA_DIR`; otherwise Windows `%LOCALAPPDATA%/MarketSentinel` or Unix XDG `market-sentinel`). Host never writes these files. Core / local CLI own storage.
 
-- Windows: `%LOCALAPPDATA%\MarketSentinel\telemetry.jsonl` and `feedback.jsonl`
-- Unix: `$XDG_DATA_HOME/market-sentinel/` or `~/.local/share/market-sentinel/`
-- Override: `MARKET_SENTINEL_DATA_DIR`
+```text
+MarketSentinel data directory/
+├ telemetry.jsonl
+├ telemetry.jsonl.1 ...
+├ feedback.jsonl
+├ feedback.jsonl.1 ...
+└ tuning/
+   └ <snapshot_uuid>.json
+```
 
-`feedback.jsonl` is created only after an explicit `user_feedback` command. Hover and badge reset do not write it.
+`telemetry.jsonl` / `feedback.jsonl` are append-only. Tuning snapshots are immutable and are not auto-loaded. `feedback.jsonl` is created only after an explicit `user_feedback` command. Hover and badge reset do not write it.
+
+Allowed artifact content is fixed config fields, snapshot identity, corpus IDs, aggregated metrics, and fixed feedback labels / data-quality counters. Not stored: workspace, conversation, source code, file contents, absolute user fixture paths, raw ticks, features payloads, prompts, API keys, model raw output, Signal title/summary, free-text feedback, or free-form tuning notes.
 
 Spawn is argv-based (`shell: false`):
 
@@ -224,7 +232,6 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - Volume ratio needs about **20 in-session 1-minute baselines** before it is defined (`None` until then, never treated as 0).
 - Session id is the **UTC+8 calendar day**. That matches current A/H MVP examples; there is no full exchange calendar.
 - `MarketBar` is an adaptive-polling **sampled/observed** 1-minute bar, not an exchange official K-line.
-- `MarketBar` is an adaptive-polling **sampled/observed** 1-minute bar, not an exchange official K-line.
 - VWAP needs reliable cumulative **turnover and volume** (live Longbridge currently maps `turnover` to `None`).
 - Tencent in-session live gate passed 2026-08-28 (1 / 2 / 10 batches + freshness). Sina is a one-shot cross-check. Longbridge remains optional. Tencent/Sina are probes until Core `MarketProvider` wiring is an explicit follow-up.
 - Python runtime is **not bundled** in the VSIX (developer install: `coreRoot` + `uvPath`). Longbridge requires a **manual** `uv sync --extra live` (Host does not pass `--extra` on spawn).
@@ -234,12 +241,12 @@ A Signal can stay in `ACTIVE SIGNALS` while `ALERTS THIS TICK` is `None` (cooldo
 - No WebView, no alert history panel.
 - No `notified_timestamp` (alert candidate ≠ notified).
 - Intelligence is **off by default** (`MARKET_SENTINEL_INTEL_ENABLED=1` to enable). Host hover/click never calls a model. No News, MCP, auto-trading, or buy/sell advice. Default sidecar timeout is 8s. The DashScope adapter sends `enable_thinking: false`. Live model calls are **not** in default pytest.
-- `ClusterMembershipTracker` keeps clustered `event_id`s for the whole Core run (once-per-run exactness). M3 reports `cluster_tracker_seen_count`. Bounded lifecycle is a v0.6 RC question, not LRU.
-- Telemetry JSONL write/flush/rotate is synchronous on the producer thread. M3 measures Replay overhead vs NoOp as evidence (`absolute_extra_s`, `relative_overhead_fraction` = extra/baseline, `total_runtime_ratio` = telemetry/baseline); it does not switch to an async queue.
-- Evaluation `alerts_per_market_hour` is A-share only (`.SH` / `.SZ`). Non-A-share scope is unavailable rather than silently using A-share windows. The denominator is telemetry-observed market-time span per `run_id`, not process wall time or feed uptime. Weekends are excluded; official exchange holidays are not yet calendar-aware. Host open/dismiss/mute rates are unavailable until those producers exist.
-- Explicit `useful_rate` is the useful share of **submitted** feedback only (self-selection). No feedback is not “not useful”. Feedback never retunes thresholds, cooldown, or RouterPolicy.
-- `feedback_coverage` is unique `alert_presented` `(run_id, signal_id)` with at least one valid explicit feedback, not coverage of every signal the QuickPick could show. Host drops stale targets when Core restarts; Core does not maintain a signal-id registry.
-- M5 is offline evidence only: candidate snapshots are never auto-loaded by daemon/`run`. Tuning feedback must join Core telemetry by `(run_id, signal_id)`. Duplicate `feedback.jsonl` rows stay append-only; the tuning dataset uses latest-wins per target. `supported` OfflineTuningConfig fields are only those with Replay + Comparison Report sensitivity proof (currently lookback + WarmingConfig). Cooldown/dwell and Intelligence router/budget are deferred.
+- `ClusterMembershipTracker` keeps clustered `event_id`s for the whole Core run (once-per-run exactness). A long-lived daemon can grow with that set. Bounded lifecycle is not LRU.
+- Telemetry JSONL write is synchronous (`write` → `flush` → `stat` → possible rotate). v0.6 does not switch to an async queue.
+- Evaluation `alerts_per_market_hour` is A-share only (`.SH` / `.SZ`). `.HK` is `unsupported_market_scope`, not a silent A-share window. The denominator is telemetry-observed market-time span per `run_id`, not process wall time or feed uptime. Weekends are excluded; official exchange holidays are not yet calendar-aware. Host `signal_opened` / `alert_dismissed` / `signal_muted` rates are **unavailable** (`producer_not_implemented`), not 0%.
+- Explicit `useful_rate` is the useful share of **submitted** feedback only (self-selection). No feedback is not “not useful”. Feedback never retunes thresholds, cooldown, or RouterPolicy. Labels are `useful` / `not_useful` / `too_noisy` / `too_late` only (no free text).
+- `feedback_coverage` is unique `alert_presented` `(run_id, signal_id)` with at least one valid explicit feedback, not coverage of every signal the QuickPick could show. Host drops stale targets when Core restarts. Structurally valid Protocol `user_feedback` for an unknown `signal_id` may still be stored; offline tuning excludes orphans by joining telemetry.
+- Offline tuning is evidence only: candidate snapshots are never auto-loaded by daemon/`run`. Tuning feedback must join Core telemetry by `(run_id, signal_id)`. Duplicate `feedback.jsonl` rows stay append-only; the tuning dataset uses latest-wins per target. Supported `OfflineTuningConfig` fields are exactly seven evidence-backed parameters (`cluster_lookback_s`, `hot_event_severity`, `hot_volume_ratio_5m`, `hot_change_5m`, `warm_change_1m`, `warm_change_5m`, `warm_volume_ratio`). Cooldown/dwell, Intelligence Router/call budget, live scheduler polling intervals, Event thresholds/TTL, and other parameters not injected into Offline Replay remain deferred. Draft tuning artifact schema 1 is fail-closed (no migration).
 
 ## v0.1 status
 

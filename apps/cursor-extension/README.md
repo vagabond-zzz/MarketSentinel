@@ -1,8 +1,9 @@
 # Market Sentinel (Cursor host)
 
-Developer-install Cursor / VS Code **Desktop** extension for Market Sentinel **v0.5.0**.
+Developer-install Cursor / VS Code **Desktop** extension for Market Sentinel **v0.6.0**.
 
-Package version: `0.5.0`
+Package version: `0.6.0`
+Wire protocol: JSONL Protocol v1 (`protocol_version === 1`). Package version and Protocol version are independent.
 Extension identifier: `market-sentinel-local.market-sentinel`
 
 `publisher` is `market-sentinel-local`. This is a **local/developer identifier** for the VSIX. It is not a Visual Studio Marketplace publisher identity. Changing it later will change the extension identifier.
@@ -15,16 +16,16 @@ uv run --directory <coreRoot> market-sentinel --provider fake daemon
 
 For live A-shares, set `marketSentinel.provider` to `longbridge` and export `LONGBRIDGE_APP_KEY` / `LONGBRIDGE_APP_SECRET` / `LONGBRIDGE_ACCESS_TOKEN` in the environment inherited by the child process (not in settings). Install the SDK with `uv sync --extra live`. See repository `docs/12_v0.4_Longbridge_Provider_Setup.md`.
 
-Wire protocol is JSONL Protocol v1 (`protocol_version === 1`).
+The Host maps Protocol state to StatusBar / hover / optional explicit feedback. It does not write `telemetry.jsonl`, `feedback.jsonl`, or tuning snapshots. Those files stay under the Core data directory.
 
 ## Install from VSIX
 
 1. From the repository root: `pnpm build` then `pnpm package:vsix`.
-2. In Cursor Desktop: Extensions → `...` → Install from VSIX → select `apps/cursor-extension/market-sentinel-0.5.0.vsix`.
+2. In Cursor Desktop: Extensions → `...` → Install from VSIX → select `apps/cursor-extension/market-sentinel-0.6.0.vsix`.
 3. Open a **trusted** workspace that contains the Python Core checkout, or set `marketSentinel.coreRoot`.
 4. Confirm `uv` is on PATH or set `marketSentinel.uvPath`.
 
-This extension is `extensionKind: ["ui"]` (local Desktop). Remote SSH / Codespaces / Web are not supported in v0.5.0.
+This extension is `extensionKind: ["ui"]` (local Desktop). Remote SSH / Codespaces / Web are not supported in v0.6.0.
 
 ## Commands
 
@@ -33,7 +34,7 @@ This extension is `extensionKind: ["ui"]` (local Desktop). Remote SSH / Codespac
 - Market Sentinel: Restart Core
 - Market Sentinel: Show Output
 - Market Sentinel: Reset Alert Badge
-- Market Sentinel: Signal Feedback
+- Market Sentinel: Signal Feedback (`useful` / `not_useful` / `too_noisy` / `too_late`; no free text)
 
 ## Settings
 

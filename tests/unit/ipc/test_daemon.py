@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 from tests.unit.ipc.helpers import command, make_engine, parse_stdout
 
+from market_sentinel import __version__
 from market_sentinel.ipc.daemon import MarketDaemon
 from market_sentinel.ipc.protocol import DaemonPhase
 
@@ -75,7 +76,7 @@ async def test_hello_start_pause_resume_get_state_shutdown() -> None:
     )
     types = [item["type"] for item in messages]
     assert types[0] == "ready"
-    assert messages[0]["core_version"] == "0.5.0"
+    assert messages[0]["core_version"] == __version__ == "0.6.0"
     assert messages[1]["type"] == "ack"
     assert messages[1]["watchlist_count"] == 1
     assert messages[2]["type"] == "state"

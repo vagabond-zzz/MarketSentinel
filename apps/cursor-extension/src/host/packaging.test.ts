@@ -3,6 +3,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { PROTOCOL_VERSION } from "../protocol/types";
+
 describe("extension packaging manifest", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as {
     name: string;
@@ -17,7 +19,7 @@ describe("extension packaging manifest", () => {
 
   it("has local VSIX identity fields without claiming a Marketplace publisher", () => {
     expect(pkg.name).toBe("market-sentinel");
-    expect(pkg.version).toBe("0.5.0");
+    expect(pkg.version).toBe("0.6.0");
     expect(pkg.publisher).toBe("market-sentinel-local");
     expect(pkg.main).toBe("./out/extension.js");
     expect(pkg.engines.vscode).toBe("^1.90.0");
@@ -25,6 +27,8 @@ describe("extension packaging manifest", () => {
     expect(pkg.private).toBe(true);
     expect(pkg.scripts["vscode:prepublish"]).toContain("tsc");
     expect(pkg.scripts["package:vsix"]).toContain("vsce package");
+    expect(PROTOCOL_VERSION).toBe(1);
+    expect(pkg.version).not.toBe(String(PROTOCOL_VERSION));
   });
 
   it("derives the VSIX filename from package.json instead of a hardcoded version", () => {

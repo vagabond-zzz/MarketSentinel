@@ -1,6 +1,6 @@
 # Roadmap v0.6 — Feedback, Observability & Tuning
 
-> Status: **M0 frozen. M1/M2 PASS. M3 PASS. M4 PASS.** **M5 offline tuning workflow** on `feat/v0.6-feedback-observability`. Package versions remain **0.5.0**. Protocol **1**. **Do not start M6.**
+> Status: **M0–M5 complete.** **M6 release prep** on `feat/v0.6-feedback-observability`. Package versions **0.6.0**. Protocol **1**. Tuning artifact schema **2**. Tuning comparison schema **2**. Do **not** merge `master`, tag, or start v1.0.
 >
 > Token target: **低**
 >
@@ -311,9 +311,7 @@ Feedback used for tuning must join telemetry by `(run_id, signal_id)` to Core li
 
 ### M6 — Release prep
 
-- privacy docs；
-- regression；
-- version。
+Package **0.6.0**. See `docs/17_v0.6_Release_Candidate.md`. No merge, tag, push, or v1.0.
 
 ---
 
