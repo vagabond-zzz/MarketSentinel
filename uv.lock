@@ -217,7 +217,7 @@ wheels = [
 
 [[package]]
 name = "market-sentinel"
-version = "0.6.0"
+version = "0.6.5"
 source = { editable = "." }
 
 [package.optional-dependencies]

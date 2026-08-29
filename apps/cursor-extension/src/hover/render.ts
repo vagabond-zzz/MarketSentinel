@@ -1,6 +1,11 @@
 import { escapeMarkdown, formatDirection } from "./format";
 import type { HoverModel, HoverSignalView, HoverSymbolView } from "./model";
 
+/** CommonMark hard break so Cursor/VS Code tooltips do not collapse single newlines. */
+function joinMarkdownLines(lines: string[]): string {
+  return lines.join("  \n");
+}
+
 function renderSignal(signal: HoverSignalView): string[] {
   const lines = [
     `[${signal.priority}] ${formatDirection(signal.direction)} ${escapeMarkdown(signal.family)}`,
@@ -60,7 +65,7 @@ function renderSymbol(symbol: HoverSymbolView): string {
   if (symbol.signals.length === 0) {
     lines.push("");
     lines.push(...renderMetrics(symbol));
-    return lines.join("\n");
+    return joinMarkdownLines(lines);
   }
   lines.push("");
   for (const [index, signal] of symbol.signals.entries()) {
@@ -74,7 +79,7 @@ function renderSymbol(symbol: HoverSymbolView): string {
   }
   lines.push("");
   lines.push(...renderMetrics(symbol));
-  return lines.join("\n");
+  return joinMarkdownLines(lines);
 }
 
 export function renderHoverMarkdown(model: HoverModel): string {
@@ -114,11 +119,11 @@ export function renderHoverMarkdown(model: HoverModel): string {
     if (model.outputHint !== undefined) {
       lines.push(model.outputHint);
     }
-    return lines.join("\n").trimEnd();
+    return joinMarkdownLines(lines).trimEnd();
   }
   for (const symbol of model.symbols) {
     lines.push("");
     lines.push(renderSymbol(symbol));
   }
-  return lines.join("\n").trimEnd();
+  return joinMarkdownLines(lines).trimEnd();
 }

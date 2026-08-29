@@ -185,7 +185,7 @@ describe("ProcessManager", () => {
       "set_watchlist",
       "start",
     ]);
-    expect((commands[0] as { host_version: string }).host_version).toBe("0.6.0");
+    expect((commands[0] as { host_version: string }).host_version).toBe("0.6.5");
     expect(manager.phase).toBe("RUNNING");
   });
 

@@ -1,8 +1,14 @@
 # Changelog
 
-## Unreleased — v0.6.5 UX polish (no version bump)
+## 0.6.5 — 2026-08-29 (release candidate / local release prep)
 
-Host daily-usability polish on `feat/v0.6.5-ux-polish`. Package stays **0.6.0**. Protocol stays **1** (additive optional wire fields only). Market semantics unchanged. **Not merged. Not tagged. Not pushed.**
+**Market Sentinel v0.6.5 — Host / CLI Daily Usability**
+
+Package versions are **0.6.5**. Protocol stays **1** (additive optional wire fields only). Tuning artifact schema is **2**. Tuning comparison schema is **2**. These are independent version spaces. Market semantics unchanged.
+
+**Release candidate / local release prep. Not merged. Not tagged. Not pushed. Not published.** This is not a released/published tag.
+
+Host daily-usability polish on `feat/v0.6.5-ux-polish`.
 
 ### Added
 
@@ -23,7 +29,7 @@ Host daily-usability polish on `feat/v0.6.5-ux-polish`. Package stays **0.6.0**.
 - Watchlist persist keeps `enabled`; runtime sync is serialized/deduped so a settings-change callback and command share one `set_watchlist`
 - Hover AI status uses requested setting vs actual `intelligence_enabled` (unavailable / pending restart, including off-requested while Core is still enabled)
 - StatusBar/QuickPick aliases are sanitized; Hover `last_market_timestamp` is UTC+8 market time labeled 最后行情; `signal.family` is labeled 信号类型
-- Restored `docs/AGENTS.md` as a pointer to root `AGENTS.md`
+- Hover markdown uses CommonMark hard breaks so Cursor/VS Code tooltips keep 规则信号 / AI 增强 / 涨跌幅 / 成交 / 技术指标 / 日内区间 / 信号类型 on separate lines (display-only; no Wire / Domain change)
 
 ## 0.6.0 — 2026-08-29 (not tagged yet)
 

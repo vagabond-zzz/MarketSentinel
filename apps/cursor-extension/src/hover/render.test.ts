@@ -81,6 +81,8 @@ describe("renderHoverMarkdown", () => {
     expect(text).not.toContain("状态：COLD");
     expect(text).toContain("1m +0.80% | 5m +1.26% | 15m --");
     expect(text).not.toContain("规则信号");
+    expect(text).toContain("连接：正常  \n行情源：LIVE");
+    expect(text).toContain("涨跌幅  \n1m +0.80%");
   });
 
   it("separates rule summary from AI enrichment", () => {
@@ -106,8 +108,10 @@ describe("renderHoverMarkdown", () => {
       }),
     );
     expect(text).toContain("规则信号");
+    expect(text).toContain("规则信号  \n量价同步扩张");
     expect(text).toContain("量价同步扩张");
     expect(text).toContain("AI 增强");
+    expect(text).toContain("信号类型  \nprice\\_volume");
     expect(text).toContain("Volume led the move.");
     expect(text).toContain("confidence 0.82");
     expect(text.indexOf("规则信号")).toBeLessThan(text.indexOf("AI 增强"));

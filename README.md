@@ -6,7 +6,7 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 包版本 | `0.6.0` |
+| 包版本 | `0.6.5` |
 | Protocol | `1` |
 | Tuning Artifact Schema | `2` |
 | Tuning Comparison Schema | `2` |
@@ -14,9 +14,9 @@
 | Watchlist 上限 | `10` 个 symbol |
 | 默认 Provider | `fake` |
 | 默认 Intelligence | 关闭 |
-| 当前发布状态 | 本地 release-ready；尚未创建 `v0.6.0` tag，也未推送远端 |
+| 当前发布状态 | v0.6.5 release candidate / local release prep；尚未 merge、尚未创建 `v0.6.5` tag、尚未推送远端、尚未发布 VSIX |
 
-> `0.6.0`、Protocol `1`、Tuning Artifact Schema `2`、Tuning Comparison Schema `2` 是四套独立版本空间，不要把它们混为同一个版本号。
+> `0.6.5`、Protocol `1`、Tuning Artifact Schema `2`、Tuning Comparison Schema `2` 是四套独立版本空间，不要把它们混为同一个版本号。
 
 Market Sentinel 的目标不是做交易终端，也不是自动交易系统。它负责持续观察少量关注标的，把报价加工成结构化特征、事件和信号，并尽量把提醒保持在“少而有用”的范围内。
 
@@ -373,7 +373,7 @@ pnpm package:vsix
 生成：
 
 ```text
-apps/cursor-extension/market-sentinel-0.6.0.vsix
+apps/cursor-extension/market-sentinel-0.6.5.vsix
 ```
 
 在 Cursor Desktop 中：
@@ -381,7 +381,7 @@ apps/cursor-extension/market-sentinel-0.6.0.vsix
 ```text
 Extensions
 → Install from VSIX…
-→ 选择 market-sentinel-0.6.0.vsix
+→ 选择 market-sentinel-0.6.5.vsix
 ```
 
 ---
@@ -1648,7 +1648,17 @@ marketSentinel.watchlist
 
 记录版本变化和已完成能力。
 
-当前 v0.6.0 的主题：
+当前 v0.6.5 的主题：
+
+```text
+Host / CLI daily usability
+StatusBar quotes
+Hover sections
+Watchlist commands
+Replay EOF
+```
+
+v0.6.0 的主题仍是：
 
 ```text
 Feedback
@@ -1690,17 +1700,26 @@ v0.6 telemetry / feedback / tuning 语义合同。
 
 ## `docs/17_v0.6_Release_Candidate.md`
 
-v0.6.0 Release Candidate 的发布准备记录。
+v0.6.0 Release Candidate 的历史发布准备记录。
+
+## `docs/18_v0.6.5_UX_Polish.md`
+
+v0.6.5 Host / CLI daily-usability 实现记录。
+
+## `docs/19_v0.6.5_Release_Candidate.md`
+
+v0.6.5 Release Candidate 的发布准备记录。
 
 包括：
 
 - version inventory；
 - Protocol/schema；
+- UX / Intelligence / Watchlist / Replay EOF；
 - tests；
 - coverage；
-- offline smoke；
 - VSIX；
-- privacy；
+- Cursor manual smoke；
+- privacy / mutation audit；
 - known limitations。
 
 ---
@@ -1780,18 +1799,10 @@ pnpm package:vsix
 当前版本：
 
 ```text
-market-sentinel-0.6.0.vsix
+market-sentinel-0.6.5.vsix
 ```
 
-Release verification 中：
-
-```text
-21 files
-27208 bytes
-audit pass
-```
-
-Python Core 不包含在 VSIX 中。
+Python Core 不包含在 VSIX 中。具体 file count / size 见 `docs/19_v0.6.5_Release_Candidate.md`。
 
 ---
 
@@ -2210,9 +2221,10 @@ MarketProvider
 当前：
 
 ```text
-本地 release-ready
-无 remote
-无 v0.6.0 tag
+v0.6.5 release candidate / local release prep
+无 merge
+无 remote publication
+无 v0.6.5 tag
 无 VSIX publication
 ```
 
@@ -2241,11 +2253,21 @@ remote add
 当前本地状态：
 
 ```text
-Market Sentinel v0.6.0
-Package = 0.6.0
+Market Sentinel v0.6.5
+Package = 0.6.5
 Protocol = 1
 Tuning Artifact Schema = 2
 Tuning Comparison Schema = 2
+```
+
+v0.6.5 当前是：
+
+```text
+release candidate / local release prep
+not merged
+not tagged
+not pushed
+not published
 ```
 
 v0.6.0 已在本地完成：
@@ -2262,6 +2284,7 @@ v0.6.0 已在本地完成：
 当前仍然：
 
 ```text
+No v0.6.5 tag
 No v0.6.0 tag
 No push
 No remote publication

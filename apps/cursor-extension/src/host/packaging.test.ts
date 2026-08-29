@@ -19,7 +19,7 @@ describe("extension packaging manifest", () => {
 
   it("has local VSIX identity fields without claiming a Marketplace publisher", () => {
     expect(pkg.name).toBe("market-sentinel");
-    expect(pkg.version).toBe("0.6.0");
+    expect(pkg.version).toBe("0.6.5");
     expect(pkg.publisher).toBe("market-sentinel-local");
     expect(pkg.main).toBe("./out/extension.js");
     expect(pkg.engines.vscode).toBe("^1.90.0");

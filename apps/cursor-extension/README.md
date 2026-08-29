@@ -1,8 +1,8 @@
 # Market Sentinel (Cursor host)
 
-Developer-install Cursor / VS Code **Desktop** extension for Market Sentinel **v0.6.0**.
+Developer-install Cursor / VS Code **Desktop** extension for Market Sentinel **v0.6.5**.
 
-Package version: `0.6.0`
+Package version: `0.6.5`
 Wire protocol: JSONL Protocol v1 (`protocol_version === 1`). Package version and Protocol version are independent.
 Extension identifier: `market-sentinel-local.market-sentinel`
 
@@ -21,11 +21,11 @@ The Host maps Protocol state to StatusBar / hover / optional explicit feedback. 
 ## Install from VSIX
 
 1. From the repository root: `pnpm build` then `pnpm package:vsix`.
-2. In Cursor Desktop: Extensions → `...` → Install from VSIX → select `apps/cursor-extension/market-sentinel-0.6.0.vsix`.
+2. In Cursor Desktop: Extensions → `...` → Install from VSIX → select `apps/cursor-extension/market-sentinel-0.6.5.vsix`.
 3. Open a **trusted** workspace that contains the Python Core checkout, or set `marketSentinel.coreRoot`.
 4. Confirm `uv` is on PATH or set `marketSentinel.uvPath`.
 
-This extension is `extensionKind: ["ui"]` (local Desktop). Remote SSH / Codespaces / Web are not supported in v0.6.0.
+This extension is `extensionKind: ["ui"]` (local Desktop). Remote SSH / Codespaces / Web are not supported in v0.6.5.
 
 ## Commands
 

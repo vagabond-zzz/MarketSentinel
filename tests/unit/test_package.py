@@ -15,7 +15,7 @@ from market_sentinel.tuning.report import TUNING_COMPARISON_SCHEMA_VERSION
 from market_sentinel.tuning.store import TUNING_ARTIFACT_SCHEMA_VERSION
 
 _ROOT = Path(__file__).resolve().parents[2]
-_RELEASE = "0.6.0"
+_RELEASE = "0.6.5"
 
 
 def test_package_version_matches_pyproject() -> None:
