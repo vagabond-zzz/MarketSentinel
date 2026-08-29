@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — v0.6 M5 Offline Tuning Workflow (no version bump)
+
+Offline snapshot + Replay comparison on `feat/v0.6-feedback-observability`. Package **0.5.0**. Protocol **1**. No M6. M5 provides offline evidence, not automatic tuning.
+
+- `OfflineTuningConfig` + `TuningSnapshot` artifact under `tuning/<snapshot_id>.json`; `capture_baseline_config()` maps current production defaults
+- `market-sentinel tuning snapshot|compare|report` only; no apply/promote/activate
+- `TuningFeedbackDataset` joins `(run_id, signal_id)` to Core lifecycle evidence; latest explicit label wins per target
+- Candidate Replay is isolated; hypothetical results are not written to telemetry.jsonl or feedback.jsonl
+
 ## Unreleased — v0.6 M4 review fixes (no version bump)
 
 Bind explicit feedback to Core execution identity after M4 external review. Package **0.5.0**. Protocol **1**. No M5.

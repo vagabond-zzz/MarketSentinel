@@ -11,9 +11,9 @@ from pathlib import Path
 
 from market_sentinel.cli.display import format_dashboard, format_updated
 from market_sentinel.clock import SystemClock
-from market_sentinel.errors import ProviderError
+from market_sentinel.errors import ProviderError, TuningConfigError, TuningSnapshotError
 from market_sentinel.evaluation.aggregate import evaluate
-from market_sentinel.evaluation.reader import TelemetryReader
+from market_sentinel.evaluation.reader import LoadedTelemetry, TelemetryReader
 from market_sentinel.evaluation.render import render_text
 from market_sentinel.health.feed_health import FeedHealthTracker
 from market_sentinel.intelligence.bootstrap import optional_intelligence
@@ -25,12 +25,18 @@ from market_sentinel.providers.factory import create_provider
 from market_sentinel.runtime.engine import MarketEngine
 from market_sentinel.runtime.results import EngineTickResult
 from market_sentinel.scheduler.scheduler import AdaptiveScheduler
+from market_sentinel.telemetry.contract import TuningSource
 from market_sentinel.telemetry.factory import jsonl_telemetry_runtime
 from market_sentinel.telemetry.paths import (
     feedback_jsonl_path,
     resolve_data_dir,
     telemetry_jsonl_path,
 )
+from market_sentinel.tuning.compare import compare_artifacts, empty_feedback_dataset
+from market_sentinel.tuning.config import OfflineTuningConfig, capture_baseline_config
+from market_sentinel.tuning.feedback import build_tuning_feedback_dataset
+from market_sentinel.tuning.replay import DEFAULT_CORPUS, default_fixture_dir
+from market_sentinel.tuning.store import load_snapshot, make_artifact, write_snapshot
 from market_sentinel.watchlist.watchlist import Watchlist
 
 
@@ -47,6 +53,8 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(_handle_daemon(args))
     if args.command == "telemetry":
         return _handle_telemetry(args)
+    if args.command == "tuning":
+        return _handle_tuning(args)
     watchlist = Watchlist(args.watchlist)
 
     if args.command == "watchlist":
@@ -99,7 +107,112 @@ def _build_parser() -> argparse.ArgumentParser:
     report.add_argument("--data-dir", type=Path, default=None)
     report.add_argument("--run-id", default=None)
     report.add_argument("--format", choices=("json", "text"), default="json")
+    tuning = sub.add_parser("tuning", help="offline snapshot and replay comparison")
+    tun_sub = tuning.add_subparsers(dest="tuning_command", required=True)
+    snap = tun_sub.add_parser("snapshot", help="write an immutable offline tuning snapshot")
+    snap.add_argument("--config-version", required=True)
+    snap.add_argument("--source", choices=("manual", "offline_eval"), default="offline_eval")
+    snap.add_argument("--config", type=Path, default=None, help="OfflineTuningConfig JSON object")
+    snap.add_argument("--data-dir", type=Path, default=None)
+    compare = tun_sub.add_parser("compare", help="replay baseline vs candidate on a fixed corpus")
+    _add_tuning_compare_args(compare)
+    report_cmd = tun_sub.add_parser("report", help="same as compare; prints a fact report")
+    _add_tuning_compare_args(report_cmd)
     return parser
+
+
+def _add_tuning_compare_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--baseline", required=True, help="baseline snapshot_id")
+    parser.add_argument("--candidate", required=True, help="candidate snapshot_id")
+    parser.add_argument("--corpus", default="default", help="default or comma-separated corpus ids")
+    parser.add_argument("--data-dir", type=Path, default=None)
+    parser.add_argument("--fixture-dir", type=Path, default=None)
+
+
+def _empty_loaded() -> LoadedTelemetry:
+    return LoadedTelemetry((), (), 0, 0, False, True)
+
+
+def _handle_tuning(args: argparse.Namespace) -> int:
+    command = args.tuning_command
+    if command in {"compare", "report"}:
+        return asyncio.run(_handle_tuning_compare(args))
+    if command != "snapshot":
+        return 2
+    try:
+        data_dir = resolve_data_dir(args.data_dir)
+        if args.config is None:
+            config = capture_baseline_config()
+        else:
+            payload = json.loads(args.config.read_text(encoding="utf-8"))
+            config = OfflineTuningConfig.from_record(payload)
+        artifact = make_artifact(
+            config,
+            config_version=args.config_version,
+            source=TuningSource(args.source),
+        )
+        path = write_snapshot(data_dir, artifact)
+    except (
+        OSError,
+        UnicodeError,
+        json.JSONDecodeError,
+        TuningConfigError,
+        TuningSnapshotError,
+        ValueError,
+    ):
+        logging.getLogger(__name__).exception("tuning snapshot failed")
+        return 2
+    print(
+        json.dumps(
+            {
+                "snapshot_id": artifact.snapshot.snapshot_id,
+                "config_version": artifact.snapshot.config_version,
+                "path_name": path.name,
+            },
+            ensure_ascii=False,
+        )
+    )
+    return 0
+
+
+def _optional_tuning_feedback(data_dir: Path):
+    tel = telemetry_jsonl_path(data_dir)
+    fb = feedback_jsonl_path(data_dir)
+    if not tel.is_file() and not fb.is_file():
+        return empty_feedback_dataset()
+    reader = TelemetryReader()
+    telemetry = reader.load(tel) if tel.is_file() else _empty_loaded()
+    feedback = reader.load(fb) if fb.is_file() else _empty_loaded()
+    return build_tuning_feedback_dataset(feedback.records, telemetry.records)
+
+
+async def _handle_tuning_compare(args: argparse.Namespace) -> int:
+    try:
+        data_dir = resolve_data_dir(args.data_dir)
+        baseline = load_snapshot(data_dir, args.baseline)
+        candidate = load_snapshot(data_dir, args.candidate)
+        fixture_dir = args.fixture_dir if args.fixture_dir is not None else default_fixture_dir()
+        work_dir = data_dir / "tuning-work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        report = await compare_artifacts(
+            baseline,
+            candidate,
+            corpus=_parse_corpus(args.corpus),
+            fixture_dir=fixture_dir,
+            work_dir=work_dir,
+            feedback=_optional_tuning_feedback(data_dir),
+        )
+    except (TuningConfigError, TuningSnapshotError, OSError, ValueError):
+        logging.getLogger(__name__).exception("tuning compare failed")
+        return 2
+    print(json.dumps(report.to_record(), ensure_ascii=False, indent=2))
+    return 0
+
+
+def _parse_corpus(raw: str) -> tuple[str, ...]:
+    if raw.strip() == "" or raw.strip() == "default":
+        return DEFAULT_CORPUS
+    return tuple(part.strip() for part in raw.split(",") if part.strip())
 
 
 def _handle_watchlist(watchlist: Watchlist, args: argparse.Namespace) -> int:

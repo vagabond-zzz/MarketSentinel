@@ -1,6 +1,6 @@
 # Roadmap v0.6 — Feedback, Observability & Tuning
 
-> Status: **M0 frozen. M1/M2 PASS. M3 PASS.** **M4 optional explicit feedback** + review-fix pass on `feat/v0.6-feedback-observability`. Package versions remain **0.5.0**. Protocol **1**. **Do not start M5.**
+> Status: **M0 frozen. M1/M2 PASS. M3 PASS. M4 PASS.** **M5 offline tuning workflow** on `feat/v0.6-feedback-observability`. Package versions remain **0.5.0**. Protocol **1**. **Do not start M6.**
 >
 > Token target: **低**
 >
@@ -277,13 +277,36 @@ Read-only. Does not rewrite telemetry semantics, Event/Signal rules, thresholds,
 
 Feedback does not mutate Event/Signal, cooldown, RouterPolicy, Scheduler, or thresholds.
 
-**Do not start M5.**
-
 ### M5 — Tuning workflow
 
-- config snapshot；
-- replay comparison；
-- no automatic mutation。
+- [x] versioned `TuningSnapshot` + `OfflineTuningConfig` artifact (`$DATA_DIR/tuning/<snapshot_id>.json`);
+- [x] `capture_baseline_config()` from current production defaults;
+- [x] fixed Replay corpus comparison (one baseline vs one candidate);
+- [x] `TuningFeedbackDataset` requires `(run_id, signal_id)` join to Core signal lifecycle evidence; latest valid feedback wins per target;
+- [x] no `apply` / `promote` / `activate` / `deploy`; production runtime does not load snapshots.
+
+M5 provides **offline evidence, not automatic tuning**. Candidate configs are never automatically loaded by production runtime.
+
+Supported M5 parameters (constructor injection, production default unchanged):
+
+```text
+cooldown_s, cluster_lookback_s
+upgrade_dwell_s, hot_downgrade_dwell_s, warm_downgrade_dwell_s
+hot_event_severity, hot_volume_ratio_5m, hot_change_5m
+warm_change_1m, warm_change_5m, warm_volume_ratio
+router_min_priority, router_require_alert_edge, router_min_convergence_types
+episode_max_calls, allow_escalation_recall
+```
+
+Deferred (module globals / live poll cadence / would need Event-rule or prompt refactor):
+
+```text
+cold/warm/hot_interval_s   # Replay corpus fetches every fixture tick (interval 0)
+event thresholds / TTL    # events/thresholds.py module globals
+prompt compactness, intelligence_timeout_s, volume_ratio_lookback
+```
+
+Feedback used for tuning must join telemetry by `(run_id, signal_id)` to Core lifecycle evidence (`signal_episode_created` / `signal_escalated` / `alert_candidate` / `alert_suppressed`). Storage stays append-only; the tuning dataset uses latest `created_timestamp` then `feedback_id` per target. `no feedback != not_useful`.
 
 ### M6 — Release prep
 
@@ -300,7 +323,7 @@ Feedback does not mutate Event/Signal, cooldown, RouterPolicy, Scheduler, or thr
 - [x] local-first storage；
 - [x] optional explicit feedback；
 - [x] no automatic online rule mutation；
-- [ ] tuning 必须跑 Replay regression；
+- [x] tuning 必须跑 Replay regression；
 - [x] Intelligence token/cost 可统计（actual `intelligence_token_usage` only; unavailable when none）；
 - [x] 不采集无关 workspace 内容。
 

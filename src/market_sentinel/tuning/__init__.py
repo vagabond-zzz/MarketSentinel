@@ -1,3 +1,4 @@
+from market_sentinel.tuning.compare import compare_artifacts
 from market_sentinel.tuning.config import (
     DEFERRED_TUNING_PARAMETER_NAMES,
     OFFLINE_TUNING_CONFIG_ALLOWLIST,
@@ -24,6 +25,7 @@ __all__ = [
     "TuningFeedbackDataset",
     "build_tuning_feedback_dataset",
     "capture_baseline_config",
+    "compare_artifacts",
     "load_snapshot",
     "make_artifact",
     "snapshot_path",
