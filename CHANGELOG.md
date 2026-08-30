@@ -1,14 +1,14 @@
 # Changelog
 
-## 0.6.5 — 2026-08-29 (release candidate / local release prep)
+## 0.6.5 — 2026-08-30 (tagged)
 
 **Market Sentinel v0.6.5 — Host / CLI Daily Usability**
 
 Package versions are **0.6.5**. Protocol stays **1** (additive optional wire fields only). Tuning artifact schema is **2**. Tuning comparison schema is **2**. These are independent version spaces. Market semantics unchanged.
 
-**Release candidate / local release prep. Not merged. Not tagged. Not pushed. Not published.** This is not a released/published tag.
+**On `master`. Pushed to GitHub. Tagged `v0.6.5`.** VSIX is a local / developer install only; not published to the Marketplace.
 
-Host daily-usability polish on `feat/v0.6.5-ux-polish`.
+Host daily-usability polish originally developed on `feat/v0.6.5-ux-polish`, then fast-forwarded to `master`.
 
 ### Added
 

@@ -12,7 +12,8 @@
 | Watchlist | 最多 `10` 个 symbol |
 | 默认 Provider | `fake` |
 | 默认 Intelligence | 关闭 |
-| 当前发布状态 | v0.6.5 release candidate；未 merge、未 tag、未 push、未发布 VSIX |
+| 当前发布状态 | v0.6.5 已在 `master` 并推送到 GitHub；tag `v0.6.5`；VSIX 仅本地安装，未上 Marketplace |
+| 远程仓库 | https://github.com/vagabond-zzz/MarketSentinel |
 
 > Package、Protocol、Tuning Artifact Schema、Tuning Comparison Schema 是四套独立版本空间。Market Sentinel 是观察与提醒系统，不是自动交易系统；反馈不会改写市场事实，离线评估也不会自动修改生产参数。
 
@@ -786,7 +787,7 @@ Python full tests
 → external final verification
 ```
 
-当前 v0.6.5 仍是 release candidate：不要在最终验证前擅自 merge、tag、push 或发布。
+v0.6.5 已在 `master` 发布并打 tag。VSIX 仍是本地 / developer 安装，不要发布到 Marketplace；不要开始 v1.0。
 
 ---
 
@@ -828,7 +829,7 @@ Python full tests
 - 将经过验证的 live source 正式 wiring 到 `MarketProvider`；
 - 更易安装的 Python Core；
 - VSIX 正式分发、Marketplace / 内部 registry；
-- 明确 remote topology 后再建立 tag / push / release automation。
+- 在现有 GitHub remote 上补充 release automation。
 
 ---
 
