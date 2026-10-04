@@ -139,6 +139,17 @@ async def test_get_active_signals_and_recent_events_envelopes() -> None:
         await runtime.stop()
 
 
+async def test_recent_events_bad_symbol_returns_envelope_not_tool_error() -> None:
+    """Regression (M4 host verification): capability errors must stay in the guard."""
+    runtime, server = await _running_server()
+    try:
+        payload = _payload(await server.call_tool("get_recent_events", {"symbol": "NOT_A_SYMBOL"}))
+        assert payload["ok"] is False
+        assert payload["error"]["code"] == "invalid_argument"
+    finally:
+        await runtime.stop()
+
+
 async def test_not_running_maps_to_envelope() -> None:
     runtime = StandaloneRuntime(provider_name="fake")
     await runtime.start()

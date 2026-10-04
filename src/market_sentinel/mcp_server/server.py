@@ -101,8 +101,12 @@ def build_server(runtime: StandaloneRuntime) -> FastMCP:
         limit: Annotated[int, Field(ge=1, le=RECENT_EVENTS_LIMIT)] = 20,
     ) -> dict[str, Any]:
         """Recently accepted market events, chronological (newest last); optional symbol filter."""
-        events = capabilities.get_recent_events(symbol=symbol, limit=limit)
-        return await _guarded(lambda: [event.to_wire() for event in events])
+
+        def read_events() -> list[dict[str, Any]]:
+            events = capabilities.get_recent_events(symbol=symbol, limit=limit)
+            return [event.to_wire() for event in events]
+
+        return await _guarded(read_events)
 
     return server
 
