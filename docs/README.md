@@ -50,3 +50,4 @@ Market Sentinel 的文档按用途分为三类。新读者建议从根目录 `RE
 |---|---|
 | [PRODUCTIZATION_AUDIT.md](PRODUCTIZATION_AUDIT.md) | M0 产品化审计：现状盘点、集成方案调研（ZCode / DeepSeek Harness / MCP）、风险与里程碑计划 |
 | [REPOSITORY_CLEANUP.md](REPOSITORY_CLEANUP.md) | M1 清理记录：每个 MOVE / KEEP / ADD / IGNORE 决策及理由、引用修复清单、验证结果 |
+| [RELEASE_READINESS.md](RELEASE_READINESS.md) | M6 发布就绪报告：打包/安装/依赖边界/卫生/许可 状态矩阵与 Blockers/Unknowns/Deferred |

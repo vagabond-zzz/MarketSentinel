@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — productization M2–M6 (no version bump)
+
+### Added
+- `market_sentinel.capabilities`: read-only capability facade over a running engine — six queries returning frozen Protocol v1 wire DTOs, with stable `CapabilityErrorCode` error semantics (`not_found` / `invalid_argument` / `not_running` / `unavailable` / `timeout` / `internal`).
+- CLI `demo`: deterministic offline walkthrough of the full pipeline (bundled package fixture, fake intelligence provider, no API keys, no files written).
+- CLI `doctor`: read-only environment diagnostics (Python, uv, package, optional extras, provider/intelligence configuration, telemetry dir), including ZCode MCP registration detection.
+- CLI `mcp`: standard MCP stdio server behind the optional `[mcp]` extra — six read-only tools (`get_market_state`, `get_symbol_state`, `get_active_signals`, `get_signal`, `get_feed_health`, `get_recent_events`) over a standalone runtime with NoOp telemetry; uniform JSON error envelope; fail-closed live-provider opt-in.
+- Integration docs and verified host records: `docs/integrations/mcp.md`, `docs/integrations/zcode.md` (ZCode 0.16.9), `docs/integrations/deepseek-harness.md` (DSH 0.2.0-rc.2), plus `examples/mcp/` client configuration fragments.
+- MIT license (`LICENSE`, packaging metadata, README statement).
+
+### Fixed
+- MCP tool errors keep their structured `{ok:false, error:{code,message}}` envelope when capability calls fail (regression caught during ZCode host verification).
+- `market-sentinel demo` no longer depends on a repository checkout: the demo fixture ships as package data.
+- `.gitignore` `data/` rule was unanchored and could shadow package data directories; now root-anchored.
+
+### Boundaries
+- Host integrations stay read-only by construction: no write/config/trade/shell tools; credentials never enter configuration files or MCP output; MCP runtime writes no telemetry. Both hosts were verified against the same unmodified MCP surface (see `docs/integrations/mcp.md` for the verification matrices).
+
 ## 0.6.5 — 2026-08-30 (tagged)
 
 **Market Sentinel v0.6.5 — Host / CLI Daily Usability**

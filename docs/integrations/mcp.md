@@ -145,6 +145,12 @@ Cursor / VS Code 扩展继续走**专有 Protocol v1 daemon**（亚秒级推送 
 - MCP runtime 不写 telemetry 文件（NoOp），不产生可交易建议（Intelligence 默认关闭）；
 - 凭据永不进入 MCP 输出（有测试断言）。
 
+## Troubleshooting（打包与运维）
+
+| 现象 | 处理 |
+|---|---|
+| Windows 升级/重装依赖时报 `market-sentinel.exe` 被占用 | 运行中的 MCP server 会锁住 venv 里的 console script；先结束宿主会话（或杀掉 `market-sentinel.exe` / 相关 `uv.exe` / `python.exe` 进程）再执行 `uv sync` / 升级 |
+
 ## 已知边界
 
 - `get_signal` 只覆盖 episode 生命周期内的 signal，无历史查询（Core 不保留过期 signal）；
