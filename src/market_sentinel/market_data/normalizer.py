@@ -25,6 +25,11 @@ _REQUIRED_FIELDS = (
 )
 
 
+def is_valid_symbol(symbol: str) -> bool:
+    """Public format check for watchable symbols; same rule as normalize_snapshot."""
+    return bool(_SYMBOL_RE.match(symbol))
+
+
 def normalize_snapshot(raw: Mapping[str, Any], clock: Clock) -> MarketSnapshot:
     missing = [field for field in _REQUIRED_FIELDS if field not in raw]
     if missing:
