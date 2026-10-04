@@ -19,6 +19,7 @@ Market Sentinel 的文档按用途分为三类。新读者建议从根目录 `RE
 | 文件 | 内容 |
 |---|---|
 | [longbridge.md](integrations/longbridge.md) | Longbridge live 行情接入：安装策略、环境变量、SDK 生命周期、错误码分类、字段映射 |
+| [mcp.md](integrations/mcp.md) | MCP stdio server：standalone runtime、6 个只读 tools、错误码、客户端配置、宿主验证状态矩阵 |
 
 ## history/ — 历史记录（不再更新）
 

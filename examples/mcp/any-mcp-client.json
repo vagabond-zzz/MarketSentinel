@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "market-sentinel": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "<repo-root>",
+        "run",
+        "market-sentinel",
+        "mcp"
+      ]
+    }
+  }
+}

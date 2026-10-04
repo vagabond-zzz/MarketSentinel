@@ -568,6 +568,7 @@ uv run market-sentinel doctor        # 加 --json 输出 JSON
 ✓ provider replay: fixture corpus found: fixtures/
 ⚠ provider longbridge: credentials not set: LONGBRIDGE_APP_KEY, ... (optional live provider)
 ✓ intelligence: disabled (default); provider dashscope, model qwen3.7-max-2026-06-08
+✓ mcp extra: installed; serve tools with `market-sentinel mcp`
 ✓ telemetry directory: writable: ...
 - ZCode integration: not implemented (planned milestone M4)
 - DeepSeek Harness integration: not implemented (planned milestone M5)
@@ -652,6 +653,22 @@ uv run market-sentinel tuning compare \
   --corpus default
 ```
 
+## 5.7 MCP Server（可选 `[mcp]` extra）
+
+```bash
+uv sync --extra mcp
+uv run market-sentinel mcp            # fake provider 默认 3 只演示标的；Ctrl+C 退出
+```
+
+把 capabilities 只读层暴露为标准 **MCP stdio server**（独立 runtime，自带 tick loop，不连接 Cursor daemon，不写 telemetry）。6 个只读 tools：
+
+```text
+get_market_state / get_symbol_state / get_active_signals
+get_signal / get_feed_health / get_recent_events
+```
+
+输出统一信封：成功 `{"ok": true, "data": ...}`，失败 `{"ok": false, "error": {"code", "message"}}`（错误码：not_found / invalid_argument / not_running / unavailable / timeout / internal）。无任何写 / 配置 / 交易 / shell / 文件系统工具；live provider 需 `--live` 显式 opt-in（fail-closed）。stdio 配置片段见 `examples/mcp/`；完整说明与各宿主验证状态见 `docs/integrations/mcp.md`。
+
 ---
 
 # 6. 面向开发者：架构、模块、数据与开发说明
@@ -697,6 +714,8 @@ Model != high-frequency main path
 | `scheduler` | WarmingPolicy、AdaptiveScheduler、COLD / WARM / HOT |
 | `runtime` | 串联 provider → feature → event → signal → scheduler，生成 MarketState |
 | `ipc` | Protocol v1、daemon JSONL、mapping、Host command、lifecycle |
+| `capabilities` | 只读能力 facade（CLI / MCP 共用的稳定边界，DTO 复用 Protocol v1 wire 模型） |
+| `mcp_server` | 可选 MCP stdio server（`[mcp]` extra）：standalone runtime + FastMCP 薄适配层 |
 | `intelligence` | deterministic router、episode budget、async sidecar、structured annotation |
 | `telemetry` | TelemetryEvent、UserFeedback、collector、JSONL、rotation / corruption handling |
 | `evaluation` | funnel / noise / host / intelligence / market-time / feedback 指标 |
