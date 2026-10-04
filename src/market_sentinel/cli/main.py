@@ -9,7 +9,9 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from market_sentinel.cli.demo import register_demo, run_demo
 from market_sentinel.cli.display import format_dashboard, format_updated
+from market_sentinel.cli.doctor import register_doctor, run_doctor
 from market_sentinel.clock import SystemClock
 from market_sentinel.errors import ProviderError, TuningConfigError, TuningSnapshotError
 from market_sentinel.evaluation.aggregate import evaluate
@@ -51,6 +53,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.command == "daemon":
         return asyncio.run(_handle_daemon(args))
+    if args.command == "demo":
+        return asyncio.run(run_demo(args))
+    if args.command == "doctor":
+        return run_doctor(args)
     if args.command == "telemetry":
         return _handle_telemetry(args)
     if args.command == "tuning":
@@ -116,6 +122,8 @@ def _build_parser() -> argparse.ArgumentParser:
     disable = watch_sub.add_parser("disable")
     disable.add_argument("symbol")
     sub.add_parser("daemon", help="JSONL stdio host protocol")
+    register_demo(sub)
+    register_doctor(sub)
     telemetry = sub.add_parser("telemetry", help="read-only telemetry evaluation")
     tel_sub = telemetry.add_subparsers(dest="telemetry_command", required=True)
     report = tel_sub.add_parser("report", help="evaluation report from local JSONL")
