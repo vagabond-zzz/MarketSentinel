@@ -13,6 +13,7 @@ import json
 import os
 import shutil
 import sys
+from pathlib import Path
 
 from market_sentinel.intelligence.model_settings import load_model_settings
 from market_sentinel.ipc.protocol import PROTOCOL_VERSION
@@ -48,8 +49,8 @@ def run_doctor(args: argparse.Namespace) -> int:
     checks.extend(_check_intelligence())
     checks.extend(_check_mcp_extra())
     checks.extend(_check_telemetry_dir())
-    checks.append((_INFO, "ZCode integration", "not implemented (planned milestone M4)"))
     checks.append((_INFO, "DeepSeek Harness integration", "not implemented (planned milestone M5)"))
+    checks.extend(_check_zcode_registration())
 
     failed = any(status == _FAIL for status, _label, _detail in checks)
     if getattr(args, "json", False):
@@ -159,6 +160,54 @@ def _check_mcp_extra() -> list[tuple[str, str, str]]:
     if importlib.util.find_spec("mcp") is None:
         return [(_WARN, "mcp extra", "not installed (optional; `uv sync --extra mcp`)")]
     return [(_OK, "mcp extra", "installed; serve tools with `market-sentinel mcp`")]
+
+
+def _zcode_config_paths() -> list[tuple[str, Path]]:
+    home = Path.home()
+    return [
+        ("user config", home / ".zcode" / "cli" / "config.json"),
+        ("workspace config", Path.cwd() / ".zcode" / "config.json"),
+        ("agents fallback", home / ".agents" / "mcp.json"),
+    ]
+
+
+def _registered_zcode_scope() -> str | None:
+    """Find a registered market-sentinel MCP server in known ZCode config files.
+
+    Registration is a config-file fact only; an actual host connection is
+    verified in a live ZCode session (see docs/integrations/zcode.md).
+    """
+    for scope, path in _zcode_config_paths():
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        servers = data.get("mcp", {}).get("servers") or data.get("mcpServers") or {}
+        if "market-sentinel" in servers:
+            return scope
+    return None
+
+
+def _check_zcode_registration() -> list[tuple[str, str, str]]:
+    scope = _registered_zcode_scope()
+    if scope is not None:
+        return [
+            (
+                _OK,
+                "ZCode integration",
+                f"market-sentinel server registered ({scope});"
+                " host connection is verified in a live session",
+            )
+        ]
+    return [
+        (
+            _WARN,
+            "ZCode integration",
+            "not registered; see docs/integrations/zcode.md for setup",
+        )
+    ]
 
 
 def _check_telemetry_dir() -> list[tuple[str, str, str]]:
