@@ -916,3 +916,9 @@ Market Sentinel 是一套面向开发者的小规模市场观察系统：用确�
 候选配置 ≠ 生产配置
 模型 ≠ 高频主链
 ```
+
+---
+
+## License
+
+MIT，见 [LICENSE](LICENSE)。版权（c）2026 MarketSentinel contributors。

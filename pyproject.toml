@@ -3,6 +3,7 @@ name = "market-sentinel"
 version = "0.6.5"
 description = "Low-latency market monitoring core for developer hosts"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
