@@ -46,6 +46,7 @@ def run_doctor(args: argparse.Namespace) -> int:
     checks.extend(_check_optional_live_deps())
     checks.extend(_check_providers())
     checks.extend(_check_intelligence())
+    checks.extend(_check_mcp_extra())
     checks.extend(_check_telemetry_dir())
     checks.append((_INFO, "ZCode integration", "not implemented (planned milestone M4)"))
     checks.append((_INFO, "DeepSeek Harness integration", "not implemented (planned milestone M5)"))
@@ -152,6 +153,12 @@ def _check_intelligence() -> list[tuple[str, str, str]]:
             )
         )
     return checks
+
+
+def _check_mcp_extra() -> list[tuple[str, str, str]]:
+    if importlib.util.find_spec("mcp") is None:
+        return [(_WARN, "mcp extra", "not installed (optional; `uv sync --extra mcp`)")]
+    return [(_OK, "mcp extra", "installed; serve tools with `market-sentinel mcp`")]
 
 
 def _check_telemetry_dir() -> list[tuple[str, str, str]]:
