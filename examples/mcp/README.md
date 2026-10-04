@@ -21,9 +21,9 @@ uv run market-sentinel mcp   # Ctrl+C to stop; stdio stays silent, logs go to st
 
 | File | Purpose |
 |---|---|
-| `zcode-mcp-servers.json` | `mcp.servers` fragment for `~/.zcode/cli/config.json` (user scope) or `<repo>/.zcode/config.json` (workspace scope) |
+| `zcode-mcp-servers.json` | `mcp.servers` fragment for `~/.zcode/cli/config.json` (user scope) or `<repo>/.zcode/config.json` (workspace scope) — verified against ZCode 0.16.9 |
 | `any-mcp-client.json` | Generic `mcpServers` fragment (Claude Desktop-style clients) |
-| `deepseek-harness.md` | DeepSeek Harness `dsh-mcp-client` composition (developer preview; **not yet verified against a live DSH install**) |
+| `deepseek-harness.md` | DeepSeek Harness `dsh-mcp-client` composition — verified against DSH 0.2.0-rc.2 (headless, stdio) |
 
 ## Platform notes
 

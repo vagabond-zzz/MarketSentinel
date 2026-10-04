@@ -97,7 +97,7 @@ market-sentinel mcp --symbols 600519.SH,000001.SZ         # 显式标的列表
 |---|---|---|
 | 任意标准 MCP 客户端（stdio + tools） | 是 | **是**——协议级集成测试（initialize / tools/list / tools/call / 干净退出、stdout 纯净性） |
 | ZCode | 是（标准 stdio MCP server，配置即接入） | **是**——ZCode 0.16.9（Windows）真实会话验证：discovery / 6 工具调用 / 错误传播 / replay 事件流 / 多 server 隔离 / 生命周期全过；详见 [zcode.md](zcode.md)（2026-10-05） |
-| DeepSeek Harness | 是（经其官方 `@deepseek-ai/dsh-mcp-client`，stdio；仅桥接 tools，不桥接 resources/prompts） | **未验证**——DSH 处于 developer preview，配置方式见 `examples/mcp/`，M5 验证后回填 |
+| DeepSeek Harness | 是（标准 stdio MCP server，经其内置 `@deepseek-ai/dsh-mcp-client` 接入；仅桥接 tools） | **是**——DSH 0.2.0-rc.2（Windows）真实会话验证：discovery / 6 工具调用 / 错误传播 / replay 事件流 / Agent tool use / 越权 negative test / 透明重连 / 无孤儿进程；详见 [deepseek-harness.md](deepseek-harness.md)（2026-10-05） |
 
 > 结论：Market Sentinel 侧交付的是一个**经过协议级验证的标准 MCP server**；"在某个宿主里可用"的最终判定以各宿主验证记录为准，未验证前不声称支持。
 
@@ -115,6 +115,23 @@ market-sentinel mcp --symbols 600519.SH,000001.SZ         # 显式标的列表
 | 坏配置的会话内报错 | OBSERVED（仅宿主日志可诊断，会话内静默；见 zcode.md troubleshooting） |
 | ZCode Desktop GUI Settings → MCP 呈现 | UNKNOWN（headless 验证未覆盖 GUI） |
 | 其他 ZCode 版本 | UNKNOWN |
+
+### DeepSeek Harness 验证矩阵（2026-10-05，DSH 0.2.0-rc.2 / Windows）
+
+| Layer | Status |
+|---|---|
+| MCP stdio protocol | VERIFIED（集成测试） |
+| MarketSentinel MCP server | VERIFIED |
+| DSH MCP discovery | VERIFIED |
+| DSH direct tool call（happy path + 错误信封） | VERIFIED |
+| DSH Agent tool use（真实 CallToolRequest + 引用工具数据） | VERIFIED |
+| DSH error propagation（capability 信封 + schema 拒绝可区分） | VERIFIED |
+| Replay → event → DSH（8 字段 EventView，无内部字段） | VERIFIED |
+| DSH reconnect（中途强杀 server，模型侧零失败） | VERIFIED |
+| DSH shutdown lifecycle（无孤儿进程） | VERIFIED |
+| DSH headless 沙箱对 shell 的限制 | OBSERVED（DSH preview 行为，与 MCP 路径无关） |
+| DSH GUI / Web profile、reconnect 上限耗尽 | UNKNOWN |
+| 其他 DSH 版本 | UNKNOWN |
 
 ## 与 Cursor 宿主的关系
 
