@@ -101,6 +101,12 @@ Cursor Host 启动 Core 时不会自动附加 `--extra live`，因此 live extra
 
 ## 2.3 最小 CLI 体验
 
+无需任何 API key 的确定性演示（replay fixture + fake intelligence）：
+
+```bash
+uv run market-sentinel demo
+```
+
 默认 Provider 是 `fake`：
 
 ```bash
@@ -522,14 +528,59 @@ Market Sentinel: Signal Feedback
 
 # 5. CLI 功能
 
-## 5.1 Watchlist
+## 5.0 Demo：5 分钟离线体验
+
+```bash
+uv run market-sentinel demo
+```
+
+用仓库自带的 `tests/fixtures/multi_a_share_ui.jsonl` 驱动真实 `MarketEngine`（FakeClock、fake intelligence provider、内存 telemetry），跑完整个 Provider → Features → Events → Signals → State 链路，然后通过 capabilities 只读层输出 `get_market_state` / `get_feed_health` / `get_active_signals` / `get_signal` / `get_recent_events`。输出摘要：
+
+```text
+Market Sentinel demo — deterministic replay walkthrough
+provider: replay (multi_a_share_ui.jsonl) | intelligence: fake provider (no API key)
+watchlist: 600519.SH, 000001.SZ, 300750.SZ
+
+[pipeline]
+  replay batches ticked : 43
+  quotes processed      : 129
+  events accepted       : 55 (61 generated, 6 deduped)
+  signal episodes       : 18
+  alert candidates      : 18 (14 suppressed by cooldown)
+  intelligence calls    : 4 succeeded of 6 routed
+```
+
+不需要网络、不写任何文件；signal/event ID 为运行时 UUID（同一 fixture 的其余输出完全确定）。`--fixture <path>` 可指定其他 replay JSONL。
+
+## 5.1 Doctor：环境诊断
+
+```bash
+uv run market-sentinel doctor        # 加 --json 输出 JSON
+```
+
+只读检查（不安装、不改配置、不联网）：Python 版本、uv、包安装与 Protocol 版本、可选 live 依赖、各 provider 配置状态（Longbridge 只报告凭据名是否存在，不读取值）、Intelligence 配置、telemetry 目录可写性。ZCode / DeepSeek Harness 集成为 `not implemented` 占位，后续里程碑加入真实探测。存在 `✗` 项时退出码为 1。
+
+```text
+✓ Python: 3.12.1 (>= 3.12 required)
+✓ package: market-sentinel 0.6.5 (protocol 1); virtualenv active
+⚠ live dependencies: not installed: httpx, longbridge (optional; `uv sync --extra live`)
+✓ provider fake: default, no configuration
+✓ provider replay: fixture corpus found: fixtures/
+⚠ provider longbridge: credentials not set: LONGBRIDGE_APP_KEY, ... (optional live provider)
+✓ intelligence: disabled (default); provider dashscope, model qwen3.7-max-2026-06-08
+✓ telemetry directory: writable: ...
+- ZCode integration: not implemented (planned milestone M4)
+- DeepSeek Harness integration: not implemented (planned milestone M5)
+```
+
+## 5.2 Watchlist
 
 ```bash
 uv run market-sentinel --watchlist data/watchlist.json watchlist add 600519.SH
 uv run market-sentinel --watchlist data/watchlist.json watchlist list
 ```
 
-## 5.2 单次运行
+## 5.3 单次运行
 
 ```bash
 uv run market-sentinel --watchlist data/watchlist.json run --once
@@ -540,7 +591,7 @@ uv run market-sentinel --watchlist data/watchlist.json run --once --verbose
 
 `--intelligence` / `--no-intelligence` 是全局 CLI flag，应放在子命令 `run` / `daemon` 前。
 
-## 5.3 Daemon / Host Protocol
+## 5.4 Daemon / Host Protocol
 
 ```bash
 uv run market-sentinel --provider fake daemon
@@ -577,7 +628,7 @@ hello
 
 `set_watchlist` 只修改当前 runtime，不写回 CLI 的 `data/watchlist.json`。
 
-## 5.4 Telemetry / Evaluation
+## 5.5 Telemetry / Evaluation
 
 ```bash
 uv run market-sentinel telemetry report
@@ -585,7 +636,7 @@ uv run market-sentinel telemetry report --data-dir <dir>
 uv run market-sentinel telemetry report --data-dir <dir> --run-id <id> --format text
 ```
 
-## 5.5 Offline Tuning
+## 5.6 Offline Tuning
 
 ```bash
 uv run market-sentinel tuning snapshot --config-version baseline-v0.6
