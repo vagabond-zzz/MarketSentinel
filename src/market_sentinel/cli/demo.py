@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import importlib.resources
 import json
 import sys
 from collections import Counter
@@ -30,7 +31,7 @@ from market_sentinel.telemetry.runtime import TelemetryRuntime
 from market_sentinel.tuning.replay import scheduler_policy_for_replay
 from market_sentinel.watchlist.watchlist import Watchlist
 
-DEFAULT_FIXTURE = Path("tests/fixtures/multi_a_share_ui.jsonl")
+DEMO_FIXTURE_PARTS = ("data", "multi_a_share_ui.jsonl")
 
 
 def register_demo(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -50,7 +51,8 @@ async def run_demo(args: argparse.Namespace) -> int:
     fixture = args.fixture if args.fixture is not None else _default_fixture()
     if fixture is None or not fixture.is_file():
         print(
-            "demo fixture not found; run from a repository checkout or pass --fixture <path>",
+            "bundled demo fixture missing from the installed package;"
+            " pass --fixture <path to a replay JSONL>",
             file=sys.stderr,
         )
         return 2
@@ -58,8 +60,12 @@ async def run_demo(args: argparse.Namespace) -> int:
 
 
 def _default_fixture() -> Path | None:
-    candidate = Path(__file__).resolve().parents[3] / DEFAULT_FIXTURE
-    return candidate if candidate.is_file() else None
+    """Resolve the package-owned demo fixture (works in wheel installs too)."""
+    candidate = importlib.resources.files("market_sentinel").joinpath(*DEMO_FIXTURE_PARTS)
+    if not candidate.is_file():
+        return None
+    with importlib.resources.as_file(candidate) as path:
+        return path
 
 
 async def _run(fixture: Path) -> int:

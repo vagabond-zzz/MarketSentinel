@@ -21,6 +21,6 @@ out/
 Thumbs.db
 
 # Local runtime data
-data/
+/data/
 *.json.bak
 .tmp/
