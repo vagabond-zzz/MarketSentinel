@@ -24,7 +24,7 @@
 | Documentation consistency | PASS | 宿主验证声明与实际一致（见 §3）；DSH 保留 developer preview 标注；无 trade/config-mutation 暗示；安装命令均经实际执行 |
 | License | **READY** | **MIT — Status: READY — Decision: USER-APPROVED**。`LICENSE`（c）2026 MarketSentinel contributors；pyproject `license = "MIT"`（wheel METADATA `License-Expression: MIT`）；README 有 License 段；无双重许可表述 |
 | Version | PASS（现状一致） | pyproject / METADATA / CHANGELOG / doctor 均为 0.6.5；M2–M6 记录于 CHANGELOG `Unreleased`（无版本 bump）。**下一发布版本号 = owner 决策（见 §4）** |
-| CI | DEFERRED | `.github/` 不存在；按计划 M8 实施（当前全部检查本地可复现） |
+| CI | **READY**（2026-10-05 更新） | `.github/workflows/ci.yml`：python（无/有 `[mcp]` extra 两轮 pytest + ruff）、typescript、package（build + artifact 检查 + fresh-install smoke + MCP/live 边界 + 握手）、hygiene（secret/artifact/whitespace 扫描）；全部步骤已在新 clone 本地预演通过，首次 Actions 运行待 owner 批准 push |
 | ZCode host | VERIFIED | 0.16.9，见 [integrations/zcode.md](integrations/zcode.md)（2026-10-05） |
 | DSH host | VERIFIED | 0.2.0-rc.2，见 [integrations/deepseek-harness.md](integrations/deepseek-harness.md)（2026-10-05） |
 
@@ -59,7 +59,7 @@ M6 未修改 `mcp_server/` 实现（仅 demo fixture 与文档），因此 M4/M5
 
 | 项 | 去向 |
 |---|---|
-| GitHub Actions CI（python/extension/secret-scan/clean-checkout） | M8 |
+| CI 首次真实 Actions 运行 | owner 批准 push 后自动触发（workflow 已就绪并在新 clone 预演） |
 | README / 产品叙事重写（英文、架构图、Quick Start 打磨） | M7 |
 | 外部视角 clean-room 全量审计（clone→install→verify 全链） | M9 |
 | 创建 GitHub Release / tag | owner 批准后（M9 后） |

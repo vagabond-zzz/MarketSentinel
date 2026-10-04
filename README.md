@@ -1,5 +1,7 @@
 # MarketSentinel
 
+[![CI](https://github.com/vagabond-zzz/MarketSentinel/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/vagabond-zzz/MarketSentinel/actions/workflows/ci.yml)
+
 Deterministic real-time market monitoring with a read-only MCP capability layer for AI agents.
 
 MarketSentinel watches a small watchlist of symbols and turns raw quotes into features, events, and signals with fully deterministic code. The resulting state is exposed three ways: a CLI, a low-latency Cursor / VS Code host protocol, and a standard MCP server that agent hosts such as ZCode and DeepSeek Harness consume. An optional LLM intelligence layer runs as a bounded asynchronous sidecar — it may annotate signals, but it never decides what happened and never touches the market pipeline.
@@ -12,7 +14,7 @@ This is developer-oriented infrastructure. The system observes, explains, and re
 | License | MIT — [LICENSE](LICENSE) |
 | Python | 3.12+, zero core runtime dependencies |
 | Agent hosts verified | ZCode 0.16.9 · DeepSeek Harness 0.2.0-rc.2 (stdio MCP) |
-| Status | Working system; CI and a GitHub release are not yet in place (see [Roadmap](#roadmap)) |
+| Status | Working system; GitHub Actions CI in place; GitHub release pending owner approval |
 
 ## Why this architecture
 
@@ -200,11 +202,11 @@ Workflow and engineering invariants: [CONTRIBUTING.md](CONTRIBUTING.md). Long-st
 - Adaptive polling produces sampled, observed 1-minute bars — not exchange-official candles; `alerts_per_market_hour` is defined for A-shares only.
 - `get_signal` sees only signals inside their episode lifecycle (no history store by design); `get_recent_events` is fed by the runtime's own tick loop, so it is empty under the static fake provider — use a replay fixture to see the event flow.
 - Host verification is version-specific (ZCode 0.16.9; DeepSeek Harness 0.2.0-rc.2, developer preview); other host versions are unverified.
-- No CI yet — every check is reproducible locally ([docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md)).
+- CI covers tests, lint, packaging, and dependency boundaries — not host integrations, live vendors, or GUI behavior (those are verified out of band, see the host table above).
 
 ## Roadmap
 
-- **M8** — GitHub Actions CI: Python and extension matrices, packaging and secret checks
+- **CI** — GitHub Actions quality gates are in place (tests, lint, packaging, fresh-install and MCP-boundary smoke; see `.github/workflows/ci.yml`). Host integrations, live vendors, and GUI behavior remain out of band.
 - **M9** — clean-room external audit: fresh clone → install → verify everything against the README
 - GitHub Release / tag — after owner approval; **PyPI: not scheduled**
 

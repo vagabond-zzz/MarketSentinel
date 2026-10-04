@@ -91,6 +91,10 @@ Before committing:
 2. Run the relevant tests and lints (both languages if you touched both)
 3. Confirm no secrets, no `.venv/`, no `node_modules/`, no generated artifacts are staged
 
+## Continuous integration
+
+Pull requests and pushes to `master` run GitHub Actions (`.github/workflows/ci.yml`): the Python suite (twice — without and with the `[mcp]` extra), ruff, the extension lint/typecheck/test/build, package build with artifact inspection, a fresh-venv install smoke (CLI / demo / doctor), the MCP core-vs-extra dependency boundary with a stdio handshake smoke, the fail-closed live-provider boundary, and repository hygiene scans. The commands are the same ones documented above — CI adds no separate test set. Host integrations (ZCode, DeepSeek Harness), live vendors, and GUI behavior are verified out of band, not in CI.
+
 ## Submitting changes
 
 Open a pull request against `master` with a short description of what changed and why, and the check results. For larger design changes (protocol, scheduler semantics, intelligence contract), open an issue first and reference the relevant contract doc in `docs/architecture/`.
