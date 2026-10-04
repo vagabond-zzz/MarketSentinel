@@ -4,7 +4,7 @@
 >
 > Token target: **0 by default**; **极低** only when intelligence is explicitly enabled.
 >
-> See `docs/14_v0.5_Intelligence_Contract.md` and `docs/15_v0.5_Release_Candidate.md`.
+> See `docs/architecture/intelligence-contract.md` and `docs/history/15_v0.5_Release_Candidate.md`.
 
 ---
 

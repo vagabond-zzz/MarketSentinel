@@ -10,10 +10,10 @@
 
 开始任何实现前，先完整阅读：
 
-- `docs/01_任务书_Market_Sentinel.md`
-- `docs/02_Roadmap_v0.1_Core.md`
-- `docs/03_Roadmap_v0.2_Event_Engine.md`
-- `docs/04_Roadmap_v0.3_Cursor_MVP.md`
+- `docs/architecture/charter.md`
+- `docs/history/02_Roadmap_v0.1_Core.md`
+- `docs/history/03_Roadmap_v0.2_Event_Engine.md`
+- `docs/history/04_Roadmap_v0.3_Cursor_MVP.md`
 - `docs/05_Roadmap_v0.4_Intelligence_and_v1.0_MultiHost.md`
 - `AGENTS.md`
 

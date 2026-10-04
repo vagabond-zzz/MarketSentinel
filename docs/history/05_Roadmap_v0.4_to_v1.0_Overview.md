@@ -128,7 +128,7 @@ Cursor Host
 - session boundary；
 - provider failure 不制造假 Event。
 
-详细见：`06_Roadmap_v0.4_Live_Market_Data.md`
+详细见：`docs/history/06_Roadmap_v0.4_Live_Market_Data.md`
 
 ---
 
@@ -148,7 +148,7 @@ Need Intelligence?
 
 高频行情路径仍然完全不调用模型。
 
-详细见：`07_Roadmap_v0.5_Market_Intelligence.md`
+详细见：`docs/history/07_Roadmap_v0.5_Market_Intelligence.md`
 
 ---
 
@@ -168,7 +168,7 @@ Need Intelligence?
 
 用这些数据调整 deterministic parameters 与 Intelligence Router，而不是让模型在线自改规则。
 
-详细见：`08_Roadmap_v0.6_Feedback_and_Tuning.md`
+详细见：`docs/history/08_Roadmap_v0.6_Feedback_and_Tuning.md`
 
 ---
 
@@ -196,7 +196,7 @@ Cursor + 1 个非 VS Code 宿主
            Adapter           Adapter
 ```
 
-详细见：`09_Roadmap_v1.0_MultiHost.md`
+详细见：`docs/architecture/multihost-spec.md`
 
 ---
 

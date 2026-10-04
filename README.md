@@ -295,7 +295,7 @@ uv run market-sentinel telemetry report --data-dir <dir>
 uv run market-sentinel telemetry report --data-dir <dir> --run-id <id> --format text
 ```
 
-`feedback_count`、`useful_rate`、`feedback_coverage`、`alerts_per_market_hour` 等指标遵循 `docs/16_v0.6_Metrics_Contract.md`；没有 feedback 时 `useful_rate` 是 unavailable，不应解释为 0%。
+`feedback_count`、`useful_rate`、`feedback_coverage`、`alerts_per_market_hour` 等指标遵循 `docs/architecture/metrics-contract.md`；没有 feedback 时 `useful_rate` 是 unavailable，不应解释为 0%。
 
 ## 3.6 Offline Tuning
 
@@ -409,12 +409,12 @@ Telemetry / Feedback 是 append-only；tuning snapshot 是 immutable。Host 不�
 | 文档 | 建议阅读场景 |
 |---|---|
 | `CHANGELOG.md` | 查看各版本完成了什么 |
-| `docs/08_Roadmap_v0.6_Feedback_and_Tuning.md` | 理解 v0.6 telemetry / feedback / tuning 路线与边界 |
-| `docs/12_v0.4_Longbridge_Provider_Setup.md` | 配置 Longbridge |
-| `docs/16_v0.6_Metrics_Contract.md` | 修改 telemetry、feedback、evaluation、market-time 统计前必读 |
-| `docs/17_v0.6_Release_Candidate.md` | v0.6.0 历史 Release Candidate |
-| `docs/18_v0.6.5_UX_Polish.md` | v0.6.5 Host / CLI UX 实现记录 |
-| `docs/19_v0.6.5_Release_Candidate.md` | v0.6.5 发布准备、tests、VSIX、privacy / mutation audit |
+| `docs/history/08_Roadmap_v0.6_Feedback_and_Tuning.md` | 理解 v0.6 telemetry / feedback / tuning 路线与边界 |
+| `docs/integrations/longbridge.md` | 配置 Longbridge |
+| `docs/architecture/metrics-contract.md` | 修改 telemetry、feedback、evaluation、market-time 统计前必读 |
+| `docs/history/17_v0.6_Release_Candidate.md` | v0.6.0 历史 Release Candidate |
+| `docs/history/18_v0.6.5_UX_Polish.md` | v0.6.5 Host / CLI UX 实现记录 |
+| `docs/history/19_v0.6.5_Release_Candidate.md` | v0.6.5 发布准备、tests、VSIX、privacy / mutation audit |
 
 ## 3.10 已知边界
 
@@ -692,7 +692,7 @@ Model != high-frequency main path
 - 不要把 user feedback 回写为 Event 事实。
 - 不要把 Intelligence 变成 tick-by-tick 主链。
 - 新的 Protocol 字段优先保持 additive optional，除非明确计划升级 Protocol。
-- 修改 telemetry / evaluation / feedback / market-time 语义前先阅读 `docs/16_v0.6_Metrics_Contract.md`。
+- 修改 telemetry / evaluation / feedback / market-time 语义前先阅读 `docs/architecture/metrics-contract.md`。
 
 ---
 
@@ -770,7 +770,7 @@ apps/cursor-extension/market-sentinel-0.6.5.vsix
 - commands / settings contributions 完整；
 - StatusBar、Hover、Details Webview、Watchlist 命令在真实 Cursor Desktop 中可用。
 
-精确测试数量、Coverage、Timing、VSIX file count / size 和最终 release audit 以 `docs/19_v0.6.5_Release_Candidate.md` 为准，避免 README 因每次测试新增而频繁过期。
+精确测试数量、Coverage、Timing、VSIX file count / size 和最终 release audit 以 `docs/history/19_v0.6.5_Release_Candidate.md` 为准，避免 README 因每次测试新增而频繁过期。
 
 ## 7.4 推荐发布前顺序
 

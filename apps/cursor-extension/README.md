@@ -14,7 +14,7 @@ Python Core is **not** bundled. The extension spawns:
 uv run --directory <coreRoot> market-sentinel --provider fake daemon
 ```
 
-For live A-shares, set `marketSentinel.provider` to `longbridge` and export `LONGBRIDGE_APP_KEY` / `LONGBRIDGE_APP_SECRET` / `LONGBRIDGE_ACCESS_TOKEN` in the environment inherited by the child process (not in settings). Install the SDK with `uv sync --extra live`. See repository `docs/12_v0.4_Longbridge_Provider_Setup.md`.
+For live A-shares, set `marketSentinel.provider` to `longbridge` and export `LONGBRIDGE_APP_KEY` / `LONGBRIDGE_APP_SECRET` / `LONGBRIDGE_ACCESS_TOKEN` in the environment inherited by the child process (not in settings). Install the SDK with `uv sync --extra live`. See repository `docs/integrations/longbridge.md`.
 
 The Host maps Protocol state to StatusBar / compact hover / persistent scrollable Details Webview / optional explicit feedback. It does not write `telemetry.jsonl`, `feedback.jsonl`, or tuning snapshots. Those files stay under the Core data directory.
 

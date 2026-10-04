@@ -294,9 +294,9 @@ def test_free_text_cannot_enter_tuning_record() -> None:
 def test_host_core_ownership_constants() -> None:
     assert HOST_INTERACTION_FACT_OWNER == "host"
     assert TELEMETRY_COLLECTOR_OWNER == "core"
-    docs = (Path(__file__).resolve().parents[3] / "docs" / "16_v0.6_Metrics_Contract.md").read_text(
-        encoding="utf-8"
-    )
+    docs = (
+        Path(__file__).resolve().parents[3] / "docs" / "architecture" / "metrics-contract.md"
+    ).read_text(encoding="utf-8")
     assert "Host interaction fact owner:" in docs
     assert "Telemetry collector / future local storage owner:" in docs
     assert "additive Protocol v1 host-interaction command" in docs

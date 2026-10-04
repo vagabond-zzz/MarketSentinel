@@ -4,7 +4,7 @@
 >
 > Token target: **0**
 >
-> See `docs/12_v0.4_Longbridge_Provider_Setup.md` and `docs/13_v0.4_Release_Candidate.md`.
+> See `docs/integrations/longbridge.md` and `docs/history/13_v0.4_Release_Candidate.md`.
 > Do not tag `v0.4.0` until the remaining Core-wiring / release steps are explicitly completed.
 
 ---

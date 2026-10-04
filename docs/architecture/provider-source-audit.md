@@ -4,7 +4,7 @@
 >
 > Baseline: Market Sentinel **v0.3.0** (tag `v0.3.0`).
 >
-> Planning sources: `docs/05_Roadmap_v0.4_to_v1.0_Overview.md`, `docs/06_Roadmap_v0.4_Live_Market_Data.md`.
+> Planning sources: `docs/history/05_Roadmap_v0.4_to_v1.0_Overview.md`, `docs/history/06_Roadmap_v0.4_Live_Market_Data.md`.
 >
 > Rule used throughout: if an official page does not state a fact, the cell is **UNKNOWN**. No blog-only semantics.
 >
@@ -27,7 +27,7 @@ v0.4 live-data **product scope is A-share only**.
 
 Narrowing to A-shares **does not** lift semantic UNKNOWN gates on volume, turnover, high/low, or timestamp ordering. Core contract is unchanged.
 
-**M1a status:** isolated probes landed; see `docs/11_v0.4_M1a_Live_Semantics_Bakeoff.md`. Longbridge live pull did **not** pass hard gates this round (no credentials). Do **not** implement `LongbridgeQuoteProvider` or wire MarketEngine until architecture review.
+**M1a status:** isolated probes landed; see `docs/history/11_v0.4_M1a_Live_Semantics_Bakeoff.md`. Longbridge live pull did **not** pass hard gates this round (no credentials). Do **not** implement `LongbridgeQuoteProvider` or wire MarketEngine until architecture review.
 
 ---
 

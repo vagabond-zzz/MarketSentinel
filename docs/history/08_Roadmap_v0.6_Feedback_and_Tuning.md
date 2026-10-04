@@ -4,7 +4,7 @@
 >
 > Token target: **低**
 >
-> See `docs/16_v0.6_Metrics_Contract.md`.
+> See `docs/architecture/metrics-contract.md`.
 
 ---
 
@@ -238,7 +238,7 @@ new config
 
 ### M0 — Metrics contract
 
-- [x] 定义什么记录、什么不记录（`docs/16_v0.6_Metrics_Contract.md`；Core types + offline tests only）。
+- [x] 定义什么记录、什么不记录（`docs/architecture/metrics-contract.md`；Core types + offline tests only）。
 - [x] 外审后最终冻结（`21e96dc` on `feat/v0.6-feedback-observability`）。
 
 M0 已纳入：`run_id`、`market_timestamp`、Host→Core collector 所有权、`alert_presented` 每 candidate、`alert_suppressed`、`decision_reason` / `latency_stage`、`event_clustered` once-per-run、无 `notes` 的 `TuningSnapshot`、最低 validation。
@@ -311,7 +311,7 @@ Feedback used for tuning must join telemetry by `(run_id, signal_id)` to Core li
 
 ### M6 — Release prep
 
-Package **0.6.0**. See `docs/17_v0.6_Release_Candidate.md`. No merge, tag, push, or v1.0.
+Package **0.6.0**. See `docs/history/17_v0.6_Release_Candidate.md`. No merge, tag, push, or v1.0.
 
 ---
 
