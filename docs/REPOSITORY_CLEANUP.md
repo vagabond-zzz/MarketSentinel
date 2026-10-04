@@ -126,12 +126,22 @@
 
 ## 5. 验证结果
 
-M1 完成后执行（结果在最终报告中回填）：
+M1 完成时实测（2026-10-04，HEAD = 61885a9）：
 
-```bash
-uv run ruff check .
-uv run ruff format --check .
-uv run pytest
-pnpm lint && pnpm typecheck && pnpm test && pnpm build
-git status && git diff --stat HEAD~3 && git diff --check
+| 检查 | 结果 |
+|---|---|
+| `uv run pytest` | **649 passed, 5 deselected**（live 排除），全绿 |
+| `uv run ruff check .` | All checks passed |
+| `uv run ruff format --check .` | 218 files already formatted |
+| `pnpm lint` / `pnpm typecheck` / `pnpm build` | 全部通过 |
+| `pnpm test`（vitest） | 21 files / 200 tests passed |
+| `git diff --check` | 无空白错误 |
+| `git status` | 工作区干净 |
+
+提交拆分：
+
+```text
+a09468a docs: organize documentation into architecture, integrations, and history
+8687b4e docs: add CONTRIBUTING and SECURITY guides
+61885a9 chore: add deterministic full-session benchmark tool
 ```
