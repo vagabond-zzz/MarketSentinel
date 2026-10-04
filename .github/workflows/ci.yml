@@ -1,0 +1,244 @@
+name: CI
+
+# Quality gates for a fresh clone / PR. Mirrors the local baseline documented
+# in README.md and CONTRIBUTING.md; runs no live market or host-integration
+# checks (ZCode / DeepSeek Harness / Longbridge verification is done out of
+# band and recorded in docs/integrations/).
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  python:
+    name: Python tests & lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Sync locked environment
+        run: uv sync --locked
+      - name: Pytest (core world — MCP tests skip by design without the extra)
+        run: uv run pytest
+      - name: Sync MCP extra
+        run: uv sync --locked --extra mcp
+      - name: Pytest (full suite incl. MCP unit tests)
+        run: uv run pytest
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+  typescript:
+    name: Extension lint & test & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      # The vitest suite skips its real core-process integration tests when
+      # uv is unavailable; Python coverage belongs to the python job.
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Test
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+
+  package:
+    name: Package build & fresh-install smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Build wheel and sdist
+        run: uv build
+      - name: Inspect artifacts
+        run: |
+          uv run python - <<'PY'
+          import tarfile, zipfile
+          from pathlib import Path
+
+          wheel = next(Path("dist").glob("*.whl"))
+          sdist = next(Path("dist").glob("*.tar.gz"))
+
+          with zipfile.ZipFile(wheel) as z:
+              names = z.namelist()
+              required = [
+                  "market_sentinel/__init__.py",
+                  "market_sentinel/capabilities/api.py",
+                  "market_sentinel/mcp_server/server.py",
+                  "market_sentinel/cli/demo.py",
+                  "market_sentinel/data/multi_a_share_ui.jsonl",
+              ]
+              missing = [item for item in required if item not in names]
+              assert not missing, f"wheel missing {missing}"
+              forbidden = [
+                  item for item in names
+                  if any(part in item for part in ("tests/", ".env", ".zcode",
+                                                   "telemetry.jsonl", "feedback.jsonl",
+                                                   "node_modules"))
+              ]
+              assert not forbidden, f"wheel contains forbidden entries: {forbidden}"
+              metadata = z.read(
+                  f"{wheel.stem.split('-py3')[0]}.dist-info/METADATA"
+              ).decode("utf-8", "replace")
+              assert "License-Expression: MIT" in metadata, "wheel METADATA lacks MIT license expression"
+
+          with tarfile.open(sdist) as t:
+              snames = t.getnames()
+              assert any(name.endswith("/LICENSE") for name in snames), "sdist lacks LICENSE"
+              assert any("/tests/" in name for name in snames), "sdist lacks tests (sources must stay auditable)"
+              bad = [name for name in snames if any(part in name for part in (".venv", "node_modules", ".zcode"))]
+              assert not bad, f"sdist contains forbidden entries: {bad}"
+
+          print("artifact inspection OK:", wheel.name, "+", sdist.name)
+          PY
+      - name: Fresh-venv install smoke (outside the checkout)
+        run: |
+          WHEEL="$(ls dist/*.whl)"
+          uv run python -m venv .ci-venv
+          .ci-venv/bin/python -m pip install --quiet --disable-pip-version-check "$WHEEL"
+          VENV="$(pwd)/.ci-venv/bin"
+          SMOKE_DIR="$(mktemp -d)"
+          cd "$SMOKE_DIR"
+          "$VENV/python" -c "import market_sentinel; assert 'site-packages' in market_sentinel.__file__, market_sentinel.__file__"
+          "$VENV/market-sentinel" --help > /dev/null
+          "$VENV/market-sentinel" demo | tee demo.out
+          # 43 = batch count of the bundled demo fixture; asserts the installed
+          # demo runs from package data, not the repository's tests/fixtures.
+          grep -q "replay batches ticked : 43" demo.out
+          grep -q "demo complete" demo.out
+          "$VENV/market-sentinel" doctor
+      - name: MCP dependency boundary (core install)
+        run: |
+          VENV="$(pwd)/.ci-venv/bin"
+          if "$VENV/python" -c "import mcp" 2>/dev/null; then
+            echo "FAIL: MCP SDK must not be importable in a core install"
+            exit 1
+          fi
+          set +e
+          "$VENV/market-sentinel" mcp >mcp.out 2>mcp.err
+          code=$?
+          set -e
+          test "$code" -eq 2 || { echo "FAIL: expected exit 2, got $code"; exit 1; }
+          grep -q "MCP support is not installed" mcp.err || { echo "FAIL: actionable error missing"; cat mcp.err; exit 1; }
+          if grep -qi "traceback" mcp.err; then echo "FAIL: traceback leaked"; cat mcp.err; exit 1; fi
+          test ! -s mcp.out || { echo "FAIL: stdout polluted"; cat mcp.out; exit 1; }
+      - name: MCP extra handshake (six tools, stdout discipline)
+        run: |
+          WHEEL="$(ls dist/*.whl)"
+          .ci-venv/bin/python -m pip install --quiet --disable-pip-version-check "market-sentinel[mcp] @ file://${WHEEL}"
+          uv run python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+
+          venv = Path(".ci-venv/bin/market-sentinel").resolve()
+          proc = subprocess.Popen(
+              [str(venv), "mcp"],
+              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+              text=True, encoding="utf-8", cwd="..",
+          )
+          try:
+              def send(payload):
+                  proc.stdin.write(json.dumps(payload) + "\n")
+                  proc.stdin.flush()
+
+              def recv():
+                  line = proc.stdout.readline()
+                  json.loads(line)  # every stdout line must be valid JSON-RPC
+                  return json.loads(line)
+
+              send({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                  "protocolVersion": "2024-11-05", "capabilities": {},
+                  "clientInfo": {"name": "ci", "version": "0"}}})
+              init = recv()
+              assert init["result"]["serverInfo"]["name"] == "market-sentinel", init
+              send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+              send({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+              # Bare names here: hosts add the mcp__<server>__ prefix when
+              # registering tools into the model's toolset.
+              tools = sorted(t["name"] for t in recv()["result"]["tools"])
+              assert tools == [
+                  "get_active_signals",
+                  "get_feed_health",
+                  "get_market_state",
+                  "get_recent_events",
+                  "get_signal",
+                  "get_symbol_state",
+              ], tools
+              send({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                    "params": {"name": "get_feed_health", "arguments": {}}})
+              payload = json.loads(recv()["result"]["content"][0]["text"])
+              assert payload["ok"] is True and payload["data"]["symbols"], payload
+              proc.stdin.close()
+              assert proc.wait(timeout=30) == 0
+          finally:
+              if proc.poll() is None:
+                  proc.kill()
+          print("MCP handshake smoke OK: 6 tools, envelope ok, stdout clean, clean exit")
+          PY
+      - name: Live provider boundary (fail-closed, no credentials)
+        run: |
+          VENV="$(pwd)/.ci-venv/bin"
+          if "$VENV/python" -c "import longbridge" 2>/dev/null; then
+            echo "FAIL: longbridge SDK must not be in a core install"
+            exit 1
+          fi
+          set +e
+          "$VENV/market-sentinel" --provider longbridge run --once >lb.out 2>lb.err
+          code=$?
+          set -e
+          test "$code" -eq 2 || { echo "FAIL: expected exit 2, got $code"; exit 1; }
+          grep -q "LONGBRIDGE_APP_KEY" lb.err || { echo "FAIL: actionable credential message missing"; cat lb.err; exit 1; }
+
+  hygiene:
+    name: Repository hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No tracked secrets
+        run: |
+          if git grep -InE "(sk-[A-Za-z0-9]{16,}|api[_-]?key[\"' ]*[:=][\"' ]*[A-Za-z0-9]{16,}|app_secret[\"' ]*[:=][\"' ]*[A-Za-z0-9]{8,}|access_token[\"' ]*[:=][\"' ]*[A-Za-z0-9]{16,}|BEGIN (RSA|OPENSSH) PRIVATE KEY)" -- . ':(exclude)pnpm-lock.yaml' ':(exclude)uv.lock'; then
+            echo "FAIL: potential secret in tracked files"
+            exit 1
+          fi
+          echo "secret scan clean"
+      - name: No tracked runtime/user artifacts
+        run: |
+          hits="$(git ls-files | grep -iE '(^|/)\.env|(^|/)\.zcode/|dsh_home|\.log$|\.dump$|\.trace$|telemetry\.jsonl$|feedback\.jsonl$' || true)"
+          if [ -n "$hits" ]; then
+            echo "FAIL: runtime/user artifacts tracked:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "tracked-file hygiene clean"
+      - name: No trailing whitespace in sources
+        # Markdown is excluded: two trailing spaces are intentional hard breaks.
+        run: |
+          if git grep -InE " +$" -- '*.py' '*.ts' '*.toml' '*.json' '*.yml' '*.yaml' | grep -v pnpm-lock; then
+            echo "FAIL: trailing whitespace found"
+            exit 1
+          fi
+          echo "whitespace scan clean"
