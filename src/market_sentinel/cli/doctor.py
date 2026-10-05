@@ -119,7 +119,14 @@ def _check_providers() -> list[tuple[str, str, str]]:
     if fixture_dir.is_dir():
         checks.append((_OK, "provider replay", f"fixture corpus found: {fixture_dir.name}/"))
     else:
-        checks.append((_WARN, "provider replay", f"fixture directory not found: {fixture_dir}"))
+        checks.append(
+            (
+                _INFO,
+                "provider replay",
+                "offline tuning/replay corpus ships with the repository checkout;"
+                " installed package still supports --replay <file> and --fixture",
+            )
+        )
     missing = missing_credential_names()
     if missing:
         checks.append(
@@ -210,13 +217,33 @@ def _check_zcode_registration() -> list[tuple[str, str, str]]:
     ]
 
 
+def _first_existing_ancestor(path: Path) -> Path:
+    """Walk up to the first ancestor that exists as a directory (or the root)."""
+    current = path
+    while not current.is_dir():
+        parent = current.parent
+        if parent == current:
+            return current
+        current = parent
+    return current
+
+
 def _check_telemetry_dir() -> list[tuple[str, str, str]]:
     data_dir = resolve_data_dir(None)
     if data_dir.is_dir():
         if os.access(data_dir, os.W_OK):
             return [(_OK, "telemetry directory", f"writable: {data_dir}")]
         return [(_FAIL, "telemetry directory", f"not writable: {data_dir}")]
-    parent = data_dir.parent
-    if parent.is_dir() and os.access(parent, os.W_OK):
+    # The directory itself does not exist yet: creation on first run only
+    # requires one writable ancestor, however deep the missing chain is.
+    # Never create anything here — doctor diagnoses, it does not write.
+    ancestor = _first_existing_ancestor(data_dir)
+    if ancestor.is_dir() and os.access(ancestor, os.W_OK):
         return [(_OK, "telemetry directory", f"creatable on first run: {data_dir}")]
-    return [(_FAIL, "telemetry directory", f"parent not writable: {parent}")]
+    return [
+        (
+            _FAIL,
+            "telemetry directory",
+            f"no writable ancestor found for: {data_dir} (checked up to {ancestor})",
+        )
+    ]

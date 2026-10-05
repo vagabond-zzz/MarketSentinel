@@ -89,3 +89,77 @@ def test_doctor_creates_nothing(tmp_path) -> None:
     data_dir = tmp_path / "ms-data"
     assert main(["doctor"]) == 0
     assert not data_dir.exists(), "doctor must not create or write the data directory"
+
+
+# ---------------------------------------------------------------------------
+# F1 regression: telemetry-directory check must walk the whole ancestor chain
+# instead of failing when the direct parent is missing (M9 finding F1).
+
+
+def test_telemetry_check_existing_writable_dir(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(doctor_module, "resolve_data_dir", lambda override: tmp_path)
+    status, _label, detail = doctor_module._check_telemetry_dir()[0]
+    assert status == "✓" and "writable" in detail
+
+
+def test_telemetry_check_missing_direct_parent(monkeypatch, tmp_path) -> None:
+    target = tmp_path / "ms-data"
+    monkeypatch.setattr(doctor_module, "resolve_data_dir", lambda override: target)
+    status, _label, detail = doctor_module._check_telemetry_dir()[0]
+    assert status == "✓" and "creatable on first run" in detail
+    assert not target.exists(), "doctor must not create the directory"
+
+
+def test_telemetry_check_multiple_missing_ancestors(monkeypatch, tmp_path) -> None:
+    target = tmp_path / "level1" / "level2" / "level3"
+    monkeypatch.setattr(doctor_module, "resolve_data_dir", lambda override: target)
+    status, _label, detail = doctor_module._check_telemetry_dir()[0]
+    assert status == "✓" and "creatable on first run" in detail
+    assert not (tmp_path / "level1").exists(), "doctor must not create any ancestor"
+
+
+def test_telemetry_check_unwritable_ancestor_fails(monkeypatch, tmp_path) -> None:
+    target = tmp_path / "a" / "b"
+    monkeypatch.setattr(doctor_module, "resolve_data_dir", lambda override: target)
+    monkeypatch.setattr(doctor_module.os, "access", lambda path, mode: False)
+    status, _label, detail = doctor_module._check_telemetry_dir()[0]
+    assert status == "✗" and "no writable ancestor" in detail
+
+
+def test_first_existing_ancestor_walk(monkeypatch, tmp_path) -> None:
+    deep = tmp_path / "x" / "y" / "z"
+    assert doctor_module._first_existing_ancestor(deep) == tmp_path
+    assert doctor_module._first_existing_ancestor(tmp_path) == tmp_path
+
+
+def test_telemetry_check_missing_ancestor_chain_linux_style(monkeypatch, tmp_path) -> None:
+    """F1 original report: ~/.local/share missing entirely (Linux runner shape)."""
+    home = tmp_path / "home"
+    target = home / ".local" / "share" / "market-sentinel"
+    monkeypatch.setattr(doctor_module, "resolve_data_dir", lambda override: target)
+    status, _label, detail = doctor_module._check_telemetry_dir()[0]
+    assert status == "✓" and "creatable on first run" in detail
+
+
+# ---------------------------------------------------------------------------
+# F4 regression: installed-package doctor must not point at a bogus
+# <site-packages>/tests/fixtures path when the repository is absent.
+
+
+def test_doctor_replay_line_in_checkout(monkeypatch, tmp_path, capsys) -> None:
+    fixtures = tmp_path / "tests" / "fixtures"
+    fixtures.mkdir(parents=True)
+    monkeypatch.setattr(doctor_module, "default_fixture_dir", lambda: fixtures)
+    assert main(["doctor"]) == 0
+    out = capsys.readouterr().out
+    assert "✓ provider replay: fixture corpus found: fixtures/" in out
+
+
+def test_doctor_replay_line_installed_package(monkeypatch, tmp_path, capsys) -> None:
+    absent = tmp_path / "lib" / "tests" / "fixtures"
+    monkeypatch.setattr(doctor_module, "default_fixture_dir", lambda: absent)
+    assert main(["doctor"]) == 0
+    out = capsys.readouterr().out
+    assert "corpus ships with the repository checkout" in out
+    assert "fixture directory not found" not in out
+    assert str(absent) not in out
