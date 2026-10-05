@@ -123,6 +123,10 @@ jobs:
           VENV="$(pwd)/.ci-venv/bin"
           SMOKE_DIR="$(mktemp -d)"
           cd "$SMOKE_DIR"
+          # Point the data dir at the smoke workspace: runner homes have no
+          # ~/.local/share, and the smoke should exercise the documented
+          # MARKET_SENTINEL_DATA_DIR override rather than $HOME assumptions.
+          export MARKET_SENTINEL_DATA_DIR="$SMOKE_DIR/ms-data"
           "$VENV/python" -c "import market_sentinel; assert 'site-packages' in market_sentinel.__file__, market_sentinel.__file__"
           "$VENV/market-sentinel" --help > /dev/null
           "$VENV/market-sentinel" demo | tee demo.out
