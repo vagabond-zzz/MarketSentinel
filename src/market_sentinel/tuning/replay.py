@@ -53,7 +53,12 @@ def corpus_fixture_path(fixture_dir: Path, corpus_id: str) -> Path:
         raise TuningConfigError("corpus_id is not a filesystem path")
     path = fixture_dir / f"{corpus_id}.jsonl"
     if not path.is_file():
-        raise TuningConfigError("unknown corpus_id")
+        raise TuningConfigError(
+            f"corpus fixture not found: {path}"
+            " (the offline tuning corpus ships with the repository checkout;"
+            " pass --fixture-dir pointing at a tests/fixtures directory"
+            " or run from a checkout)"
+        )
     return path
 
 

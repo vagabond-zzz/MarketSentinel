@@ -219,6 +219,16 @@ async def _handle_tuning_compare(args: argparse.Namespace) -> int:
         baseline = load_snapshot(data_dir, args.baseline)
         candidate = load_snapshot(data_dir, args.candidate)
         fixture_dir = args.fixture_dir if args.fixture_dir is not None else default_fixture_dir()
+        if not fixture_dir.is_dir():
+            print(
+                f"offline tuning corpus fixtures not found: {fixture_dir}",
+                "the corpus ships with the repository checkout — run `tuning compare`"
+                " from a checkout or pass --fixture-dir pointing at a tests/fixtures"
+                " directory",
+                sep="\n  ",
+                file=sys.stderr,
+            )
+            return 2
         work_dir = data_dir / "tuning-work"
         work_dir.mkdir(parents=True, exist_ok=True)
         report = await compare_artifacts(

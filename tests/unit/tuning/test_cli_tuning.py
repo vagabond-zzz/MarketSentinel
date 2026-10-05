@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
 
 from market_sentinel.cli.main import _build_parser, _parse_corpus, main
 from market_sentinel.errors import TuningConfigError
-from market_sentinel.tuning.replay import default_fixture_dir
+from market_sentinel.tuning.replay import corpus_fixture_path, default_fixture_dir
 
 
 def test_tuning_snapshot_and_compare_cli(tmp_path: Path, capsys) -> None:
@@ -161,3 +162,52 @@ def test_cli_empty_corpus_exits_2(tmp_path: Path, capsys) -> None:
         ]
     )
     assert code == 2
+
+
+# ---------------------------------------------------------------------------
+# F2 regression: installed-package tuning compare must fail with an actionable
+# message instead of "unknown corpus_id" (M9 finding F2).
+
+
+def test_corpus_fixture_path_missing_file_message() -> None:
+    with pytest.raises(TuningConfigError) as excinfo:
+        corpus_fixture_path(Path("/absent"), "normal_market")
+    message = str(excinfo.value)
+    assert "corpus fixture not found" in message
+    assert "repository checkout" in message
+    assert "unknown corpus_id" not in message
+
+
+def test_corpus_fixture_path_still_rejects_path_like_ids(tmp_path: Path) -> None:
+    with pytest.raises(TuningConfigError) as excinfo:
+        corpus_fixture_path(tmp_path, "../escape")
+    assert "not a filesystem path" in str(excinfo.value)
+
+
+def test_tuning_compare_without_fixtures_is_actionable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    main_module = sys.modules["market_sentinel.cli.main"]
+
+    snapshot = main(["tuning", "snapshot", "--config-version", "base", "--data-dir", str(tmp_path)])
+    assert snapshot == 0
+    baseline = sorted(p.stem for p in (tmp_path / "tuning").glob("*.json"))[0]
+    monkeypatch.setattr(main_module, "default_fixture_dir", lambda: tmp_path / "absent-fixtures")
+    capsys.readouterr()
+    code = main(
+        [
+            "tuning",
+            "compare",
+            "--baseline",
+            baseline,
+            "--candidate",
+            baseline,
+            "--data-dir",
+            str(tmp_path),
+        ]
+    )
+    assert code == 2
+    err = capsys.readouterr().err
+    assert "offline tuning corpus fixtures not found" in err
+    assert "repository checkout" in err
+    assert "Traceback" not in err
