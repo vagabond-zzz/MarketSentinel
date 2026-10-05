@@ -152,7 +152,7 @@ jobs:
           test ! -s mcp.out || { echo "FAIL: stdout polluted"; cat mcp.out; exit 1; }
       - name: MCP extra handshake (six tools, stdout discipline)
         run: |
-          WHEEL="$(ls dist/*.whl)"
+          WHEEL="$(realpath dist/*.whl)"
           .ci-venv/bin/python -m pip install --quiet --disable-pip-version-check "market-sentinel[mcp] @ file://${WHEEL}"
           uv run python - <<'PY'
           import json, subprocess
