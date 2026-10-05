@@ -57,13 +57,15 @@ ZCode
 
 ## 3. 当前版本边界
 
-当前开发以 Roadmap 中明确指定的版本为准。
+当前处于 v0.6.5 之后的 productization 轨道（M0–M10 已完成：文档治理、capabilities 只读层、CLI demo/doctor、MCP stdio server、ZCode 与 DeepSeek Harness 宿主验证、开源基础文件、CI、clean-room audit 与 finding closure）。
 
-如果用户没有明确要求进入下一版本：
+新能力开发仍以 owner 明确指定的 milestone 为准：
 
 > 不允许主动跨版本开发。
 
-特别是 v0.1 阶段不要提前实现：
+### 历史：v0.1 阶段的冻结边界
+
+以下清单是 v0.1 时期的版本边界（历史记录，保留以理解决策脉络）——当时禁止提前实现：
 
 ```text
 LLM
@@ -77,6 +79,35 @@ MCP
 自动交易
 买卖建议
 ```
+
+其中 LLM（受约束的 Intelligence sidecar）、复杂 Event Engine、复杂 Cursor UI 已在受控边界内实现；MCP 与宿主接入已按"只读 capability surface"实现并经宿主验证。**未实现且仍然禁止**的是下面 §3.1 的越权能力。
+
+### 3.1 当前仍然禁止的能力边界
+
+无论宿主形态（CLI / Cursor daemon / MCP），以下能力一律不得实现：
+
+```text
+交易执行 / 下单 / 券商交易接口
+买卖建议输出（模型输出中的交易建议被 fail-closed 拒绝）
+Agent / MCP 客户端的写能力（mutate watchlist、provider、intelligence 配置、
+  tuning、生产参数）
+shell / 文件系统 / 任意代码执行工具
+LLM 进入高频 tick 主链
+自动 promote tuning 候选为生产配置
+MCP resources / prompts（当前 tools-only 是有意为之）
+```
+
+### 3.2 当前的两条宿主路径
+
+```text
+Cursor / VS Code extension → Protocol v1 JSONL daemon（低延迟推送 + 双向命令）
+Agent hosts (ZCode / DeepSeek Harness / 其他 MCP 客户端) → MCP stdio server
+  → market_sentinel.capabilities（只读） → deterministic core
+```
+
+两条路径并存：MCP 是 agent-facing 的只读 capability surface（恰好六个只读工具、
+统一错误信封），不替代 Protocol v1，也不把宿主逻辑引入 Core；MCP standalone
+runtime 独立持有自己的 engine 与 tick loop，默认 NoOp telemetry。
 
 ---
 
