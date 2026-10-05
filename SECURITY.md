@@ -29,7 +29,7 @@ Please report security issues privately via [GitHub private vulnerability report
 
 Include: affected version/commit, a minimal reproduction, and your assessment of impact. Please give maintainers reasonable time to respond before any public disclosure.
 
-Supported versions: the latest tagged release on `master` (currently v0.6.5).
+Supported versions: the latest tagged release on `master` (currently v0.7.0).
 
 ## Scope notes
 

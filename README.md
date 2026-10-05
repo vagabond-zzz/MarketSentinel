@@ -10,7 +10,7 @@ This is developer-oriented infrastructure. The system observes, explains, and re
 
 | | |
 |---|---|
-| Package | `market-sentinel` 0.6.5 (wire protocol v1) |
+| Package | `market-sentinel` 0.7.0 (wire protocol v1) |
 | License | MIT — [LICENSE](LICENSE) |
 | Python | 3.12+, zero core runtime dependencies |
 | Agent hosts verified | ZCode 0.16.9 · DeepSeek Harness 0.2.0-rc.2 (stdio MCP) |

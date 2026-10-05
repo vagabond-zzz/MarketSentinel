@@ -13,7 +13,7 @@ def test_doctor_reports_and_exits_zero(capsys) -> None:
     out = capsys.readouterr().out
     assert "✓ Python" in out
     assert "✓ package" in out
-    assert "market-sentinel 0.6.5 (protocol 1)" in out
+    assert "market-sentinel 0.7.0 (protocol 1)" in out
     assert "provider fake" in out
     assert "ZCode integration" in out
     assert "DeepSeek Harness integration: not implemented (planned milestone M5)" in out

@@ -1,6 +1,6 @@
 [project]
 name = "market-sentinel"
-version = "0.6.5"
+version = "0.7.0"
 description = "Low-latency market monitoring core for developer hosts"
 readme = "README.md"
 license = "MIT"

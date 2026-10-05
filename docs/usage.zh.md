@@ -1,6 +1,6 @@
 # 使用手册（中文 / Usage Guide）
 
-> 本手册承接早期 README 的操作细节，覆盖 package `0.6.5` + productization M2–M6（capabilities / demo / doctor / MCP）。
+> 本手册承接早期 README 的操作细节，覆盖 package `0.7.0` + productization M2–M10（capabilities / demo / doctor / MCP）。
 > 项目概览、架构与安全边界见根目录 [README](../README.md)；命令均经实际验证。
 
 ## 1. 环境要求与安装

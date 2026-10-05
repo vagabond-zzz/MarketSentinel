@@ -1,22 +1,69 @@
 # Changelog
 
-## Unreleased — productization M2–M6 (no version bump)
+## 0.7.0 — 2026-10-04
+
+**MarketSentinel v0.7.0 — Read-only MCP Capability Layer**
+
+Productization release: the deterministic monitoring core gains a stable, read-only capability layer and a standard MCP stdio server, verified end-to-end against two independent agent hosts.
+
+### Highlights
+
+- Deterministic real-time market monitoring core: provider → normalization → ring buffer → features → events → signals → scheduler
+- Read-only `MarketCapabilities` layer: six queries over frozen Protocol v1 wire DTOs with stable, machine-mappable error codes
+- Standalone MCP stdio server (optional `[mcp]` extra): own engine and tick loop, NoOp telemetry, fail-closed live-provider opt-in
+- Exactly six read-only MCP tools: `get_market_state`, `get_symbol_state`, `get_active_signals`, `get_signal`, `get_feed_health`, `get_recent_events`
+- MCP error/envelope semantics: `{"ok": true, "data"}` / `{"ok": false, "error": {"code", "message"}}`; argument-type violations rejected by the schema layer, capability errors keep stable codes
+- Optional LLM Intelligence sidecar remains outside the high-frequency tick path: bounded, structured-output validated, fail-open to rules-only
+- ZCode 0.16.9 VERIFIED and DeepSeek Harness 0.2.0-rc.2 VERIFIED (end-to-end host verification; see `docs/integrations/`)
+- wheel/sdist packaging with fresh-install validation; the demo fixture ships as package data
+- Clean-room audit completed (M9 PASS WITH FINDINGS); M9 findings F1–F4 closed (M10)
+- GitHub Actions CI verified (tests, lint, packaging, dependency boundaries, hygiene)
+- MIT license
 
 ### Added
-- `market_sentinel.capabilities`: read-only capability facade over a running engine — six queries returning frozen Protocol v1 wire DTOs, with stable `CapabilityErrorCode` error semantics (`not_found` / `invalid_argument` / `not_running` / `unavailable` / `timeout` / `internal`).
-- CLI `demo`: deterministic offline walkthrough of the full pipeline (bundled package fixture, fake intelligence provider, no API keys, no files written).
-- CLI `doctor`: read-only environment diagnostics (Python, uv, package, optional extras, provider/intelligence configuration, telemetry dir), including ZCode MCP registration detection.
-- CLI `mcp`: standard MCP stdio server behind the optional `[mcp]` extra — six read-only tools (`get_market_state`, `get_symbol_state`, `get_active_signals`, `get_signal`, `get_feed_health`, `get_recent_events`) over a standalone runtime with NoOp telemetry; uniform JSON error envelope; fail-closed live-provider opt-in.
-- Integration docs and verified host records: `docs/integrations/mcp.md`, `docs/integrations/zcode.md` (ZCode 0.16.9), `docs/integrations/deepseek-harness.md` (DSH 0.2.0-rc.2), plus `examples/mcp/` client configuration fragments.
-- MIT license (`LICENSE`, packaging metadata, README statement).
+
+- `market_sentinel.capabilities`: read-only capability facade over a running engine (`get_market_state`, `get_symbol_state`, `get_active_signals`, `get_signal`, `get_feed_health`, `get_recent_events`)
+- CLI `demo`: deterministic offline walkthrough of the full pipeline (bundled package fixture, fake intelligence provider, no API keys)
+- CLI `doctor`: read-only environment diagnostics, including ZCode MCP registration detection
+- CLI `mcp`: standard MCP stdio server behind the optional `[mcp]` extra (mcp SDK stays out of the core dependency tree)
+- Integration docs and verified host records: `docs/integrations/mcp.md`, `zcode.md`, `deepseek-harness.md`, plus `examples/mcp/` client configuration fragments
+- Open-source foundation: MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, restructured docs, GitHub Actions CI
 
 ### Fixed
-- MCP tool errors keep their structured `{ok:false, error:{code,message}}` envelope when capability calls fail (regression caught during ZCode host verification).
-- `market-sentinel demo` no longer depends on a repository checkout: the demo fixture ships as package data.
-- `.gitignore` `data/` rule was unanchored and could shadow package data directories; now root-anchored.
 
-### Boundaries
-- Host integrations stay read-only by construction: no write/config/trade/shell tools; credentials never enter configuration files or MCP output; MCP runtime writes no telemetry. Both hosts were verified against the same unmodified MCP surface (see `docs/integrations/mcp.md` for the verification matrices).
+- MCP tool errors keep their structured envelope when capability calls fail (regression caught during ZCode host verification)
+- `market-sentinel demo` no longer depends on a repository checkout (fixture ships as package data)
+- doctor telemetry-directory check walks the entire ancestor chain instead of failing when the direct parent is missing (M9 F1)
+- Installed-package tuning semantics: `tuning compare` without repository fixtures now explains the checkout/`--fixture-dir` requirement instead of a misleading "unknown corpus_id"; doctor no longer points at a nonexistent site-packages fixture path (M9 F2/F4)
+- `.gitignore` `data/` rule root-anchored so package data directories are not shadowed
+
+### Changed
+
+- AGENTS.md governance updated to current boundaries: v0.1-era freeze kept as labeled history; read-only MCP surface, the two host paths, and the still-forbidden overreach are stated explicitly (M9 F3)
+
+### Safety boundary (non-goals)
+
+MarketSentinel is not a trading bot. This release contains:
+
+- no trade execution and no brokerage trading integration
+- no agent write or configuration-mutation tools
+- no shell, filesystem, or arbitrary-code-execution tools
+- no MCP resources or prompts (tools-only by design)
+- no autonomous trading: the Intelligence sidecar is bounded and never becomes the source of truth
+
+### Verification
+
+- Python: 737 passed / 5 deselected (offline by default; coverage gate 85%)
+- TypeScript: lint / typecheck / tests / build green (core-process integration tests skip where uv is absent)
+- GitHub Actions: 4/4 jobs green on the release lineage (runs 37249350623, 37254406735)
+- Host verification: ZCode 0.16.9 VERIFIED, DeepSeek Harness 0.2.0-rc.2 VERIFIED (version-specific, not future-version promises)
+- M9 clean-room audit: PASS WITH FINDINGS → M10: PASS — all M9 findings closed → M10 CI: PASS
+
+### Distribution
+
+- GitHub Release: v0.7.0 (this release)
+- PyPI: not published
+- Cursor / VS Code: local developer VSIX only, not published to any marketplace
 
 ## 0.6.5 — 2026-08-30 (tagged)
 

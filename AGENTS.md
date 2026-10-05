@@ -57,7 +57,7 @@ ZCode
 
 ## 3. 当前版本边界
 
-当前处于 v0.6.5 之后的 productization 轨道（M0–M10 已完成：文档治理、capabilities 只读层、CLI demo/doctor、MCP stdio server、ZCode 与 DeepSeek Harness 宿主验证、开源基础文件、CI、clean-room audit 与 finding closure）。
+当前发布版本为 v0.7.0（productization M0–M10 已完成（M0–M10 已完成：文档治理、capabilities 只读层、CLI demo/doctor、MCP stdio server、ZCode 与 DeepSeek Harness 宿主验证、开源基础文件、CI、clean-room audit 与 finding closure）。
 
 新能力开发仍以 owner 明确指定的 milestone 为准：
 

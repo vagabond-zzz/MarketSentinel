@@ -1,6 +1,8 @@
 # Release Readiness（M6）
 
 > 日期：2026-10-05 · 基线：`master @ b5d67a9` + M6 提交
+> 2026-10-05 更新：owner 已决策发布 **v0.7.0**；本文的版本数字为 M6 时点的历史记录，当前发布状态以 `CHANGELOG.md` 与 GitHub Release 为准。
+>
 > 性质：发布就绪审计，非营销材料。状态取值：`READY / PASS / UNKNOWN / BLOCKED / DEFERRED`。
 > 不创建 GitHub Release / tag；下一步 narrative（M7）、CI（M8）、外部 clean-room 审计（M9）另行执行。
 
