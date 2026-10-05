@@ -158,7 +158,7 @@ All numbers are a point-in-time snapshot (M6, 2026-10-05), not a permanent guara
 
 - Python suite: **726 passed, 5 deselected** — offline by default, live vendor tests opt-in; coverage gate 85%
 - Extension: **21 test files / 200 tests** (vitest, including real core-process integration tests) plus typecheck, lint, and build
-- Packaging: wheel and sdist verified; fresh-venv install verified; `[mcp]` and `[live]` optional-dependency boundaries verified — [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md)
+- Packaging: wheel and sdist verified; fresh-venv install verified; `[mcp]` and `[live]` optional-dependency boundaries verified — see `CHANGELOG.md` and the CI workflow
 - MCP stdio: protocol-level integration test (initialize → tools/list → tool calls → clean shutdown, stdout purity enforced)
 - Host verification: ZCode 0.16.9 and DeepSeek Harness 0.2.0-rc.2, end-to-end (see the host table above)
 

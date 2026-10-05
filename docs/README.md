@@ -1,6 +1,6 @@
 # Documentation
 
-Market Sentinel 的文档按用途分为三类。新读者建议从根目录 [README](../README.md)（英文产品概览）开始；操作细节见 [usage.zh.md](usage.zh.md)（中文使用手册）。
+Market Sentinel 的当前文档按用途分为三类。新读者建议从根目录 [README](../README.md)（英文产品概览）开始；操作细节见 [usage.zh.md](usage.zh.md)（中文使用手册）。
 
 ## architecture/ — 当前架构契约与规格
 
@@ -44,11 +44,8 @@ Market Sentinel 的文档按用途分为三类。新读者建议从根目录 [RE
 | 19_v0.6.5_Release_Candidate.md | v0.6.5 | v0.6.5 发布记录：测试、VSIX、privacy / mutation audit、已知边界 |
 | CURSOR_开发总指令.md | v0.1 前 | 最早的 agent bootstrap 指令（已被根目录 AGENTS.md 取代） |
 
-## 根目录下的过程文档
+## 根目录
 
-| 文件 | 内容 |
-|---|---|
-| [PRODUCTIZATION_AUDIT.md](PRODUCTIZATION_AUDIT.md) | M0 产品化审计：现状盘点、集成方案调研（ZCode / DeepSeek Harness / MCP）、风险与里程碑计划 |
-| [usage.zh.md](usage.zh.md) | 中文使用手册：安装、Provider、Cursor 使用、CLI 参考、配置总表、数据语义、隐私边界、测试流程、工程 backlog |
-| [REPOSITORY_CLEANUP.md](REPOSITORY_CLEANUP.md) | M1 清理记录：每个 MOVE / KEEP / ADD / IGNORE 决策及理由、引用修复清单、验证结果 |
-| [RELEASE_READINESS.md](RELEASE_READINESS.md) | M6 发布就绪报告：打包/安装/依赖边界/卫生/许可 状态矩阵与 Blockers/Unknowns/Deferred |
+[usage.zh.md](usage.zh.md) — 中文使用手册：安装、Provider、Cursor 使用、CLI 参考、配置总表、数据语义、隐私边界、测试流程。
+
+历史 roadmap、Release Candidate 记录与过程审计文档已随 v0.7.0 清理移出仓库（完整副本保留在仓库外的本地归档中）；完整演变脉络见 [CHANGELOG](../CHANGELOG.md) 与 Git 历史。

@@ -745,4 +745,4 @@ TUNING_ARTIFACT_SCHEMA_VERSION = 2
 TUNING_COMPARISON_SCHEMA_VERSION = 2
 ```
 
-See `docs/history/17_v0.6_Release_Candidate.md` for the release-prep stop report.
+See `CHANGELOG.md` for the v0.6 release record.

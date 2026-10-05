@@ -189,10 +189,10 @@ uv run pytest                 # 默认排除 live；726 passed 基线（M6 快�
 uv run ruff check .
 uv run ruff format --check .
 pnpm test && pnpm typecheck && pnpm lint && pnpm build
-uv build                      # wheel + sdist；干净安装验证见 docs/RELEASE_READINESS.md
+uv build                      # wheel + sdist；发布验证记录见 CHANGELOG
 ```
 
-Coverage gate 85%（当前 91%）；perf regression 测试需在无 coverage 下单独运行（见 CONTRIBUTING）。live 测试分两类：Longbridge smoke（无凭据自动 skip）、Tencent gate（fail-closed，真联网）。精确历史数字以 [history/19_v0.6.5_Release_Candidate.md](history/19_v0.6.5_Release_Candidate.md) 为准。
+Coverage gate 85%（当前 91%）；perf regression 测试需在无 coverage 下单独运行（见 CONTRIBUTING）。live 测试分两类：Longbridge smoke（无凭据自动 skip）、Tencent gate（fail-closed，真联网）。
 
 ## 15. 工程 backlog（未排期，非承诺）
 
